@@ -25,6 +25,7 @@ public class runSteps {
         int numLambdas = 40;
         double lambdaLow = 0.1;
         double lambdaHigh = 0.9;
+        boolean LOO = true;
 
         ArrayList<String> varsToRemove = new ArrayList<String>();
         while (index < args.length) {
@@ -83,6 +84,11 @@ public class runSteps {
                 lambdaHigh = Double.parseDouble(args[index+1]);
                 index+=2;
             }
+            else if(args[index].equals("-LOO"))
+            {
+                LOO = Boolean.parseBoolean(args[index+1]);
+                index+=2;
+            }
         }
         DelimiterType d2 = DelimiterType.TAB;
         DataSet d = MixedUtils.loadDataSet2(directory + "/" + file,d2);
@@ -101,7 +107,7 @@ public class runSteps {
         // d.removeColumn(d.getVariable("Age"));
         //  DataSet d3 = MixedUtils.completeCases(d);
 
-        STEPS s = new STEPS(d,lambda,g,d.getNumRows(),true);
+        STEPS s = new STEPS(d,lambda,g,d.getNumRows(),LOO);
         Graph g2 = s.runStepsPar();
         double [][] stab = s.stabilities;
         PrintStream out = new PrintStream(directory + "/" + graphFile);
