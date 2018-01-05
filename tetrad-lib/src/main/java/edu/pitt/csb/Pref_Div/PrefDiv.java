@@ -1,0 +1,408 @@
+package edu.pitt.csb.Pref_Div;
+
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.math.RoundingMode;
+import java.text.DecimalFormat;
+import java.util.*;
+
+
+public class PrefDiv {
+	
+    public int topK;
+    public double accuracy;
+    public double radius;
+    public ArrayList<Gene> items;
+    public ArrayList<Gene> result;
+    public ArrayList<Gene> G = new ArrayList<Gene>();
+    public ArrayList<Gene> B = new ArrayList<Gene>();
+    public HashMap<Gene,List<Gene>> clusters;
+    public double topKIntensity;
+   private double []diverse;
+   private boolean clustering = false;
+    
+    public PrefDiv(ArrayList<Gene> items, int topK, double accuracy, double radius, double topKIntensity) throws IOException {
+    	this.topK = topK;
+    	this.accuracy = accuracy;
+    	this.radius = radius;
+    	this.items = items;
+    	this.result = new ArrayList<Gene>();
+    	this.topKIntensity = topKIntensity;
+    }
+    
+	public PrefDiv(double[]d, ArrayList<Gene> items, int topK, double accuracy, double radius, double topKIntensity) throws IOException {
+    	this.diverse = d;
+		this.topK = topK;
+    	this.accuracy = accuracy;
+    	this.radius = radius;
+    	this.items = items;
+    	this.result = new ArrayList<Gene>();
+    	this.topKIntensity = topKIntensity;
+    }
+    //============================================================
+    //====================== Algorithm ===========================
+    //============================================================
+    
+
+    public void setCluster(boolean clust)
+    {
+        clustering = clust;
+        clusters = new HashMap<Gene,List<Gene>>();
+    }
+	public static double findTopKIntensity(ArrayList<Gene> record, int topK){
+		double result = 0;
+		for(int i = 0; i < topK; i++)
+			result+=record.get(i).intensityValue;
+		return result;
+	}
+    
+    
+    public ArrayList<Gene> diverset() {
+    	
+        System.out.println("original item size = " + this.items.size());
+    	
+    	if(this.items.size() == topK){   		
+            this.result = items;
+            return result;
+    	}
+
+        ArrayList<Gene> result = new ArrayList<Gene>();
+        // edge handling
+        if (this.topK > this.items.size()) {
+            this.result = this.items;
+            return this.result;
+        } else if (topK == 0){
+            System.out.println("Error: topK can not be 0");
+            this.result = result;
+            return this.result;
+        } else if (accuracy > 1) {
+            System.out.println("Error: Accuracy should not be bigger than 1");
+            this.result = result;
+            return this.result;
+        }
+        
+        double acc = this.accuracy;
+        
+        int setNum = Integer.valueOf(this.items.size()/this.topK);
+        if (this.items.size() % this.topK != 0){
+            setNum++;
+        }
+        ArrayList<Gene> temp = new ArrayList<Gene>();
+        //Outside while loop? For loop here
+        for (int i = 0; i < setNum; i++){
+
+            ArrayList<Gene> S = new ArrayList<Gene>();
+            //Add the k objects with the highest intensity from P to S
+            for (int j = i*this.topK; j < Math.min((i+1)*this.topK, this.items.size()); j++) {
+                S.add(this.items.get(j));
+            }
+
+            //Find all genes in S that aren't within radius distance of result TODO Add clustering
+            temp = pairEliminator(result, S, this.radius);
+            
+            //Eliminate variables within temp that are within radius distance of another variable from temp (choose higher intensity)TODO Add clustering
+            temp = eliminate(temp, radius);
+
+            result.addAll(temp);
+
+            // Use B according to accuracy
+            if (i != 0)
+                acc = acc/2;
+
+        	//Sort all marked genes
+        	Collections.sort(B, new Comparator<Gene>() {    
+                @Override
+                public int compare(Gene o1, Gene o2) {
+                    return new Double(o2.intensityValue).compareTo(o1.intensityValue);
+                }               
+        	});
+        	
+            //Add enough marked genes to get to A*k for this iteration
+            //TODO Right now we keep this as is, so it could be the case that a gene in a cluster is also a representative gene in the Top K
+            int remain = (int)(acc*this.topK) - temp.size();
+            if (remain > 0 && B.size() > 0) {	
+                for (int j = 0; j < Math.min(remain,B.size()); j++){
+                    result.add(B.get(0));
+                    B.remove(0);
+                }
+            }else {
+                if(B.size() > 0) {
+                    result.add(B.get(0));
+                }
+            }
+            
+            if (i == 0) {
+                G.addAll(B);
+            }
+            B.clear();
+            // result bigger then required topK
+            int oversize = result.size() - this.topK;
+            if (oversize == 0) {
+                break;
+            } else if (oversize > 0){
+                for (int j = result.size() - 1; j >= this.topK; j--) {
+                    result.remove(j);
+                }
+                result.trimToSize();
+                break;
+            }
+        }
+
+        int addUp = this.topK - result.size();
+        if (addUp > 0) {
+        	System.out.println("addUp size = " + addUp);
+            for (int i = 0; i < addUp; i++) {
+                result.add(G.get(i));
+            }
+        }
+        B.clear();
+        G.clear();
+        this.result.addAll(result);
+
+        return result;
+   
+    }
+
+    //Identify lower intensity genes to removed from input, since another similar gene is already in input
+    public ArrayList<Gene> eliminate(ArrayList<Gene> input, double radius){
+        ArrayList<Gene> output = new ArrayList<Gene>(input);
+        ArrayList<Gene> finalOutput = new ArrayList<Gene>();
+        if(input.size() != 0){
+            ArrayList<Gene> temp = new ArrayList<Gene>();
+            Gene coreElement;
+            int i = 0;
+            while (i < output.size()) {
+                coreElement = output.get(i);
+                finalOutput.add(coreElement);
+                if (output.size() != 1) {
+                    for (int j = i+1; j < output.size(); j++) {
+                        if (distance(output.get(j),coreElement) > radius) {
+                            temp.add(output.get(j));
+                        } else {
+                            if(clusters.get(coreElement)==null)
+                            {
+                                List<Gene> clust = new ArrayList<Gene>();
+                                clust.add(output.get(j));
+                                clusters.put(coreElement,clust);
+                            }
+                            else
+                            {
+                                List<Gene> clust = clusters.get(coreElement);
+                                clust.add(output.get(j));
+                                clusters.put(coreElement,clust);
+                            }
+                            B.add(output.get(j));
+                        }
+                    }
+                    output.clear();
+                    output.addAll(finalOutput);
+                    output.addAll(temp);
+                    temp.clear();
+                }
+                i++;
+            }
+        }
+        return finalOutput;
+    }
+
+    //R, S, radius
+    //Returns all genes from input (S) that are further than radius distance from the genes in finalResult (R)
+
+    public ArrayList<Gene> pairEliminator(ArrayList<Gene> finalResult, ArrayList<Gene> input, double radius){
+        ArrayList<Gene> output = new ArrayList<Gene>(input);
+        //System.out.println("pairEliminator size:" + input.size());
+        if (finalResult.size() != 0) {
+            ArrayList<Gene> temp = new ArrayList<Gene>();
+            for (int i = 0; i < finalResult.size(); i++) {
+                Gene toBeCompare = finalResult.get(i);
+                if (output.size() == 0) {
+                    break;
+                } else {
+                    for (int j = 0; j < output.size(); j++) {
+                        if (distance(output.get(j),toBeCompare) > radius) {
+                            temp.add(output.get(j));
+                        } else {
+                            B.add(output.get(j));
+                            if(clusters.get(toBeCompare)==null)
+                            {
+                                List<Gene> clust = new ArrayList<Gene>();
+                                clust.add(output.get(j));
+                                clusters.put(toBeCompare,clust);
+                            }
+                            else
+                            {
+                                List<Gene> clust = clusters.get(toBeCompare);
+                                clust.add(output.get(j));
+                                clusters.put(toBeCompare,clust);
+                            }
+                        }
+
+                    }
+                    output.clear();
+                    output.addAll(temp);
+                    temp.clear();
+                }
+            }
+        }
+        return output;
+    }
+    
+    public static boolean isNumeric(String s) {  
+        return s.matches("[-+]?\\d*\\.?\\d+");  
+    }  
+    
+    public static String[] emptyReomver(String[] firstArray){
+        List<String> list = new ArrayList<String>();
+        for(String s : firstArray) {
+           if(s != null && s.length() > 0 && !isNumeric(s)) {
+              list.add(new String(s));
+           }
+        }
+        return list.toArray(new String[list.size()]);
+    }
+    
+
+    public static boolean compareFloatArr(float[] fArr1,float[] fArr2){
+    	if(fArr1.length != fArr2.length)
+    		return false;
+    	for(int i = 0; i < fArr1.length; i++){
+    		if(fArr1[i] != fArr2[i])
+    			return false;
+    	}
+    	return true;
+    }
+    
+    public double distance(Gene gene1, Gene gene2) {
+		double diverse_a = 0.25;
+		double diverse_b = 0.25;
+		double diverse_c = 0.25;
+		if(diverse!=null)
+		{
+			diverse_a = diverse[0];
+			diverse_b = diverse[1];
+			diverse_c = diverse[2];
+		}
+    	
+		return Functions.computeDistance(gene1,gene2,diverse_a,diverse_b,diverse_c);
+    }
+
+
+ 
+    
+    //======================================================================
+    //======================== Statistic methods ===========================
+    //======================================================================
+    
+    public int getSize() {
+        return this.result.size();
+    }
+  
+    public void printResultGeneIds(){
+    	for(int i = 0; i < this.result.size(); i++)
+    		System.out.println("Gene " + i + " id = " + this.result.get(i).ID);
+    }
+    public ArrayList<Gene> getResultGenes(){
+    	return this.result;
+    }
+    
+    
+    public static void writeResulttoFile (String file, String result) {  	 
+        BufferedWriter bw = null;
+        try {
+           bw = new BufferedWriter(new FileWriter(file, true));
+	       bw.write(result);
+	       bw.newLine();
+	       bw.flush();
+        } catch (IOException ioe) {
+	       ioe.printStackTrace();
+        } finally {                    
+	       if (bw != null) try {
+	          bw.close();
+	       } catch (IOException ioe2) {
+	          
+	       }
+        } 
+   
+     } 
+    
+
+    public double sumDistance() {
+        double sum = 0;
+        for (int i = 0; i < this.result.size() - 1; i++) {
+            for (int j = i + 1; j < this.result.size(); j++) {
+                sum += distance(this.result.get(i),this.result.get(j));
+            }
+        }
+        return sum;
+    }
+    
+    public double averageDistance() {
+        double distSum = 0;
+        double counter = 0;
+        
+        for (int i = 0; i < this.result.size() - 1; i++) {
+            for (int j = i + 1; j < this.result.size(); j++ ) {
+            	double tempDist = distance(this.result.get(i),this.result.get(j));
+            	if(tempDist > 1.0) System.out.println("dist = " + tempDist);
+                distSum += distance(this.result.get(i),this.result.get(j));
+                counter++;
+            }
+        }
+        return distSum/counter;
+    }
+    
+    
+    public double maxDistance() {
+    	double max = Double.MIN_VALUE;
+        double distSum = 0;
+        int counter = 0;
+        for (int i = 0; i < this.result.size() - 1; i++) {
+            for (int j = i + 1; j < this.result.size(); j++ ) {
+            	double dist = distance(this.result.get(i),this.result.get(j));
+                if(dist > max)
+                	max = dist;
+            }
+        }
+        return max;
+    }    
+
+    public double sumIntensity(){
+        double averageSum = 0;
+        for (int i = 0; i < this.result.size(); i++) {
+            averageSum += this.result.get(i).intensityValue;
+        }
+        return averageSum;
+    }
+    
+    public double averageIntensity() {
+    	double averageSum = 0;
+        for (int i = 0; i < this.result.size(); i++) {
+            averageSum = averageSum + this.result.get(i).intensityValue;
+        }
+        return averageSum/this.result.size();
+    }
+ 
+    public double normalizedIntensity() {
+    	double averageSum = 0;
+        for (int i = 0; i < this.result.size(); i++) {
+            averageSum = averageSum + this.result.get(i).intensityValue;
+        }
+        return averageSum/this.topKIntensity;
+    }
+
+
+    public double coverage() {
+    	double count = 0.0; 
+    	for(int i = 0; i < items.size(); i++){
+            for (int j = 0; j< result.size(); j++) {
+                if (distance(result.get(j),items.get(i)) <= radius) {
+                    count++;
+                    break;
+                }
+            }
+        }
+        return count/(double)items.size();
+    }
+    //---------------------------------------------
+}

@@ -1,0 +1,13 @@
+/src/main/java/edu/cmu/tetrad/search/BuildPureClusters.java
+# Created by .ignore support plugin (hsz.mobi)
+
+# IntelliJ IDEA files.
+.idea/**
+tetrad-gui/tetrad-gui.iml
+tetrad-lib/tetrad-lib.iml
+tetrad-cli/tetrad-cli.iml
+causal-cmd/causal-cmd.iml
+tetrad.iml
+*.iml
+analysis/AnalysisScriptAlpha.java
+analysis/TestFunctions.java
