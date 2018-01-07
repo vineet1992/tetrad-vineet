@@ -53,6 +53,22 @@ public class MixedUtils {
         reader.setDelimiter(d);
         return reader.parseTabular(file);
     }
+    public static DataSet loadDataSet2(String filename,DelimiterType d, int maxCat) throws IOException {
+        File file = new File(filename);
+        DataReader reader = new DataReader();
+        reader.setVariablesSupplied(true);
+        reader.setMaxIntegralDiscrete(maxCat);
+        reader.setDelimiter(d);
+        return reader.parseTabular(file);
+    }
+    public static DataSet loadDataSet2(String filename,int maxDiscrete) throws IOException {
+        File file = new File(filename);
+        DataReader reader = new DataReader();
+        reader.setVariablesSupplied(true);
+        reader.setMaxIntegralDiscrete(maxDiscrete);
+        return reader.parseTabular(file);
+    }
+
     public static DataSet loadDataSet2(String filename) throws IOException {
         File file = new File(filename);
         DataReader reader = new DataReader();
