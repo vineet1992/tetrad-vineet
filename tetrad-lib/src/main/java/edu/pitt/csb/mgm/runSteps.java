@@ -26,7 +26,7 @@ public class runSteps {
         double lambdaLow = 0.1;
         double lambdaHigh = 0.9;
         boolean LOO = true;
-
+        int maxCategoriesForDiscrete = 4;
         ArrayList<String> varsToRemove = new ArrayList<String>();
         while (index < args.length) {
             if (args[index].equals("-d"))
@@ -89,9 +89,14 @@ public class runSteps {
                 LOO = Boolean.parseBoolean(args[index+1]);
                 index+=2;
             }
+            else if(args[index].equals("-mc"))
+            {
+                maxCategoriesForDiscrete = Integer.parseInt(args[index+1]);
+                index+=2;
+            }
         }
         DelimiterType d2 = DelimiterType.TAB;
-        DataSet d = MixedUtils.loadDataSet2(directory + "/" + file,d2);
+        DataSet d = MixedUtils.loadDataSet2(directory + "/" + file,d2,maxCategoriesForDiscrete);
         System.out.println(d);
         double [] lambda = new double[numLambdas];
         for(int i = 0; i < numLambdas;i++)
