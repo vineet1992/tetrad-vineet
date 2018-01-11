@@ -73,6 +73,7 @@ public class mgmPriors {
             }
         }
         this.lambdas = constructLambdasPar(initLambdas, data);
+
         this.data = data;
         this.priors = priors;
         this.sourcePrior = new boolean[data.getNumColumns()][data.getNumColumns()][priors.length];
@@ -202,22 +203,7 @@ public class mgmPriors {
         }
         double[][] NPIndex = new double[3][2]; //CC, CD, DD rows and Index, Max Value columns
         double[][] WPIndex = new double[3][2];
-/*
-        //   System.out.println("No Prior Scores: ");
-        for (int i = 0; i < scoresNP.length; i++) {
-            for (int j = 0; j < scoresNP[0].length; j++) {
-                //        System.out.print(scoresNP[i][j] + "\t");
-            }
-            //     System.out.println();
-        }
-        // System.out.println("With Prior Scores");
-        for (int i = 0; i < scoresWP.length; i++) {
-            for (int j = 0; j < scoresWP[0].length; j++) {
-                //       System.out.print(scoresWP[i][j] + "\t");
-            }
-            //    System.out.println();
-        }
-        */
+
         for (int i = 0; i < lambdas[0].length; i++) {
             for (int j = 0; j < 3; j++) {
                 if (scoresNP[j][i] > NPIndex[j][1]) {
@@ -249,7 +235,8 @@ public class mgmPriors {
 
             }
         }
-        edgeScores = constructEdgeScores(theta,g,NPIndex,WPIndex);
+
+        edgeScores = constructEdgeScores(npLambdas,wpLambdas,havePriors);
         MGM_Priors m = new MGM_Priors(data, npLambdas, wpLambdas, havePriors);
         m.learnEdges(1000);
         return m.graphFromMGM();
@@ -267,40 +254,80 @@ public class mgmPriors {
         return alpha;
     }
 
-    private double [][] constructEdgeScores(TetradMatrix [] theta, TetradMatrix [] g, double [][] NPIndex, double [][]WPIndex)
+
+
+    private double [][] constructEdgeScores(final double [] npLambdas, final double [] wpLambdas,final boolean [][] havePriors)
     {
-        double[][] scores = new double[data.getNumColumns()][data.getNumColumns()];
+        final double [][] edgeCounts = new double[data.getNumColumns()][data.getNumColumns()];
+        final ForkJoinPool pool = ForkJoinPoolInstance.getInstance().getPool();
 
-        for(int i = 0; i < data.getNumColumns();i++)
-        {
-            for(int j = i + 1; j < data.getNumColumns();j++)
-            {
-                int type = -1;
-                if(data.getVariable(i)instanceof ContinuousVariable && data.getVariable(j) instanceof ContinuousVariable)
-                    type = 0;
-                else if(data.getVariable(i)instanceof DiscreteVariable && data.getVariable(j) instanceof DiscreteVariable)
-                    type = 2;
-                else
-                    type = 1;
-                TetradMatrix currTheta = null;
-                TetradMatrix currG = null;
-                if(havePriors[i][j]) {
-                    currTheta = theta[(int)WPIndex[type][0]];
-                    currG = g[(int)WPIndex[type][0]];
-                }
-                else {
-                    currTheta = theta[(int)NPIndex[type][0]];
-                    currG = g[(int)NPIndex[type][0]];
-                }
-                scores[i][j] = currTheta.get(i,j)*(1-currG.get(i,j));
-                scores[j][i] = scores[i][j];
+        class StabilityAction extends RecursiveAction {
+            private int chunk;
+            private int from;
+            private int to;
 
+            public StabilityAction(int chunk, int from, int to){
+                this.chunk = chunk;
+                this.from = from;
+                this.to = to;
             }
+
+
+            private synchronized void updateEdgeCounts(double [][] t, Graph g)
+            {
+                for(int i = 0; i < data.getNumColumns();i++)
+                {
+                    for(int j = i+1; j < data.getNumColumns();j++)
+                    {
+                        if(g.getEdge(g.getNode(data.getVariable(i).getName()),g.getNode(data.getVariable(j).getName()))!=null)
+                        {
+                            t[i][j]++;
+                            t[j][i]++;
+                        }
+
+                    }
+                }
+            }
+
+            @Override
+            protected void compute(){
+                if (to - from <= chunk) {
+                    for (int s = from; s < to; s++) {
+                        //temp is an int array with the samples for the current subsampling
+                        DataSet current = subsamples[s];
+                        MGM_Priors m = new MGM_Priors(current,npLambdas,wpLambdas,havePriors);
+                        m.learnEdges(iterLimit);
+                        Graph g = m.graphFromMGM();
+
+
+                        updateEdgeCounts(edgeCounts,g);
+
+                    }
+
+                    return;
+                } else {
+                    List<StabilityAction> tasks = new ArrayList<>();
+
+                    final int mid = (to + from) / 2;
+
+                    tasks.add(new StabilityAction(chunk, from, mid));
+                    tasks.add(new StabilityAction(chunk, mid, to));
+
+                    invokeAll(tasks);
+
+                    return;
+                }
+            }
+
         }
-        //Loop through each edge first, and then choose the correct theta and g matrix for the edge, based off
-        //1) whether it has prior information
-        //2) Edge type: cc, cd, dd
-        return scores;
+
+        final int chunk = 2;
+
+        pool.invoke(new StabilityAction(chunk, 0, numSubsamples));
+
+        if(logging)
+            log.flush();
+        return edgeCounts;
     }
     private double[] getWeights(double[] alpha) {
         double alpSum = StatUtils.sum(alpha);

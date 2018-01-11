@@ -20,7 +20,9 @@ public class addClinicalData
             b2.close();
         }
         PrintStream out = new PrintStream("genes_with_clinical.txt");
+        PrintStream out2 = new PrintStream("genes_with_clinical_normals.txt");
         out.println("/variables");
+        out2.println("/variables");
         BufferedReader b = new BufferedReader(new FileReader("expression_subset.txt"));
         String [] samples = b.readLine().split("\t");
         int geneCount = 0;
@@ -54,6 +56,7 @@ public class addClinicalData
                 }
                 idk.add(gene);
                 out.println(gene + ":Continuous");
+                out2.println(gene + ":Continuous");
                 count++;
             }
 
@@ -69,11 +72,24 @@ public class addClinicalData
         out.println("Subtype:0 1 2 3");
         //4 = not reported
         out.println("/data");
+
+        out2.println("Tumor_Stage:Continuous");//need to determine this mapping from the spreadsheet i*, ii*, iii*, iv
+        out2.println("Vital_Status:0 1");// 0 = dead
+        //out.println("Gender:0 1"); //0 = female
+        out2.println("Age:Continuous");
+        //out.println("Tumor:0 1");
+        //out.println("Race:0 1 2 3");//Need to determine this mapping as well 0 = white, 1 = black, 2 = asian, 3 = american indian
+        out2.println("Subtype:0 1 2 3");
+        //4 = not reported
+        out2.println("/data");
+
         for(int i = 0; i < idk.size();i++)
         {
             out.print(idk.get(i) + "\t");
+            out2.print(idk.get(i) + "\t");
         }
         out.println("Tumor_Stage\tVital_Status\tAge\tSubtype");
+        out2.println("Tumor_Stage\tVital_Status\tAge\tSubtype");
        // out.println("Tumor_Stage\tVital_Status\tGender\tAge\tTumor\tRace\tSubtype");
         BufferedReader b2 = new BufferedReader(new FileReader("BRCA.merged_only_clinical_clin_format.txt"));
         //getarrays of each barcode?
@@ -234,18 +250,29 @@ public class addClinicalData
                 HashMap<String,String> t = temp.get(x);
                 if(t.get("Gender")==null || t.get("Race")==null || t.get("Vital")==null || t.get("Age")==null || t.get("Stage")==null || t.get("Subtype")==null)
                     continue;
-                for(int j = 0;j < idk.size();j++)
-                {
-                    out.print(data[j][i]+"\t");
-                }
                 int tumor = Integer.parseInt(samples[i].substring(13,14));
                 //1 is normal, 0 is tumor
                 if(tumor==1)
-                    continue;
-                //out.println(t.get("Stage")+"\t"+t.get("Vital")+"\t"+t.get("Gender")+"\t"+t.get("Age")+"\t"+tumor+ "\t" + t.get("Race") + "\t" + t.get("Subtype"));
-            out.println(t.get("Stage")+"\t"+t.get("Vital")+"\t"+t.get("Age") + "\t" + t.get("Subtype"));
+                {
+                    for(int j = 0; j < idk.size();j++)
+                    {
+                        out2.print(data[j][i] + "\t");
+                    }
+                    out2.println(t.get("Stage") + "\t" + t.get("Vital") + "\t" + t.get("Age") + "\t" + t.get("Subtype"));
+                }
+                else {
+                    for (int j = 0; j < idk.size(); j++) {
+                        out.print(data[j][i] + "\t");
+
+                    }
+
+                    //out.println(t.get("Stage")+"\t"+t.get("Vital")+"\t"+t.get("Gender")+"\t"+t.get("Age")+"\t"+tumor+ "\t" + t.get("Race") + "\t" + t.get("Subtype"));
+                    out.println(t.get("Stage") + "\t" + t.get("Vital") + "\t" + t.get("Age") + "\t" + t.get("Subtype"));
+                }
         }
         }
+        out2.flush();
+        out2.close();
         out.flush();
         b.close();
         b2.close();
