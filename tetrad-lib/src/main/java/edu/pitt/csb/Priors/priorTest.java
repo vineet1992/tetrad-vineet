@@ -25,25 +25,27 @@ public class priorTest {
     {
         boolean numEdgesRandom = true;
         double amountPrior = .1;
-        boolean reliable = true;
+        boolean reliable = false;
+        boolean diffNumPrior = true;
+        boolean pureRandom = true; //Only for different number of edges given by each prior, this sets the priors to be purely random with reliability computed after the fact
         int reliableExperts = 3;
-        int numExperts = 5;
+        int numExperts = 15;
         int numLambdas = 40;
-        int numVariables = 300;
+        int numVariables = 100;
         int numEdges = 75;
-        int sampleSize = 1000;
+        int sampleSize = 500;
         int numSubsamples = 10;
-        int numRuns = 20;
+        int numRuns = 10;
         int index = 0;
         int numCategories = 4;
         double gamma = 0.05;
         boolean saveData = true;
         boolean reuseData = true;
-        boolean rerunAlgorithms = false;
+        boolean rerunAlgorithms = true;
         String directory = ".";
-        String [] algs = {"mgm_one_steps","oracle_one","STEPS","oracle","mgm_priors","mgm_priors_split"};
+   //     String [] algs = {"mgm_one_steps","oracle_one","STEPS","oracle","mgm_priors","mgm_priors_split"};
    //     String [] algs = {"mgm_one_steps","STEPS"};
-     //    String[] algs = {"mgm_priors","mgm_priors_split"};
+         String[] algs = {"mgm_priors"};
         while(index < args.length)
         {
 
@@ -241,15 +243,29 @@ public class priorTest {
 
                 }
             }
+            int [] edges = new int[numExperts];
+            double [] reli = new double[numExperts];
            // System.out.println(c.getDataSet(0));
             c.setTrueGraph(moralize(c.getTrueGraph()));
            //  priors = simulatePrior(c.getTrueGraph(), amountPrior, numExperts,priors,c.getDataSet(0));
             if(reliable)
                 priors = simulatePriorDim(c.getTrueGraph(), amountPrior, numExperts,priors,c.getDataSet(0));
+            else if(!reliable && diffNumPrior) {
+
+                priors = simulatePriorUnreli(c.getTrueGraph(), numExperts, c.getDataSet(0),edges,reli,pureRandom);
+            }
+          //  else if(reliable&&diffNumPrior)
+            //    priors = simulatePriorDim(c.getTrueGraph(),numExperts,priors,c.getDataSet(0)); TODO
             else
                 priors = simulatePriorUnreli(c.getTrueGraph(),amountPrior,numExperts,c.getDataSet(0),reliableExperts);
             boolean done = false;
-            checkPriors(c.getTrueGraph(),c.getDataSet(0),priors,i);
+            if (!diffNumPrior)
+                 checkPriors(c.getTrueGraph(),c.getDataSet(0),priors,i,true);
+            else
+                checkPriors(c.getTrueGraph(),c.getDataSet(0),priors,i,false);
+
+            System.out.println(Arrays.toString(reli));
+            System.out.println(Arrays.toString(edges));
             while(!done)
             {
                 System.out.println(i);
@@ -340,6 +356,14 @@ public class priorTest {
                             if(!reliable) {
                                 PrintStream p3 = new PrintStream("Weights/Weight_" + algs[j] + "_" + i + "_" + numVariables + "_" + sampleSize + "_" + amountPrior + "_" + reliableExperts + "_" + numExperts + ".txt");
                                 p3.println(Arrays.toString(m.expertWeights));
+                                if(diffNumPrior)
+                                {
+                                    p3.println(Arrays.toString(reli));
+                                    p3.println(Arrays.toString(edges));
+                                    p3.println(Arrays.toString(m.normalizedTao));
+                                    p3.println(Arrays.toString(m.pValues));
+                                    p3.println(Arrays.toString(m.normalizedExpertWeights));
+                                }
                                 p3.flush();
                                 p3.close();
                             }
@@ -352,6 +376,14 @@ public class priorTest {
                             if(!reliable) {
                                 PrintStream p3 = new PrintStream("Weights/Weight_" + algs[j] + "_" + i + "_" + numVariables + "_" + sampleSize + "_" + amountPrior + "_" + reliableExperts + "_" + numExperts + ".txt");
                                 p3.println(Arrays.toString(mtemp.expertWeights));
+                                if(diffNumPrior)
+                                {
+                                    p3.println(Arrays.toString(reli));
+                                    p3.println(Arrays.toString(edges));
+                                    p3.println(Arrays.toString(m.normalizedTao));
+                                    p3.println(Arrays.toString(m.pValues));
+                                    p3.println(Arrays.toString(m.normalizedExpertWeights));
+                                }
                                 p3.flush();
                                 p3.close();
                             }
@@ -506,6 +538,95 @@ public class priorTest {
         return temp;
     }
 
+
+
+    //Generates unreliable priors, with differing amount of prior information from each expert HARD PRIOR (0-1) only
+    public static TetradMatrix [] simulatePriorUnreli(Graph g, int numExperts, DataSet d, int [] edges, double [] reliability,boolean pureRandom)
+    {
+        TetradMatrix [] temp = new TetradMatrix [numExperts];
+        for(int i = 0; i < numExperts;i++)
+        {
+            TetradMatrix curr = new TetradMatrix(g.getNumNodes(),g.getNumNodes());
+            temp[i] = curr;
+        }
+        Random rand = new Random();
+        int totalPossible = g.getNumNodes()*(g.getNumNodes()-1)/2;
+        //Priors are purely random, with no relation to the underlying ground truth graph
+        if(pureRandom)
+        {
+            for(int i = 0; i < numExperts;i++)
+            {
+                edges[i] = rand.nextInt((g.getNumNodes()*(g.getNumNodes()-1))/2);
+                int numEdges = edges[i];
+                int trueEdges = 0;
+                while (numEdges > 0) {
+                    int x = rand.nextInt(g.getNumNodes());
+                    int y = rand.nextInt(g.getNumNodes());
+                    if (x == y) {
+                        continue;
+                    }
+                    if (x > y) {
+                        int t = x;
+                        x = y;
+                        y = t;
+                    }
+                    if(temp[i].get(x,y)==0)
+                    {
+                        temp[i].set(x,y,1);
+                        numEdges--;
+                        if(g.getEdge(g.getNode(d.getVariable(x).getName()),g.getNode(d.getVariable(y).getName()))!=null)
+                            trueEdges++;
+                    }
+                }
+
+                reliability[i] = trueEdges/(double)edges[i];
+            }
+        }
+        else {
+            for (int i = 0; i < edges.length; i++) {
+                edges[i] = rand.nextInt(g.getNumEdges() * 2);
+                while (edges[i] > totalPossible || edges[i] == 0)
+                    edges[i] = rand.nextInt(g.getNumEdges() * 2);
+            }
+
+            int[] trueEdges = new int[numExperts];
+            int[] remaining = new int[numExperts];
+            int iters = 0;
+            for (int i = 0; i < numExperts; i++) {
+                trueEdges[i] = rand.nextInt(g.getNumEdges() + 1);
+                while ((trueEdges[i] == 0 || (edges[i] - trueEdges[i]) < 0) || edges[i] - trueEdges[i] > (totalPossible - g.getNumEdges()) || ((edges[i] / (double) trueEdges[i]) < 0.2 && iters < 1000)) {
+                    trueEdges[i] = rand.nextInt(g.getNumEdges() + 1);
+                    iters++;
+                }
+                remaining[i] = edges[i] - trueEdges[i];
+                reliability[i] = trueEdges[i] / (double) edges[i];
+            }
+
+
+            for (int i = 0; i < numExperts; i++) {
+                while (trueEdges[i] > 0 || remaining[i] > 0) {
+                    int x = rand.nextInt(g.getNumNodes());
+                    int y = rand.nextInt(g.getNumNodes());
+                    if (x == y) {
+                        continue;
+                    }
+                    if (x > y) {
+                        int t = x;
+                        x = y;
+                        y = t;
+                    }
+                    if (g.getEdge(g.getNode(d.getVariable(x).getName()), g.getNode(d.getVariable(y).getName())) != null && temp[i].get(x, y) == 0 && trueEdges[i] > 0) {
+                        temp[i].set(x, y, 1);
+                        trueEdges[i]--;
+                    } else if (g.getEdge(g.getNode(d.getVariable(x).getName()), g.getNode(d.getVariable(y).getName())) == null && temp[i].get(x, y) == 0 && remaining[i] > 0) {
+                        temp[i].set(x, y, 1);
+                        remaining[i]--;
+                    }
+                }
+            }
+        }
+        return temp;
+    }
     //Generates unreliable priors, currently generates the entire set of priors from scratch, can't deal with potentially generated priors TODO
     public static TetradMatrix [] simulatePriorUnreli(Graph g, double ap, int numExperts, DataSet d, int numReliable) {
         Random rand = new Random();
@@ -641,23 +762,27 @@ public class priorTest {
             }
         }
     }
-    public static void checkPriors(Graph g, DataSet d, TetradMatrix [] priors,int index)
+    public static void checkPriors(Graph g, DataSet d, TetradMatrix [] priors,int index,boolean exit)
     {
         for(int i = 0; i < priors.length;i++)
         {
+            int count = 0;
             for(int j = 0; j < d.getNumColumns();j++)
             {
                 for(int k = 0; k < d.getNumColumns();k++)
                 {
+
                     if(priors[i].get(j,k)!=0)
                     {
                         if(g.getEdge(g.getNode(d.getVariable(j).getName()),g.getNode(d.getVariable(k).getName()))==null)
                         {
-                            System.out.println("Violation in prior " + i + ", for run " + index);
-                            System.exit(-1);
+                            if(exit) {
+                                System.out.println("Violation in prior " + i + ", for run " + index);
+                                System.exit(-1);
+                            }
+                            count++;
                         }
                     }
-
                 }
             }
         }

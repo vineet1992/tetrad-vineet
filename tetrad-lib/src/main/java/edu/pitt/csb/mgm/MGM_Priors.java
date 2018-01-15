@@ -311,6 +311,11 @@ public class MGM_Priors extends ConvexProximal implements GraphSearch{
         return DoubleFactory1D.dense.make(colArray);
     }
 
+
+    public MGMParams getParams()
+    {
+        return params;
+    }
     //init all parameters to zeros except for betad which is set to 1s
     private void initParameters(){
         lcumsum = new int[l.length+1];

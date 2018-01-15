@@ -45,15 +45,32 @@ public class mgmPriors {
     public Graph trueGraph;
     private PrintStream log;
     public double [] expertWeights;
+    public double [] normalizedExpertWeights;
+    public double [] normalizedTao;
+    public double [] pValues;
     private boolean logging = false;
+    private boolean normalize = true;
+    private int normalizationSamples = 10000;
     public double [][] edgeScores;
 
     public void setLog(boolean b)
     {
         logging = b;
     }
+
+
+    //If this is set to true, the method will normalize by computing a null distribution for each size of prior
+    public void setNormalize(boolean b)
+    {
+        normalize = b;
+    }
+    public void setNormalizationSamples(int x)
+    {
+        normalizationSamples = x;
+    }
     public mgmPriors(int numSubsamples, double[] initLambdas, DataSet data, TetradMatrix[] priors) {
         this.numSubsamples = numSubsamples;
+        this.pValues = new double[priors.length];
         this.lambdas = constructLambdasPar(initLambdas, data);
         this.data = data;
         this.priors = priors;
@@ -65,6 +82,7 @@ public class mgmPriors {
 
     public mgmPriors(int numSubsamples, double[] initLambdas, DataSet data, TetradMatrix[] priors,DataSet [] subsamples) {
         this.subsamples = subsamples;
+        this.pValues = new double[priors.length];
         this.numSubsamples = numSubsamples;
         if(logging) {
             try {
@@ -85,6 +103,7 @@ public class mgmPriors {
 
     public mgmPriors(int numSubsamples, double[] initLambdas, DataSet data, TetradMatrix[] priors, Graph truth,boolean splitLambdas,DataSet [] subsamples) {
         this.subsamples = subsamples;
+        this.pValues = new double[priors.length];
         this.splitLambdas = splitLambdas;
         this.numSubsamples = numSubsamples;
         if(logging) {
@@ -107,6 +126,7 @@ public class mgmPriors {
     public mgmPriors(int numSubsamples, double[] initLambdas, DataSet data, TetradMatrix[] priors, Graph truth,boolean splitLambdas) {
         this.splitLambdas = splitLambdas;
         this.numSubsamples = numSubsamples;
+        this.pValues = new double[priors.length];
         if(logging) {
             try {
                 this.log = new PrintStream("log_file.txt");
@@ -145,6 +165,7 @@ public class mgmPriors {
         TetradMatrix[] phi = new TetradMatrix[priors.length];
         // TetradMatrix[] tao = new TetradMatrix[priors.length];
         double[] tao = new double[priors.length];
+        double [] normalTao = new double[priors.length];
         double[] alpha = new double[priors.length];
         double[] weights = new double[priors.length];
         if (priors.length == 1) {
@@ -156,13 +177,29 @@ public class mgmPriors {
             phi[tr] = getPhi(currPrior);
             //How many times do we expect an edge to appear based on the prior, for a given lambda?
             //phi = prior value * numSubSamples
-            tao[tr] = getTao(phi[tr], counts, havePriors);
+
+            tao[tr] = getTao(phi[tr], counts,tr);
+
+            if(normalize)
+                normalTao[tr] = normalizeTao(tao[tr],counts,tr);
             //How confident are we about source tr?
             //tao = average deviation between our predicted probability from prior (phi) and actual counts u
         }
-        alpha = getAlpha(tao);
-        weights = getWeights(alpha);
-        expertWeights = weights;
+        if(normalize)
+        {
+            normalizedTao = normalTao;
+            double [] normAlpha = getAlpha(normalTao);
+            normalizedExpertWeights = getWeights(normAlpha);
+            weights = normalizedExpertWeights;
+            tao = normalizedTao;
+        }
+        else
+        {
+            alpha = getAlpha(tao);
+            weights = getWeights(alpha);
+            expertWeights = weights;
+        }
+
         TetradMatrix u_mixture = getMeanMixture(phi, weights);
         TetradMatrix var_mixture = getVarMixture(weights, tao, u_mixture, phi);
 
@@ -238,6 +275,7 @@ public class mgmPriors {
 
         edgeScores = constructEdgeScores(npLambdas,wpLambdas,havePriors);
         MGM_Priors m = new MGM_Priors(data, npLambdas, wpLambdas, havePriors);
+        m.
         m.learnEdges(1000);
         return m.graphFromMGM();
 
@@ -247,8 +285,21 @@ public class mgmPriors {
     }
 
     private double[] getAlpha(double[] tao) {
+        //HEURISTIC HACK TO ENSURE THAT THERE IS NO ZERO VALUE
+        double min = Double.MAX_VALUE;
+        for(int i = 0; i < tao.length;i++)
+        {
+            if(tao[i]!=0 && tao[i] < min)
+                min = tao[i];
+        }
+        for(int i = 0; i < tao.length;i++)
+        {
+            if(tao[i]==0)
+                tao[i] = min/2;
+        }
         double taoSum = StatUtils.sum(tao);
         double[] alpha = new double[tao.length];
+
         for (int i = 0; i < tao.length; i++)
             alpha[i] = taoSum / tao[i];
         return alpha;
@@ -337,12 +388,13 @@ public class mgmPriors {
         return weights;
     }
 
-    private double getTao(TetradMatrix phi, TetradMatrix counts, boolean[][] havePriors) {
+
+    private double getTao(TetradMatrix phi, TetradMatrix counts, int tr) {
         double tao = 0;
         int numPriors = 0;
         for (int i = 0; i < counts.rows(); i++) {
             for (int j = i + 1; j < counts.columns(); j++) {
-                if (havePriors[i][j]) {
+                if (sourcePrior[i][j][tr]) {
                     tao += Math.abs(phi.get(i, j) - counts.get(i, j) / (double) lambdas[0].length);
                     numPriors++;
                 }
@@ -350,6 +402,76 @@ public class mgmPriors {
         }
         tao = tao / numPriors;
         return tao;
+    }
+
+    //Normalizes the deviance score by computing a null distribution with the same number of entries as the current prior
+    private double normalizeTao(double tao,TetradMatrix counts, int tr)
+    {
+        double [] hist = new double[normalizationSamples];
+       for(int i = 0; i < normalizationSamples;i++)
+        {
+            TetradMatrix rand = generateRandomPrior(tr);
+            rand = getPhi(rand);
+            double currTao = 0;
+            int numEdges = 0;
+            if(counts.rows()!=rand.rows()||counts.columns()!=rand.columns())
+                System.exit(-1);
+            for(int j = 0; j < counts.rows();j++)
+            {
+                for(int k = j+1; k<counts.columns();k++)
+                {
+                    if(rand.get(j,k)!=0)
+                    {
+                        currTao+=Math.abs(rand.get(j,k) -  counts.get(j,k)/(double)lambdas[0].length);
+                        numEdges++;
+                    }
+                }
+            }
+            currTao=currTao/(double)numEdges;
+            hist[i] = currTao;
+        }
+        Arrays.sort(hist);
+       System.out.println(tao);
+       System.out.println(Arrays.toString(hist));
+        int index =0;
+        while(tao > hist[index] && index < hist.length)
+        {
+            index++;
+        }
+        pValues[tr] = index/(double)normalizationSamples;
+        tao = tao/StatUtils.mean(hist);
+
+        return tao;
+    }
+
+    //Generates a random hard prior with the same number of entries as sourcePrior[][][k] (The kth expert)
+    private TetradMatrix generateRandomPrior(int k)
+    {
+        int count = 0;
+        for(int i = 0; i < data.getNumColumns();i++)
+        {
+            for(int j = i+1; j < data.getNumColumns();j++)
+            {
+                if(sourcePrior[i][j][k])
+                    count++;
+            }
+        }
+        TetradMatrix t = new TetradMatrix(data.getNumColumns(),data.getNumColumns());
+        while(count >0)
+        {
+            int x = rand.nextInt(data.getNumColumns());
+            int y = rand.nextInt(data.getNumColumns());
+            while(t.get(x,y)==1 || x==y)
+            {
+                x = rand.nextInt(data.getNumColumns());
+                y = rand.nextInt(data.getNumColumns());
+            }
+            t.set(x,y,1);
+            t.set(y,x,1);
+            count--;
+        }
+        return t;
+
     }
 
     private double[][] getScoresWP(TetradMatrix[] theta, TetradMatrix[] g) {
@@ -577,6 +699,8 @@ public class mgmPriors {
         }
         return temp;
     }
+
+
 
     private TetradMatrix getPhi(TetradMatrix priors) {
         TetradMatrix temp = new TetradMatrix(priors.rows(), priors.columns());
@@ -994,7 +1118,6 @@ public class mgmPriors {
             protected void compute(){
                 if (to - from <= chunk) {
                     for (int s = from; s < to; s++) {
-                        System.out.println(s);
                         double[] lambda = {init[s], init[s], init[s]};
                         MGM m = new MGM(data, lambda);
                         m.learnEdges(iterLimit);
