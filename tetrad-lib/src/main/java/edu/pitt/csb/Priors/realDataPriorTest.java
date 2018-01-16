@@ -349,6 +349,7 @@ public class realDataPriorTest {
             double [][] stab = m.edgeScores;
             double [] weights = m.normalizedExpertWeights;
             double [] pValues = m.pValues;
+            double [] normalizedTao = m.normalizedTao;
             PrintStream w;
             if(tumors)
                  w = new PrintStream("Weights_Pathway_Prior.txt");
@@ -356,7 +357,7 @@ public class realDataPriorTest {
                  w = new PrintStream("Weights_Pathway_Prior_Normals.txt");
             for(int i = 0; i < weights.length;i++)
             {
-                w.println(files.get(i).getName().replace(".txt","") + "\t" + weights[i] + "\t" + pValues[i]);
+                w.println(files.get(i).getName().replace(".txt","") + "\t" + weights[i] + "\t" + pValues[i] + "\t" + normalizedTao[i]);
             }
             w.flush();
             w.close();

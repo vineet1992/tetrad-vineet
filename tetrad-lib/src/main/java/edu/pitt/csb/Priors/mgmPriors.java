@@ -275,7 +275,6 @@ public class mgmPriors {
 
         edgeScores = constructEdgeScores(npLambdas,wpLambdas,havePriors);
         MGM_Priors m = new MGM_Priors(data, npLambdas, wpLambdas, havePriors);
-        m.
         m.learnEdges(1000);
         return m.graphFromMGM();
 
