@@ -1,5 +1,6 @@
 package edu.pitt.csb.Priors;
 
+import cern.colt.matrix.DoubleMatrix2D;
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.GraphUtils;
@@ -35,7 +36,11 @@ public class realDataPriorTest {
         boolean runRelevantPrior = false;
         boolean runBoth = false; //Pathway Priors
         boolean tumors = false;
+        boolean erPositive = false;
+        boolean erNegative = false;
         boolean computeMetrics = false;
+        boolean useStabilities = false;
+
         int numLambda = 40;
         int numPriors = 9;
         double g = 0.01;
@@ -83,6 +88,22 @@ public class realDataPriorTest {
                 g = Double.parseDouble(args[index+1]);
                 index+=2;
             }
+            else if (args[index].equals("-us"))
+            {
+                useStabilities = true;
+                index++;
+            }
+            else if(args[index].equals("-er+"))
+            {
+                erPositive = true;
+                index++;
+            }
+            else if(args[index].equals("-er-"))
+            {
+                erNegative = true;
+                index++;
+            }
+
         }
 
         double [] lambda = new double[numLambda];
@@ -92,7 +113,11 @@ public class realDataPriorTest {
             lambda[i] = i*inc + low;
         }
         DataSet data = null;
-        if(tumors)
+        if(erPositive)
+            data = MixedUtils.loadDataSet2("ER_Positive.txt");
+        else if(erNegative)
+            data = MixedUtils.loadDataSet2("ER_Negative.txt");
+        else if(tumors)
             data = MixedUtils.loadDataSet2("genes_with_clinical.txt");
         else
             data = MixedUtils.loadDataSet2("genes_with_clinical_normals.txt");
@@ -100,7 +125,11 @@ public class realDataPriorTest {
         data = MixedUtils.completeCases(data);
         //System.out.println(data);
         File f = new File("Subsamples");
-        if(!tumors)
+        if(erPositive)
+            f = new File("ER_Positive_Subsamples");
+        else if(erNegative)
+            f = new File("ER_Negative_Subsamples");
+        else if(!tumors)
             f = new File("Normal_Subsamples");
         if(!f.exists())
             f.mkdir();
@@ -115,7 +144,11 @@ public class realDataPriorTest {
         {
             //File temp = new File("Subsamples/Subsample_" + i + ".txt");
             File temp = new File("Subsamples/Subsample_" + i + ".txt");
-            if(!tumors)
+            if(erPositive)
+                temp = new File("ER_Positive_Subsamples/ER_Positive_Subsample_" + i + ".txt");
+            else if(erNegative)
+                temp = new File("ER_Negative_Subsamples/ER_Negative_Subsample_" + i + ".txt");
+            else if(!tumors)
                 temp = new File("Normal_Subsamples/Normal_Subsample_" + i + ".txt");
             if(!temp.exists())
             {
@@ -331,66 +364,164 @@ public class realDataPriorTest {
             for(int i = 0; i < files.size();i++) {
                 priors[i] = new TetradMatrix(loadPrior(files.get(i),data.getNumColumns()));
             }
-            mgmPriors m = new mgmPriors(subsamples.length,lambda,data,priors,subsamples);
-            PrintStream lb;
-            if(tumors)
-                lb = new PrintStream("Pathway_Lambdas.txt");
-            else
-                lb = new PrintStream("Pathway_Lambdas_Normals.txt");
-            for(int i = 0; i < m.getLambdas().length;i++)
-            {
-                lb.println(Arrays.toString(m.getLambdas()[i]));
-            }
-            lb.flush();
-            lb.close();
 
 
-            Graph g2 = m.runPriors();
-            double [][] stab = m.edgeScores;
-            double [] weights = m.normalizedExpertWeights;
-            double [] pValues = m.pValues;
-            double [] normalizedTao = m.normalizedTao;
-            PrintStream w;
-            if(tumors)
-                 w = new PrintStream("Weights_Pathway_Prior.txt");
-            else
-                 w = new PrintStream("Weights_Pathway_Prior_Normals.txt");
-            for(int i = 0; i < weights.length;i++)
+            //Basically these are sufficient statistics from the data to evaluate any pathway
+            if(useStabilities)
             {
-                w.println(files.get(i).getName().replace(".txt","") + "\t" + weights[i] + "\t" + pValues[i] + "\t" + normalizedTao[i]);
-            }
-            w.flush();
-            w.close();
-            PrintStream out;
-            if(tumors)
-                out = new PrintStream("Stabilities_Pathway_Prior.txt");
-            else
-                out = new PrintStream("Stabilities_Pathway_Prior_Normals.txt");
-            for (int i = 0; i < data.getNumColumns(); i++) {
-                if (i == data.getNumColumns() - 1)
-                    out.println(data.getVariable(i).getName());
+                TetradMatrix stabs;
+                if(tumors)
+                    stabs = new TetradMatrix(loadStability("Results/Full_Counts_Pathway_Prior.txt",priors[0].rows()));
                 else
-                    out.print(data.getVariable(i).getName() + "\t");
-            }
-            for (int i = 0; i < stab.length; i++) {
-                out.print(data.getVariable(i).getName() + "\t");
-                for (int j = 0; j < stab[i].length; j++) {
-                    if (j == stab[i].length - 1)
-                        out.println(stab[i][j]);
-                    else
-                        out.print(stab[i][j] + "\t");
+                    stabs = new TetradMatrix(loadStability("Results/Full_Counts_Pathway_Prior_Normals.txt",priors[0].rows()));
+                mgmPriors m  = new mgmPriors(numSub,lambda,stabs,priors);
+                m.evaluatePriors();
+                double [] weights = m.normalizedExpertWeights;
+                double [] pValues = m.pValues;
+                double [] normalizedTao = m.normalizedTao;
+                PrintStream w;
+                if(erPositive)
+                    w = new PrintStream("Weights_Pathway_Prior_ER_Positive.txt");
+                else if(erNegative)
+                    w = new PrintStream("Weights_Pathway_Prior_ER_Negative.txt");
+                else if(tumors)
+                    w = new PrintStream("Weights_Pathway_Prior.txt");
+                else
+                    w = new PrintStream("Weights_Pathway_Prior_Normals.txt");
+                for(int i = 0; i < weights.length;i++)
+                {
+                    w.println(files.get(i).getName().replace(".txt","") + "\t" + weights[i] + "\t" + pValues[i] + "\t" + normalizedTao[i]);
                 }
+                w.flush();
+                w.close();
             }
-            out.flush();
-            out.close();
-            if(tumors)
-                out = new PrintStream("Graph_Pathway_Prior.txt");
-            else
-                out = new PrintStream("Graph_Pathway_Prior_Normals.txt");
-            out.println(g2);
-            out.flush();
-            out.close();
 
+            //If you need to recompute all of the edge counts, they will be saved into a matrix
+            else {
+
+                mgmPriors m = new mgmPriors(subsamples.length, lambda, data, priors, subsamples);
+                PrintStream lb;
+                if(erPositive)
+                    lb = new PrintStream("Pathway_Lambdas_ER_Positive.txt");
+                else if(erNegative)
+                    lb = new PrintStream("Pathway_Lambdas_ER_Negative.txt");
+                else if (tumors)
+                    lb = new PrintStream("Pathway_Lambdas.txt");
+                else
+                    lb = new PrintStream("Pathway_Lambdas_Normals.txt");
+                for (int i = 0; i < m.getLambdas().length; i++) {
+                    lb.println(Arrays.toString(m.getLambdas()[i]));
+                }
+                lb.flush();
+                lb.close();
+
+                Graph g2 = m.runPriors();
+                double[][] stab = m.edgeScores;
+                double[] weights = m.normalizedExpertWeights;
+                double[] pValues = m.pValues;
+                double[] normalizedTao = m.normalizedTao;
+                double [][] beta = m.betas;
+                TetradMatrix fullCounts = m.fullCounts;
+                PrintStream w;
+                if(erPositive)
+                    w = new PrintStream("Weights_Pathway_Prior_ER_Positive.txt");
+                else if(erNegative)
+                    w = new PrintStream("Weights_Pathway_Prior_ER_Negative.txt");
+                else if (tumors)
+                    w = new PrintStream("Weights_Pathway_Prior.txt");
+                else
+                    w = new PrintStream("Weights_Pathway_Prior_Normals.txt");
+                for (int i = 0; i < weights.length; i++) {
+                    w.println(files.get(i).getName().replace(".txt", "") + "\t" + weights[i] + "\t" + pValues[i] + "\t" + normalizedTao[i]);
+                }
+                w.flush();
+                w.close();
+                PrintStream out;
+                if(erPositive)
+                    out = new PrintStream("Stabilities_Pathway_Prior_ER_Positive.txt");
+                else if(erNegative)
+                    out = new PrintStream("Stabilities_Pathway_Prior_ER_Negative.txt");
+                else if (tumors)
+                    out = new PrintStream("Stabilities_Pathway_Prior.txt");
+                else
+                    out = new PrintStream("Stabilities_Pathway_Prior_Normals.txt");
+                for (int i = 0; i < data.getNumColumns(); i++) {
+                    if (i == data.getNumColumns() - 1)
+                        out.println(data.getVariable(i).getName());
+                    else
+                        out.print(data.getVariable(i).getName() + "\t");
+                }
+                for (int i = 0; i < stab.length; i++) {
+                    out.print(data.getVariable(i).getName() + "\t");
+                    for (int j = 0; j < stab[i].length; j++) {
+                        if (j == stab[i].length - 1)
+                            out.println(stab[i][j]);
+                        else
+                            out.print(stab[i][j] + "\t");
+                    }
+                }
+                out.flush();
+                out.close();
+                if(erPositive)
+                    out = new PrintStream("Graph_Pathway_Prior_ER_Positive.txt");
+                else if(erNegative)
+                    out = new PrintStream("Graph_Pathway_Prior_ER_Negative.txt");
+                else if (tumors)
+                    out = new PrintStream("Graph_Pathway_Prior.txt");
+                else
+                    out = new PrintStream("Graph_Pathway_Prior_Normals.txt");
+                out.println(g2);
+                out.flush();
+                out.close();
+                if(erPositive)
+                    out = new PrintStream("Full_Counts_Pathway_Prior_ER_Positive.txt");
+                else if(erNegative)
+                    out = new PrintStream("Full_Counts_Pathway_Prior_ER_Negative.txt");
+                else if (tumors)
+                    out = new PrintStream("Full_Counts_Pathway_Prior.txt");
+                else
+                    out = new PrintStream("Full_Counts_Pathway_Prior_Normals.txt");
+                for(int i =0; i < fullCounts.rows();i++)
+                {
+                    for(int j = 0; j < fullCounts.columns();j++)
+                    {
+                        if(j==fullCounts.columns()-1)
+                            out.println(fullCounts.get(i,j));
+                        else
+                            out.print(fullCounts.get(i,j) + "\t");
+                    }
+                }
+
+
+                if(erPositive)
+                    out = new PrintStream("Beta_Pathway_Prior_ER_Positive.txt");
+                else if(erNegative)
+                    out = new PrintStream("Beta_Pathway_Prior_ER_Negative.txt");
+                else if (tumors)
+                    out = new PrintStream("Beta_Pathway_Prior.txt");
+                else
+                    out = new PrintStream("Beta_Pathway_Prior_Normals.txt");
+
+                DataSet cont = MixedUtils.getContinousData(data);
+                for (int i = 0; i < cont.getNumColumns(); i++) {
+                    if (i == cont.getNumColumns() - 1)
+                        out.println(cont.getVariable(i).getName());
+                    else
+                        out.print(cont.getVariable(i).getName() + "\t");
+                }
+                for (int i = 0; i < beta.length; i++) {
+                    out.print(cont.getVariable(i).getName() + "\t");
+                    for (int j = 0; j < beta[0].length; j++) {
+                        if (j == beta[0].length - 1)
+                            out.println(beta[i][j]);
+                        else
+                            out.print(beta[i][j] + "\t");
+                    }
+                }
+
+                out.flush();
+                out.close();
+            }
 
         }
 
@@ -403,6 +534,21 @@ public class realDataPriorTest {
         double [][] temp = new double[numVariables][numVariables];
         BufferedReader b = new BufferedReader(new FileReader(data));
         b.readLine();
+        for(int i = 0; i < numVariables;i++)
+        {
+            String [] line = b.readLine().split("\t");
+            for(int j = 0; j < numVariables;j++)
+            {
+                temp[i][j] = Double.parseDouble(line[j]);
+            }
+        }
+        return temp;
+    }
+    public static double [][] loadStability(String data, int numVariables) throws Exception
+    {
+
+        double [][] temp = new double[numVariables][numVariables];
+        BufferedReader b = new BufferedReader(new FileReader(new File(data)));
         for(int i = 0; i < numVariables;i++)
         {
             String [] line = b.readLine().split("\t");

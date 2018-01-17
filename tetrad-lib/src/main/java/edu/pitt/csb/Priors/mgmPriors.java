@@ -1,5 +1,6 @@
 package edu.pitt.csb.Priors;
 
+import cern.colt.matrix.DoubleMatrix2D;
 import edu.cmu.tetrad.data.*;
 import edu.cmu.tetrad.graph.Edge;
 import edu.cmu.tetrad.graph.Graph;
@@ -10,6 +11,7 @@ import edu.cmu.tetrad.util.ForkJoinPoolInstance;
 import edu.cmu.tetrad.util.TetradMatrix;
 import edu.pitt.csb.mgm.MGM;
 import edu.pitt.csb.mgm.MGM_Priors;
+import edu.pitt.csb.mgm.MixedUtils;
 import org.apache.commons.math3.distribution.BinomialDistribution;
 import org.apache.commons.math3.distribution.NormalDistribution;
 import org.apache.commons.math3.stat.StatUtils;
@@ -44,10 +46,13 @@ public class mgmPriors {
     private DataSet [] subsamples;
     public Graph trueGraph;
     private PrintStream log;
+    public TetradMatrix fullCounts;
     public double [] expertWeights;
     public double [] normalizedExpertWeights;
     public double [] normalizedTao;
     public double [] pValues;
+    public double [][] betas;
+    private TetradMatrix stability;
     private boolean logging = false;
     private boolean normalize = true;
     private int normalizationSamples = 10000;
@@ -79,6 +84,29 @@ public class mgmPriors {
         gEpsilon = 1 / (double) numSubsamples;
     }
 
+
+    //Used to reuse computes stabilities to just run pathway evaluation, no need to compute theta or anything
+    public mgmPriors(int numSubsamples, double [] initLambdas, TetradMatrix edgeCounts, TetradMatrix[] priors) {
+        this.pValues = new double[priors.length];
+        this.numSubsamples = numSubsamples;
+        this.stability = edgeCounts;
+        if(logging) {
+            try {
+                this.log = new PrintStream("log_file.txt");
+            } catch (Exception e) {
+            }
+        }
+
+        this.lambdas = new double[3][initLambdas.length];
+        this.lambdas[0] = initLambdas;
+        this.lambdas[1] = initLambdas;
+        this.lambdas[2] = initLambdas;
+       this.priors = priors;
+        this.sourcePrior = new boolean[priors[0].rows()][priors[0].columns()][priors.length];
+        havePriors = findPrior(priors);
+
+        gEpsilon = 1 / (double) numSubsamples;
+    }
 
     public mgmPriors(int numSubsamples, double[] initLambdas, DataSet data, TetradMatrix[] priors,DataSet [] subsamples) {
         this.subsamples = subsamples;
@@ -145,6 +173,44 @@ public class mgmPriors {
 
 
 
+
+    public void evaluatePriors()
+    {
+         TetradMatrix[] phi = new TetradMatrix[priors.length];
+        // TetradMatrix[] tao = new TetradMatrix[priors.length];
+        double[] tao = new double[priors.length];
+        double [] normalTao = new double[priors.length];
+        double[] alpha = new double[priors.length];
+        double[] weights = new double[priors.length];
+       System.out.println(lambdas[0].length);
+        for (int tr = 0; tr < priors.length; tr++) //for each source of prior information
+        {
+            TetradMatrix currPrior = priors[tr];
+            phi[tr] = getPhi(currPrior);
+            //How many times do we expect an edge to appear based on the prior, for a given lambda?
+            //phi = prior value * numSubSamples
+
+            tao[tr] = getTao(phi[tr], stability,tr);
+            if(normalize)
+                normalTao[tr] = normalizeTao(tao[tr],stability,tr);
+            //How confident are we about source tr?
+            //tao = average deviation between our predicted probability from prior (phi) and actual counts u
+        }
+        if(normalize)
+        {
+            normalizedTao = normalTao;
+            double [] normAlpha = getAlpha(normalTao);
+            normalizedExpertWeights = getWeights(normAlpha);
+            weights = normalizedExpertWeights;
+            tao = normalizedTao;
+        }
+        else
+        {
+            alpha = getAlpha(tao);
+            weights = getWeights(alpha);
+            expertWeights = weights;
+        }
+    }
     public Graph runPriors() {
         if(logging) {
             try {
@@ -158,7 +224,9 @@ public class mgmPriors {
          edgeCounts = getEdgeProbabilitiesPar(); //matrix of numLambdas x numSubsamples that contains a matrix of edge appearences for each edge at each index
 //edgeCounts = getEdgeProbabilities();
 
+
         TetradMatrix counts = getFullCounts(edgeCounts); // # of times each edge appeared
+        this.fullCounts = counts;
         //Across all lambda*subsamples graphs
         TetradMatrix variances = getVariances(counts); // variance of appearences of each edge
         //  System.out.println("Variances: " + variances);
@@ -273,6 +341,7 @@ public class mgmPriors {
             }
         }
 
+
         edgeScores = constructEdgeScores(npLambdas,wpLambdas,havePriors);
         MGM_Priors m = new MGM_Priors(data, npLambdas, wpLambdas, havePriors);
         m.learnEdges(1000);
@@ -309,6 +378,8 @@ public class mgmPriors {
     private double [][] constructEdgeScores(final double [] npLambdas, final double [] wpLambdas,final boolean [][] havePriors)
     {
         final double [][] edgeCounts = new double[data.getNumColumns()][data.getNumColumns()];
+
+        final double [][] betas = new double[MixedUtils.getContinousData(data).getNumColumns() ][MixedUtils.getContinousData(data).getNumColumns()];
         final ForkJoinPool pool = ForkJoinPoolInstance.getInstance().getPool();
 
         class StabilityAction extends RecursiveAction {
@@ -338,6 +409,16 @@ public class mgmPriors {
                     }
                 }
             }
+            private synchronized void updateBetas(double [][] t, DoubleMatrix2D newBeta)
+            {
+                for(int i = 0; i < t.length;i++)
+                {
+                    for(int j = i+1; j < t[0].length;j++)
+                    {
+                        t[i][j] += newBeta.get(i,j);
+                    }
+                }
+            }
 
             @Override
             protected void compute(){
@@ -351,6 +432,7 @@ public class mgmPriors {
 
 
                         updateEdgeCounts(edgeCounts,g);
+                        updateBetas(betas,m.getParams().getBeta());
 
                     }
 
@@ -374,7 +456,7 @@ public class mgmPriors {
         final int chunk = 2;
 
         pool.invoke(new StabilityAction(chunk, 0, numSubsamples));
-
+        this.betas = betas;
         if(logging)
             log.flush();
         return edgeCounts;
@@ -433,7 +515,7 @@ public class mgmPriors {
        System.out.println(tao);
        System.out.println(Arrays.toString(hist));
         int index =0;
-        while(tao > hist[index] && index < hist.length)
+        while(index < hist.length && tao > hist[index])
         {
             index++;
         }
@@ -447,23 +529,23 @@ public class mgmPriors {
     private TetradMatrix generateRandomPrior(int k)
     {
         int count = 0;
-        for(int i = 0; i < data.getNumColumns();i++)
+        for(int i = 0; i < priors[0].rows();i++)
         {
-            for(int j = i+1; j < data.getNumColumns();j++)
+            for(int j = i+1; j < priors[0].rows();j++)
             {
                 if(sourcePrior[i][j][k])
                     count++;
             }
         }
-        TetradMatrix t = new TetradMatrix(data.getNumColumns(),data.getNumColumns());
+        TetradMatrix t = new TetradMatrix(priors[0].rows(),priors[0].rows());
         while(count >0)
         {
-            int x = rand.nextInt(data.getNumColumns());
-            int y = rand.nextInt(data.getNumColumns());
+            int x = rand.nextInt(priors[0].rows());
+            int y = rand.nextInt(priors[0].rows());
             while(t.get(x,y)==1 || x==y)
             {
-                x = rand.nextInt(data.getNumColumns());
-                y = rand.nextInt(data.getNumColumns());
+                x = rand.nextInt(priors[0].rows());
+                y = rand.nextInt(priors[0].rows());
             }
             t.set(x,y,1);
             t.set(y,x,1);
@@ -853,7 +935,6 @@ public class mgmPriors {
                     return;
                 }
             }
-
         }
 
         final int chunk = 2;
