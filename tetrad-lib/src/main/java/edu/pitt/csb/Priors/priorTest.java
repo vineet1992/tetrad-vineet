@@ -27,15 +27,15 @@ public class priorTest {
         double amountPrior = .1;
         boolean reliable = false;
         boolean diffNumPrior = true;
-        boolean pureRandom = true; //Only for different number of edges given by each prior, this sets the priors to be purely random with reliability computed after the fact
+        boolean pureRandom = false; //Only for different number of edges given by each prior, this sets the priors to be purely random with reliability computed after the fact
         int reliableExperts = 3;
         int numExperts = 15;
         int numLambdas = 40;
         int numVariables = 100;
         int numEdges = 75;
-        int sampleSize = 500;
+        int sampleSize = 750;
         int numSubsamples = 10;
-        int numRuns = 10;
+        int numRuns = 25;
         int index = 0;
         int numCategories = 4;
         double gamma = 0.05;
@@ -380,9 +380,9 @@ public class priorTest {
                                 {
                                     p3.println(Arrays.toString(reli));
                                     p3.println(Arrays.toString(edges));
-                                    p3.println(Arrays.toString(m.normalizedTao));
-                                    p3.println(Arrays.toString(m.pValues));
-                                    p3.println(Arrays.toString(m.normalizedExpertWeights));
+                                    p3.println(Arrays.toString(mtemp.normalizedTao));
+                                    p3.println(Arrays.toString(mtemp.pValues));
+                                    p3.println(Arrays.toString(mtemp.normalizedExpertWeights));
                                 }
                                 p3.flush();
                                 p3.close();
@@ -585,7 +585,7 @@ public class priorTest {
         else {
             for (int i = 0; i < edges.length; i++) {
                 edges[i] = rand.nextInt(g.getNumEdges() * 2);
-                while (edges[i] > totalPossible || edges[i] == 0)
+                while (edges[i] > totalPossible || edges[i] == 0 || edges[i] < 10)
                     edges[i] = rand.nextInt(g.getNumEdges() * 2);
             }
 

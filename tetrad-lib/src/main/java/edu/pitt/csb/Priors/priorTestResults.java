@@ -22,23 +22,23 @@ import java.util.ArrayList;
 public class priorTestResults{
 public static void main(String [] args) throws Exception
     {
-        String [] algs = {"mgm_priors","mgm_priors_split"};
-        //String [] algs = {"mgm_priors","mgm_priors_split","STEPS","oracle","oracle_one","mgm_one_steps"};
+       // String [] algs = {"mgm_priors","mgm_priors_split"};
+        String [] algs = {"mgm_priors","mgm_priors_split","STEPS","oracle","oracle_one","mgm_one_steps"};
         String [] type = {"CC","CD","DD","ALL"};
         int numSubsamples = 10;
         double [] priors = {0.1,0.3,0.6};
      //   int [] sampleSize = {500,1000,2000,3000};
         int [] sampleSize = {500};
         //double [] priors = {0.6};
-        int numVars = 50;
+        int numVars = 100;
         //int [] numExperts = {1,2,3,4,5};
         int [] numExperts = {5};
         int [] reliableExperts = {1,3,5};
 
 
         boolean priorInfo = false; //Compute information about each prior source
-        boolean gatherWeights = true; //Compute information about weights computed by the SP MGM algorithm
-        boolean unreliable = false; //Compute results for experiment with unreliable prior information sources
+        boolean gatherWeights = false; //Compute information about weights computed by the SP MGM algorithm
+        boolean unreliable = true; //Compute results for experiment with unreliable prior information sources
 
 
 

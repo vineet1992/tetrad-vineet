@@ -23,12 +23,21 @@ public class addClinicalData
         //ER_Negative -> Subtype = 2 or 3
         PrintStream erPos = new PrintStream("ER_Positive.txt");
         PrintStream erNeg = new PrintStream("ER_Negative.txt");
+        PrintStream [] types = new PrintStream [4];
+        String [] typeString = {"Luminal A","Luminal B", "Triple-Negative", "HER2"};
+        for(int i = 0; i < types.length;i++)
+        {
+            //Luminal A, Luminal B, Triple Negative, HER2
+            types[i] = new PrintStream(typeString[i] + ".txt");
+        }
         PrintStream out = new PrintStream("genes_with_clinical.txt");
         PrintStream out2 = new PrintStream("genes_with_clinical_normals.txt");
         out.println("/variables");
         out2.println("/variables");
         erPos.println("/variables");
         erNeg.println("/variables");
+        for(int i = 0; i < types.length;i++)
+            types[i].println("/variables");
         BufferedReader b = new BufferedReader(new FileReader("expression_subset.txt"));
         String [] samples = b.readLine().split("\t");
         int geneCount = 0;
@@ -65,6 +74,8 @@ public class addClinicalData
                 out2.println(gene + ":Continuous");
                 erPos.println(gene + ":Continuous");
                 erNeg.println(gene + ":Continuous");
+                for(int xx = 0; xx < types.length;xx++)
+                    types[xx].println(gene + ":Continuous");
                 count++;
             }
 
@@ -97,7 +108,7 @@ public class addClinicalData
         erPos.println("Age:Continuous");
         //out.println("Tumor:0 1");
         //out.println("Race:0 1 2 3");//Need to determine this mapping as well 0 = white, 1 = black, 2 = asian, 3 = american indian
-        erPos.println("Subtype:0 1 2 3");
+        erPos.println("Subtype:0 1");
         //4 = not reported
         erPos.println("/data");
 
@@ -107,9 +118,18 @@ public class addClinicalData
         erNeg.println("Age:Continuous");
         //out.println("Tumor:0 1");
         //out.println("Race:0 1 2 3");//Need to determine this mapping as well 0 = white, 1 = black, 2 = asian, 3 = american indian
-        erNeg.println("Subtype:0 1 2 3");
+        erNeg.println("Subtype:2 3");
         //4 = not reported
         erNeg.println("/data");
+
+        for(int i = 0; i < types.length;i++)
+        {
+            types[i].println("Tumor_Stage:Continuous");//need to determine this mapping from the spreadsheet i*, ii*, iii*, iv
+            types[i].println("Vital_Status:0 1");// 0 = dead
+            //out.println("Gender:0 1"); //0 = female
+            types[i].println("Age:Continuous");
+            types[i].println("/data");
+        }
 
         for(int i = 0; i < idk.size();i++)
         {
@@ -117,13 +137,16 @@ public class addClinicalData
             out2.print(idk.get(i) + "\t");
             erPos.print(idk.get(i) + "\t");
             erNeg.print(idk.get(i) + "\t");
+            for(int j = 0; j < types.length;j++)
+                types[j].print(idk.get(i) + "\t");
         }
         out.println("Tumor_Stage\tVital_Status\tAge\tSubtype");
         out2.println("Tumor_Stage\tVital_Status\tAge\tSubtype");
 
         erPos.println("Tumor_Stage\tVital_Status\tAge\tSubtype");
         erNeg.println("Tumor_Stage\tVital_Status\tAge\tSubtype");
-
+        for(int j = 0; j < types.length;j++)
+            types[j].println("Tumor_Stage\tVital_Status\tAge");
         // out.println("Tumor_Stage\tVital_Status\tGender\tAge\tTumor\tRace\tSubtype");
         BufferedReader b2 = new BufferedReader(new FileReader("BRCA.merged_only_clinical_clin_format.txt"));
         //getarrays of each barcode?
@@ -296,9 +319,10 @@ public class addClinicalData
                 }
                 else
                 {
+
                     for (int j = 0; j < idk.size(); j++) {
                         out.print(data[j][i] + "\t");
-
+                        types[Integer.parseInt(t.get("Subtype"))].print(data[j][i] + "\t");
                     }
 
                     if(Integer.parseInt(t.get("Subtype"))==0 || Integer.parseInt(t.get("Subtype"))==1)
@@ -318,6 +342,7 @@ public class addClinicalData
                         erNeg.println(t.get("Stage") + "\t" + t.get("Vital") + "\t" + t.get("Age") + "\t" + t.get("Subtype"));
                     }
 
+                    types[Integer.parseInt(t.get("Subtype"))].println(t.get("Stage") + "\t" + t.get("Vital") + "\t" + t.get("Age"));
                     //out.println(t.get("Stage")+"\t"+t.get("Vital")+"\t"+t.get("Gender")+"\t"+t.get("Age")+"\t"+tumor+ "\t" + t.get("Race") + "\t" + t.get("Subtype"));
                     out.println(t.get("Stage") + "\t" + t.get("Vital") + "\t" + t.get("Age") + "\t" + t.get("Subtype"));
                 }
@@ -333,5 +358,9 @@ public class addClinicalData
         erPos.close();
         erNeg.flush();
         erNeg.close();
+        for(int i = 0; i < types.length;i++) {
+            types[i].flush();
+            types[i].close();
+        }
     }
 }

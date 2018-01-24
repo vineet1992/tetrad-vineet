@@ -55,7 +55,7 @@ public class mgmPriors {
     private TetradMatrix stability;
     private boolean logging = false;
     private boolean normalize = true;
-    private int normalizationSamples = 10000;
+    private int normalizationSamples = 20000;
     public double [][] edgeScores;
 
     public void setLog(boolean b)
@@ -236,9 +236,6 @@ public class mgmPriors {
         double [] normalTao = new double[priors.length];
         double[] alpha = new double[priors.length];
         double[] weights = new double[priors.length];
-        if (priors.length == 1) {
-
-        }
         for (int tr = 0; tr < priors.length; tr++) //for each source of prior information
         {
             TetradMatrix currPrior = priors[tr];
@@ -259,6 +256,7 @@ public class mgmPriors {
             double [] normAlpha = getAlpha(normalTao);
             normalizedExpertWeights = getWeights(normAlpha);
             weights = normalizedExpertWeights;
+            expertWeights = normalizedExpertWeights;
             tao = normalizedTao;
         }
         else
@@ -266,6 +264,8 @@ public class mgmPriors {
             alpha = getAlpha(tao);
             weights = getWeights(alpha);
             expertWeights = weights;
+            normalizedTao = tao;
+            normalizedExpertWeights = weights;
         }
 
         TetradMatrix u_mixture = getMeanMixture(phi, weights);
@@ -1198,6 +1198,7 @@ public class mgmPriors {
             protected void compute(){
                 if (to - from <= chunk) {
                     for (int s = from; s < to; s++) {
+                        System.out.println("Computing Lambda: " + s + "/" + numLambdas);
                         double[] lambda = {init[s], init[s], init[s]};
                         MGM m = new MGM(data, lambda);
                         m.learnEdges(iterLimit);

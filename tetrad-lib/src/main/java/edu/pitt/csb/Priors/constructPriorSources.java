@@ -41,8 +41,6 @@ public class constructPriorSources {
         int ind = vars.indexOf("Subtype");
         for (int i = 0; i < vars.size(); i++) {
             for (int j = 0; j < vars.size(); j++) {
-                if (i == j)
-                    continue;
                 if ((i == ind && pam50.contains(vars.get(j))) || (j == ind && pam50.contains(vars.get(i)))) {
                     if (j == vars.size() - 1)
                         out.println(1);
@@ -56,7 +54,7 @@ public class constructPriorSources {
                 }
             }
         }
-        for (int k = 1; k < 4; k++)
+        for (int k = 1; k < 6; k++)
         {
             b2 = new BufferedReader(new FileReader("Irr_PAM50_" + k + ".txt"));
             out = new PrintStream("prior_sources/Irr_PAM50_" + (k-1) + ".txt");
@@ -67,8 +65,6 @@ public class constructPriorSources {
             ind = vars.indexOf("Subtype");
             for (int i = 0; i < vars.size(); i++) {
                 for (int j = 0; j < vars.size(); j++) {
-                    if (i == j)
-                        continue;
                     if ((i == ind && pam50.contains(vars.get(j))) || (j == ind && pam50.contains(vars.get(i)))) {
                         if (j == vars.size() - 1)
                             out.println(1);
