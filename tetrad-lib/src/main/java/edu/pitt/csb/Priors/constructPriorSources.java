@@ -12,6 +12,11 @@ import java.util.ArrayList;
 public class constructPriorSources {
 
     public static void main(String [] args)throws Exception {
+
+
+        boolean onlyPAM = true;
+
+
         BufferedReader b = new BufferedReader(new FileReader("genes_with_clinical.txt"));
         b.readLine();
         ArrayList<String> vars = new ArrayList<String>();
@@ -22,15 +27,20 @@ public class constructPriorSources {
             vars.add(line.split(":")[0]);
 
         }
+
+
+
         File temp = new File("prior_sources");
         if (!temp.exists())
             temp.mkdirs();
-        File f = new File("pathway_lists");
-        for (File t : f.listFiles()) {
-            String[] name = t.getName().split("_");
-            PrintStream out = new PrintStream("prior_sources/" + name[0]);
-            createPrior(t, out, vars);
+        if(!onlyPAM) {
+            File f = new File("pathway_lists");
+            for (File t : f.listFiles()) {
+                String[] name = t.getName().split("_");
+                PrintStream out = new PrintStream("prior_sources/" + name[0]);
+                createPrior(t, out, vars);
 
+            }
         }
         BufferedReader b2 = new BufferedReader(new FileReader("PAM50.txt"));
         PrintStream out = new PrintStream("prior_sources/Prior_PAM50.txt");

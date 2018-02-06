@@ -981,17 +981,15 @@ public class MixedUtils {
     }
 
     //returns undirected skeleton matrix (symmetric
-    public static DoubleMatrix2D skeletonToMatrix(Graph graph) {
+    public static DoubleMatrix2D skeletonToMatrix(Graph graph, DataSet d) {
         // initialize matrix
         int n = graph.getNumNodes();
         DoubleMatrix2D matrix = DoubleFactory2D.dense.make(n, n, 0.0);
 
         // map node names in order of appearance
         HashMap<Node, Integer> map = new HashMap<Node, Integer>();
-        int i = 0;
         for (Node node : graph.getNodes()) {
-            map.put(node, i);
-            i++;
+            map.put(node, d.getColumn(d.getVariable(node.getName())));
         }
 
         // mark edges

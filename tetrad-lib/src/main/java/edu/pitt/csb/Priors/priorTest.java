@@ -26,14 +26,14 @@ public class priorTest {
         boolean numEdgesRandom = true;
         double amountPrior = .1;
         boolean reliable = false;
-        boolean diffNumPrior = true;
+        boolean diffNumPrior = false;
         boolean pureRandom = false; //Only for different number of edges given by each prior, this sets the priors to be purely random with reliability computed after the fact
         int reliableExperts = 3;
-        int numExperts = 15;
+        int numExperts = 5;
         int numLambdas = 40;
         int numVariables = 100;
         int numEdges = 75;
-        int sampleSize = 750;
+        int sampleSize = 500;
         int numSubsamples = 10;
         int numRuns = 25;
         int index = 0;
@@ -41,11 +41,11 @@ public class priorTest {
         double gamma = 0.05;
         boolean saveData = true;
         boolean reuseData = true;
-        boolean rerunAlgorithms = true;
+        boolean rerunAlgorithms = false;
         String directory = ".";
    //     String [] algs = {"mgm_one_steps","oracle_one","STEPS","oracle","mgm_priors","mgm_priors_split"};
    //     String [] algs = {"mgm_one_steps","STEPS"};
-         String[] algs = {"mgm_priors"};
+         String[] algs = {"mgm_priors","oracle_one","STEPS","oracle","mgm_one_steps"};
         while(index < args.length)
         {
 
@@ -264,8 +264,6 @@ public class priorTest {
             else
                 checkPriors(c.getTrueGraph(),c.getDataSet(0),priors,i,false);
 
-            System.out.println(Arrays.toString(reli));
-            System.out.println(Arrays.toString(edges));
             while(!done)
             {
                 System.out.println(i);

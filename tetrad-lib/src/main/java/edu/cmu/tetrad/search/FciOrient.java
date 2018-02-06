@@ -393,9 +393,9 @@ public final class FciOrient {
             }
 
             graph.setEndpoint(c, b, Endpoint.TAIL);
-            //whyOrient.put(c.getName() + "," + b.getName(),1);
+            //whyOrient.put(c.getName() + "," + b.getName(),"1");
             graph.setEndpoint(b, c, Endpoint.ARROW);
-            //whyOrient.put(b.getName() + "," + c.getName(),1);
+            whyOrient.put(b.getName() + "," + c.getName(),"1");
             changeFlag = true;
 
             if (verbose) {

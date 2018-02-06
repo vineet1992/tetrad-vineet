@@ -24,7 +24,11 @@ package edu.pitt.csb.mgm;
 import cern.colt.matrix.DoubleMatrix2D;
 import com.google.gson.JsonArray;
 import com.google.gson.stream.JsonReader;
+import edu.cmu.tetrad.cmd.TetradCmd;
+import edu.cmu.tetrad.data.DataReader;
 import edu.cmu.tetrad.data.DataSet;
+import edu.cmu.tetrad.data.IKnowledge;
+import edu.cmu.tetrad.data.Knowledge;
 import edu.cmu.tetrad.graph.Edge;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.GraphUtils;
@@ -56,11 +60,19 @@ public class runAlgorithms {
     private static boolean runSteps = false;
     private static int ns = 20;
     private static double g = 0.05;
+    private static boolean useKnowledge = false;
+    private static String kFile = "";
     public static void main(String[] args) throws Exception{
         try {
 
             while(count < args.length)
             {
+                if(args[count].equals("-k"))
+                {
+                    useKnowledge = true;
+                    kFile = args[count+1];
+                    count+=2;
+                }
                 if(args[count].equals("-steps"))
                 {
                     runSteps = true;
@@ -124,9 +136,9 @@ public class runAlgorithms {
                 throw new Exception("Unknown Algorithm: " + alg + ", Please use either PCS, CPC, MAX, or None");
             if(runSteps)
             {
-
-                double low = .1;
-                double high = .8;
+                System.out.print("Running StEPS...");
+                double low = .05;
+                double high = .9;
                 double[] initLambdas = new double[40];
                 for (int i = 0; i < 40; i++) {
                     initLambdas[i] = i * (high - low) / 40 + low;
@@ -139,40 +151,82 @@ public class runAlgorithms {
                 out.println(lbm[0] + "\t" + lbm[1] + "\t" + lbm[2]);
                 out.flush();
                 out.close();
+                System.out.println("Done");
             }
 
             MGM m = new MGM(d,lambda); //Create MGM object
             m.learnEdges(1000);//Use maximum 1000 iterations to learn the edges for the undirected MGM graph, stop searching if the edges in the graph don't change after 3 iterations
             Graph g = m.graphFromMGM(); //store the mgm graph
             Graph finalOutput = null;
+            IKnowledge k = null;
+
+            if(useKnowledge) {
+                if (kFile == null) {
+                    throw new IllegalStateException("No data file was specified.");
+                }
+
+                try {
+                    File knowledgeFile = new File(kFile);
+
+                    CharArrayWriter writer = new CharArrayWriter();
+
+                    FileReader fr = new FileReader(knowledgeFile);
+                    int i;
+
+                    while ((i = fr.read()) != -1) {
+                        writer.append((char) i);
+                    }
+
+                    DataReader reader = new DataReader();
+                    char[] chars = writer.toCharArray();
+
+                    k = reader.parseKnowledge(chars);
+                }
+                catch(Exception e)
+                {
+                    System.out.println("Unable to read knowledge file");
+                    return;
+                }
+            }
             if(!alg.equals("None")) {
                 IndependenceTest i = new IndTestMultinomialAJ(d, alpha); //Create an independence test object suitable for mixed data
                 if(alg.equals("PCS")) {
+                    System.out.print("Running PCS...");
                     PcStable p = new PcStable(i); //Create a PC Stable search (you can replace this with any search algorithm that you would want to use
                     p.setInitialGraph(g); //Restrict the search to only the edges chosen by MGM
+                    if(useKnowledge)
+                        p.setKnowledge(k);
                     finalOutput = p.search(); //Get final output from the pc-stable search
                     PrintStream out = new PrintStream(outputPath);
                     out.flush();
                     out.close();
+                    System.out.println("Done");
                 }
                 else if(alg.equals("CPC"))
                 {
+                    System.out.print("Running CPC...");
                     CpcStable p = new CpcStable(i);
                     p.setInitialGraph(g);
+                    if(useKnowledge)
+                        p.setKnowledge(k);
                     finalOutput = p.search();
                     PrintStream out = new PrintStream(outputPath);
                     out.flush();
                     out.close();
-
+                    System.out.println("Done");
                 }
                 else if(alg.equals("MAX"))
                 {
+                    System.out.print("Running PC-Max...");
                     PcMax p = new PcMax(i);
                     p.setInitialGraph(g);
+                    if(useKnowledge)
+                        p.setKnowledge(k);
                     finalOutput = p.search();
                     PrintStream out = new PrintStream(outputPath);
                     out.flush();
                     out.close();
+                    System.out.println("Done");
                 }
             }
             else

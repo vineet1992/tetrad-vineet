@@ -60,7 +60,7 @@ public class StabilityUtils {
             DataSet dataSubSamp = data.subsetRows(samps[s]);
             Graph g = gs.search(dataSubSamp);
 
-            DoubleMatrix2D curAdj = MixedUtils.skeletonToMatrix(g);
+            DoubleMatrix2D curAdj = MixedUtils.skeletonToMatrix(g,dataSubSamp);
             thetaMat.assign(curAdj, Functions.plus);
         }
         thetaMat.assign(Functions.mult(1.0 / N));
@@ -101,7 +101,8 @@ public class StabilityUtils {
                         DataSet dataSubSamp = subsamples[s];
                         DataGraphSearch curGs = gs.copy();
                         Graph g = curGs.search(dataSubSamp);
-                        DoubleMatrix2D curAdj = MixedUtils.skeletonToMatrix(g); //set weights so that undirected stability works
+                        System.out.println(dataSubSamp.getVariableNames() + "\n" + g.getNodes());
+                        DoubleMatrix2D curAdj = MixedUtils.skeletonToMatrix(g,dataSubSamp); //set weights so that undirected stability works
                         addToMat(thetaMat, curAdj);
                     }
 
@@ -180,7 +181,7 @@ public class StabilityUtils {
                         DataGraphSearch curGs = gs.copy();
                         Graph g = curGs.search(dataSubSamp);
 
-                        DoubleMatrix2D curAdj = MixedUtils.skeletonToMatrix(g); //set weights so that undirected stability works
+                        DoubleMatrix2D curAdj = MixedUtils.skeletonToMatrix(g,dataSubSamp); //set weights so that undirected stability works
                         addToMat(thetaMat, curAdj);
                     }
 
@@ -246,7 +247,7 @@ public class StabilityUtils {
                         DataGraphSearch curGs = gs.copy();
                         Graph g = curGs.search(dataSubSamp);
 
-                        DoubleMatrix2D curAdj = MixedUtils.skeletonToMatrix(g); //set weights so that undirected stability works
+                        DoubleMatrix2D curAdj = MixedUtils.skeletonToMatrix(g,dataSubSamp); //set weights so that undirected stability works
                         addToMat(thetaMat, curAdj);
                     }
 

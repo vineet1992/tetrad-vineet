@@ -10,6 +10,7 @@ import edu.pitt.csb.mgm.MGM;
 import edu.pitt.csb.mgm.MGM_Priors;
 import edu.pitt.csb.mgm.MixedUtils;
 import edu.pitt.csb.mgm.STEPS;
+import edu.pitt.csb.stability.CrossValidationSets;
 import edu.pitt.csb.stability.StabilityUtils;
 
 import java.io.BufferedReader;
@@ -36,6 +37,8 @@ public class realDataPriorTest {
         boolean runNoPrior = false;
         boolean runIrrelevantPrior = false;
         boolean runRelevantPrior = false;
+        boolean doNumPriors = false;
+        boolean runOnlyRelevant = false;
         boolean runBoth = false; //Pathway Priors
         boolean tumors = false;
         boolean erPositive = false;
@@ -45,11 +48,12 @@ public class realDataPriorTest {
         boolean useStabilities = false;
 
         int numLambda = 40;
-        int numPriors = 9;
+        int numPriors = 5;
         double g = 0.01;
 
         double low = .05;
         double high = .9;
+        int k = 10;
 
         String [] types = {"Luminal_A", "Luminal_B","Triple_Negative", "HER2"};
 
@@ -62,6 +66,12 @@ public class realDataPriorTest {
             {
                 runNoPrior = true;
                 index++;
+            }
+            else if(args[index].equals("-numPrior"))
+            {
+                numPriors = Integer.parseInt(args[index+1]);
+                doNumPriors = true;
+                index+=2;
             }
             else if(args[index].equals("-ip"))
             {
@@ -98,6 +108,11 @@ public class realDataPriorTest {
                 useStabilities = true;
                 index++;
             }
+            else if(args[index].equals("-rorp"))
+            {
+                runOnlyRelevant=true;
+                index++;
+            }
             else if(args[index].equals("-er+"))
             {
                 erPositive = true;
@@ -111,6 +126,11 @@ public class realDataPriorTest {
             else if(args[index].equals("-type"))
             {
                 type = Integer.parseInt(args[index + 1]);
+                index+=2;
+            }
+            else if(args[index].equals("-kfold"))
+            {
+                k = Integer.parseInt(args[index+1]);
                 index+=2;
             }
 
@@ -194,19 +214,9 @@ public class realDataPriorTest {
             Graph graph = s.runStepsPar();
             double[][] stab = s.stabilities;
             //TODO Should parallelize this, but want to be safe because of the time crunch for the paper deadline
-            double [] lambdas = s.lastLambda;
-            PrintStream feats = new PrintStream("Selected_Features_No_Prior.txt");
-            for(int i = 0; i < subsamples.length;i++)
-            {
-                MGM m = new MGM(subsamples[i],lambdas);
-                m.learnEdges(1000);
-                Graph subGraph = m.graphFromMGM();
-                for(Node n: subGraph.getAdjacentNodes(subGraph.getNode("Subtype")))
-                    feats.print(n + "\t");
-                feats.println();
-            }
-            feats.flush();
-            feats.close();
+            System.out.println("Cross Validating");
+            CrossValidationSets cv = new CrossValidationSets(data,s.lastLambda,"Subsamples",".","Subtype",k,"No_Prior");
+            cv.crossValidate();
             ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
             PrintStream out;
@@ -263,6 +273,15 @@ public class realDataPriorTest {
             lb.close();
             System.out.println("Running Priors...");
             Graph g2 = m.runPriors();
+
+            //TODO SAME AS ABOVE SHOULD BE PARALLELIZED BUT TIME CRUNCH
+            System.out.println("Cross Validating");
+            CrossValidationSets cv = new CrossValidationSets(data,m.lastNPLambda,m.lastWPLambda,"Subsamples",".","Subtype",m.lastHavePrior,k,"Irrelevant_Prior");
+            cv.crossValidate();
+            //////////////////////////////////////////////////////////////
+
+
+            /////////////////////
             double [][] stab = m.edgeScores;
             double [] weights = m.normalizedExpertWeights;
             double [] pValues = m.pValues;
@@ -312,13 +331,91 @@ public class realDataPriorTest {
         }
 
 
+        if(runOnlyRelevant)
+        {
+            TetradMatrix [] priors = new TetradMatrix[1];
+            priors[0] = new TetradMatrix(loadPAM50(new File("prior_sources/Prior_PAM50.txt"),data.getNumColumns()));
+
+            mgmPriors m = new mgmPriors(subsamples.length,lambda,data,priors,subsamples);
+            PrintStream lb;
+            if(tumors)
+                lb = new PrintStream("Only_Relevant_Lambdas.txt");
+            else
+                lb = new PrintStream("Only_Relevant_Lambdas_Normals.txt");
+            for(int i = 0; i < m.getLambdas().length;i++)
+            {
+                lb.println(Arrays.toString(m.getLambdas()[i]));
+            }
+            lb.flush();
+            lb.close();
+            System.out.println("Running Priors...");
+            Graph g2 = m.runPriors();
+
+
+            //TODO SAME AS ABOVE SHOULD BE PARALLELIZED BUT TIME CRUNCH
+            System.out.println("Cross Validating...");
+            CrossValidationSets cv = new CrossValidationSets(data,m.lastNPLambda,m.lastWPLambda,"Subsamples",".","Subtype",m.lastHavePrior,k,"Only_Relevant_Prior");
+            cv.crossValidate();
+            System.out.println("Done");
+            //////////////////////////////////////////////////////////////
+            double [][] stab = m.edgeScores;
+            double [] weights = m.normalizedExpertWeights;
+            double [] pValues = m.pValues;
+
+
+            PrintStream w;
+            if(tumors)
+                w = new PrintStream("Weights_Only_Relevant_Prior.txt");
+            else
+                w = new PrintStream("Weights_Only_Relevant_Prior_Normals.txt");
+            for(int i = 0; i < weights.length;i++)
+            {
+                if(i==weights.length-1)
+                    w.println("PAM50\t" + weights[i] + "\t" + pValues[i]);
+                else
+                    w.println("Irr_PAM50_" + i + "\t" + weights[i] + "\t" + pValues[i]);
+            }
+            w.flush();
+            w.close();
+            PrintStream out;
+            if(tumors)
+                out = new PrintStream("Stabilities_Only_Relevant_Prior.txt");
+            else
+                out = new PrintStream("Stabilities_Only_Relevant_Prior_Normals.txt");
+            for (int i = 0; i < data.getNumColumns(); i++) {
+                if (i == data.getNumColumns() - 1)
+                    out.println(data.getVariable(i).getName());
+                else
+                    out.print(data.getVariable(i).getName() + "\t");
+            }
+            for (int i = 0; i < stab.length; i++) {
+                out.print(data.getVariable(i).getName() + "\t");
+                for (int j = 0; j < stab[i].length; j++) {
+                    if (j == stab[i].length - 1)
+                        out.println(stab[i][j]);
+                    else
+                        out.print(stab[i][j] + "\t");
+                }
+            }
+            out.flush();
+            out.close();
+            if(tumors)
+                out = new PrintStream("Graph_Only_Relevant_Prior.txt");
+            else
+                out = new PrintStream("Graph_Only_Relevant_Prior_Normals.txt");
+            out.println(g2);
+            out.flush();
+            out.close();
+
+        }
 
 
         //Test Relevant PAM 50 Situation
         if(runRelevantPrior)
         {
 
-            numPriors = 5;
+            if(!doNumPriors)
+                numPriors = 5;
             TetradMatrix [] priors = new TetradMatrix[numPriors+1];
             for(int i = 0; i < numPriors;i++) {
                 priors[i] = new TetradMatrix(loadPAM50(new File("prior_sources/Irr_PAM50_" + i + ".txt"),data.getNumColumns()));
@@ -340,6 +437,17 @@ public class realDataPriorTest {
             lb.close();
             System.out.println("Running Priors...");
             Graph g2 = m.runPriors();
+
+
+            //TODO SAME AS ABOVE SHOULD BE PARALLELIZED BUT TIME CRUNCH
+            System.out.println("Cross Validating...");
+            String runName = "Relevant_Priors";
+            if(doNumPriors)
+                runName ="Relevant_Prior_" + numPriors;
+            CrossValidationSets cv = new CrossValidationSets(data,m.lastNPLambda,m.lastWPLambda,"Subsamples",".","Subtype",m.lastHavePrior,k,runName);
+            cv.crossValidate();
+            System.out.println("Done");
+            //////////////////////////////////////////////////////////////
             double [][] stab = m.edgeScores;
             double [] weights = m.normalizedExpertWeights;
             double [] pValues = m.pValues;
@@ -355,7 +463,7 @@ public class realDataPriorTest {
                 if(i==weights.length-1)
                     w.println("PAM50\t" + weights[i] + "\t" + pValues[i]);
                 else
-                    w.println("Irr_PAM50_" + i + "\t" + weights[i] + pValues[i]);
+                    w.println("Irr_PAM50_" + i + "\t" + weights[i] + "\t" + pValues[i]);
             }
             w.flush();
             w.close();

@@ -33,6 +33,9 @@ public class mgmPriors {
     private double noPrior = 0;
     private int numSubsamples;
     private double[][] lambdas;
+    public double [] lastNPLambda;
+    public double [] lastWPLambda;
+    public boolean [][] lastHavePrior;
     private DataSet data;
     private TetradMatrix[] priors;
     private boolean[][] havePriors; //did any source provide priors about edge i,j?
@@ -182,7 +185,6 @@ public class mgmPriors {
         double [] normalTao = new double[priors.length];
         double[] alpha = new double[priors.length];
         double[] weights = new double[priors.length];
-       System.out.println(lambdas[0].length);
         for (int tr = 0; tr < priors.length; tr++) //for each source of prior information
         {
             TetradMatrix currPrior = priors[tr];
@@ -342,6 +344,9 @@ public class mgmPriors {
         }
 
 
+        lastNPLambda = npLambdas;
+        lastWPLambda = wpLambdas;
+        lastHavePrior = havePriors;
         edgeScores = constructEdgeScores(npLambdas,wpLambdas,havePriors);
         MGM_Priors m = new MGM_Priors(data, npLambdas, wpLambdas, havePriors);
         m.learnEdges(1000);
@@ -512,8 +517,6 @@ public class mgmPriors {
             hist[i] = currTao;
         }
         Arrays.sort(hist);
-       System.out.println(tao);
-       System.out.println(Arrays.toString(hist));
         int index =0;
         while(index < hist.length && tao > hist[index])
         {
@@ -1198,7 +1201,6 @@ public class mgmPriors {
             protected void compute(){
                 if (to - from <= chunk) {
                     for (int s = from; s < to; s++) {
-                        System.out.println("Computing Lambda: " + s + "/" + numLambdas);
                         double[] lambda = {init[s], init[s], init[s]};
                         MGM m = new MGM(data, lambda);
                         m.learnEdges(iterLimit);

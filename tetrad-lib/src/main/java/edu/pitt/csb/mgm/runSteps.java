@@ -97,7 +97,6 @@ public class runSteps {
         }
         DelimiterType d2 = DelimiterType.TAB;
         DataSet d = MixedUtils.loadDataSet2(directory + "/" + file,d2,maxCategoriesForDiscrete);
-        System.out.println(d);
         double [] lambda = new double[numLambdas];
         for(int i = 0; i < numLambdas;i++)
         {
@@ -107,10 +106,6 @@ public class runSteps {
             stabilityFile = "Stability_" + file;
         if(graphFile.equals(""))
             graphFile = "Graph_" + file;
-
-        // d.removeColumn(d.getVariable("Gender"));
-        // d.removeColumn(d.getVariable("Age"));
-        //  DataSet d3 = MixedUtils.completeCases(d);
 
         STEPS s = new STEPS(d,lambda,g,d.getNumRows(),LOO);
         Graph g2 = s.runStepsPar();
