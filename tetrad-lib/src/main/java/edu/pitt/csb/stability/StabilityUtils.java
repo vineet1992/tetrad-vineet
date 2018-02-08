@@ -686,6 +686,24 @@ public class StabilityUtils {
     }
 
 
+    //Assumes Leave one out cross validation, since no number of subsamples is specified
+    public static int [][] generateSubsamples(int sampleSize)
+    {
+        int [][] result = new int[sampleSize][sampleSize-1];
+        for(int i = 0; i < sampleSize;i++)
+        {
+            int count = 0;
+            for(int j = 0; j < sampleSize;j++)
+            {
+                if(i!=j)
+                {
+                    result[i][count] = j;
+                    count++;
+                }
+            }
+        }
+        return result;
+    }
     //Automatically generate N approximately equal size subsamples for data set of size sampleSize
 public static int [][] generateSubsamples(int N, int sampleSize)
 {

@@ -893,7 +893,7 @@ System.out.println("Lambdas: " + Arrays.toString(lambda));
         //  System.out.println("b:" + b);
         A:while(true) //go until we break by having instability better than threshold
         {
-               System.out.println("Lambda: " + lambda[currIndex]);
+              // System.out.println("Lambda: " + lambda[currIndex]);
                 double [] lambdaCurr = {lambda[currIndex],lambda[currIndex],lambda[currIndex]};
                 DoubleMatrix2D adjMat;
                 if(subsamples!=null)
