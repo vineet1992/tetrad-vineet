@@ -33,7 +33,7 @@ import static edu.pitt.csb.mgm.MixedUtils.loadDataSet2;
  * Created by vinee_000 on 9/11/2017.
  */
 public class mirnaPrediction {
-    public static String runName = "0.5_TUMOR_SAMPLES";
+  /*  public static String runName = "0.5_TUMOR_SAMPLES";
     public static double lambdaLow = .2;
     public static int numLambdas = 30;
     public static double lambdaHigh = .7;
@@ -77,14 +77,14 @@ public class mirnaPrediction {
         final PrintStream temp = new PrintStream(runName + "/log.txt");
 
         DataSet d = MixedUtils.loadDataSet2(expressionFile);
-        /*will comment this out when adding Pref-Div to the pipeline*/
+        /*will comment this out when adding Pref-Div to the pipeline
        final ArrayList<Gene> pdSelected = new ArrayList<Gene>();
        for(Gene gen: g2)
        {
            if(d.getVariable(gen.symbol)!=null)
                pdSelected.add(gen);
        }
-       /************************************************************/
+
         d.removeColumn(d.getVariable("patient.gender"));
         final List<Node> discVars = MixedUtils.getDiscreteData(d).getVariables();
         System.out.println("Loaded Dataset");
@@ -199,7 +199,7 @@ public class mirnaPrediction {
                 /*double corr1 = Functions.computePValue(one,gen);
                 if(corr1>=corrCutoff)
                     continue;
-                double corr2 = Functions.computePValue(two,gen);*/
+                double corr2 = Functions.computePValue(two,gen);
 
                             if (Functions.computePValue(one, gen) || Functions.computePValue(two, gen)) //computePValue returns true if they are independnet
                                 continue;
@@ -298,7 +298,7 @@ public class mirnaPrediction {
                     }
 
                 }
-            }*/
+            }
         output.flush();
 
 
@@ -307,13 +307,13 @@ public class mirnaPrediction {
             Determine if pair p remains bidirected connected
             If not, determine if either variable in pair is disconnected from the rest of the network
             Cluster these representatives together and repeat the procedure
-             */
+
         /*Run STEPS to get MGM parameter estimates
         Run STARS with MFM to get alpha estimate
         Run Stability search with the selected alpha and lambda estimates to get most stable bidirected edges
         Go to the correlation matrix computed from the Functions class to find other variables that should be used with this set of bidirected ones
         Repeat the procedure to find new bidirected edges, if the original remain stable then include these in the final
-         */
+
     }
     //[0,1,2]
     public synchronized static void writeTempExpression(String expFile,List<Node> discVars, List<Gene> genes, Gene one, Gene two)
@@ -499,5 +499,5 @@ public class mirnaPrediction {
                 return true;
             }
         }
-    }
+    }*/
 }

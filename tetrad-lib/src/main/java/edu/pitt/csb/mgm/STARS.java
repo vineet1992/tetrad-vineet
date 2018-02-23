@@ -6,6 +6,7 @@ import edu.cmu.tetrad.data.DiscreteVariable;
 import edu.cmu.tetrad.graph.Edge;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.Node;
+import edu.cmu.tetrad.graph.NodeType;
 import edu.cmu.tetrad.search.CpcStable;
 import edu.cmu.tetrad.search.FciMaxP;
 import edu.cmu.tetrad.search.IndependenceTest;
@@ -127,10 +128,13 @@ public class STARS {
         {
 
             PrintStream out;
+            PrintStream out2;
 
             try {
-                out = new PrintStream("Detailed_Results_" + runNumber + ".txt");
+                out = new PrintStream("Detailed_Results_" + d.getNumColumns() + "_"  + runNumber + "_" + d.getNumColumns() + ".txt");
+                out2 = new PrintStream("Detailed_Results_" + d.getNumColumns() + "_" + runNumber + "_" + d.getNumColumns() + "_AUC.txt");
                 out.println("Alpha\tNum_Latents_Predicted\tEdge_Stability\tLatent_Stability\tPrecision\tRecall");
+                out2.println("Alpha\tPrediction\tActual");
             }
             catch(Exception e)
             {
@@ -173,7 +177,7 @@ public class STARS {
                 DoubleMatrix2D adjMat2 = null;
                 if(leaveOneOut)
                 {
-                    //TODO SearchPar or SearchParLatent?
+                    //TODO SearchPar or SearchParLatent? basically can we select a good alpha value better than just using stability?
                     if(alg ==Algorithm.FCI) {
                         double [] fciParam = {alpha[currIndex]};
                         adjMat = StabilityUtils.StabilitySearchPar(d, new SearchWrappers.FCIWrapper(fciParam));
@@ -319,10 +323,12 @@ public class STARS {
                                 estLatents.add(new LatentPrediction.Pair(d.getVariable(i),d.getVariable(j)));
                                 numLatents++;
                             }
+                            out2.println(alpha[currIndex+1] + "\t" + adjMat2.get(i,j) + "\t" + isLatent(trueGraph,d,i,j));
                         }
                     }
                     out.println(numLatents+"\t"+ allDestable + "\t" + latentStability(adjMat2) + "\t" + LatentPrediction.getPrecision(estLatents,trueGraph,d,"All") + "\t" + LatentPrediction.getRecall(estLatents,trueGraph,d,"All"));
                     out.flush();
+                    out2.flush();
                     //out.close();
                 }
                 catch(Exception e)
@@ -344,6 +350,8 @@ public class STARS {
 
             out.flush();
             out.close();
+            out2.flush();
+            out2.close();
             // DoubleMatrix2D stabs = StabilitySearchPar(d,new SearchWrappers.MGMWrapper(lambda));
             // this.stabilities = stabs.toArray();
             lastAlpha = oneLamb;
@@ -352,6 +360,17 @@ public class STARS {
         }
 
 
+        private synchronized int isLatent(Graph truth, DataSet d, int i, int j)
+        {
+            for(Node n : truth.getParents(truth.getNode(d.getVariable(i).getName())))
+            {
+                if(n.getNodeType()== NodeType.LATENT && truth.isParentOf(n,truth.getNode(d.getVariable(j).getName())))
+                {
+                    return 1;
+                }
+            }
+            return 0;
+        }
         private synchronized double latentStability(DoubleMatrix2D adjMat)
         {
             double deStable = 0;

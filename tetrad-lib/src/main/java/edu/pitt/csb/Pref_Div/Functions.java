@@ -6,8 +6,12 @@ import edu.cmu.tetrad.search.IndTestPartialCorrelation;
 import edu.cmu.tetrad.search.IndependenceTest;
 import edu.cmu.tetrad.util.StatUtils;
 import edu.cmu.tetrad.util.TetradMatrix;
+import edu.cmu.tetrad.util.TetradVector;
 import edu.pitt.csb.mgm.IndTestMultinomialAJ;
+import org.apache.commons.math3.distribution.NormalDistribution;
 
+import java.text.DecimalFormat;
+import java.text.NumberFormat;
 import java.util.*;
 import java.io.*;
 public class Functions
@@ -18,16 +22,15 @@ public class Functions
    private static final double MEDIAN_DISEASE_SCORE = 0.000543;
     public static IndependenceTest indT;
     private static float [] corrMat;
-    private static byte [] indep;
     private static int n;
     private static double[][] data;
-    private static double averageDiseaseScore;//Average disease score to return when disease information is not present
     private static double maxDiseaseScore;
-    private static double maxDiseaseIntensity;
-    private static double maxFoldChange;
-    private static boolean normalizeDisease = false;
+    private static double meanIntensity; //Used to place z-scored theory information onto the intensity distribution
+    private static double stdIntensity; //Same as above
     private static PrintStream out;
-    private static PrintStream out2;
+    private static NumberFormat nf;
+    private static int theorySources;
+    private static int maxIntDiscrete = 5;
 
     //Computes Intensity Score for a gene g1
     //Needs parameter a which specifies tradeoff between using foldChange in Expression value versus gene-disease mapping
@@ -65,9 +68,7 @@ public class Functions
         }
         if(a < 0 || a > 1)
             return Double.MIN_VALUE;
-        out2.println(g1.foldChange + "\t" + disScore);
-        out2.flush();
-        return a*Math.abs(g1.foldChange/maxFoldChange)+(1-a)*disScore/maxDiseaseIntensity;
+        return a*Math.abs(g1.foldChange)+(1-a)*disScore;
     }
     //Computes the Distance between two genes g1 and g2
 //Parameter a controls weight of gene expression correlation
@@ -135,15 +136,14 @@ public class Functions
         }
         int index = (n*(n-1)/2) - (n-i)*((n-i)-1)/2 + j - i - 1;
         double [] temp = {DS,CD,family,computeCorrelation(i,j)};
-        out.println(DS + "\t" + CD + "\t" + family + "\t" + corrMat[index] );
+        out.println(nf.format(corrMat[index]) + "\t" + nf.format(DS) + "\t" + nf.format(CD) + "\t" + nf.format(family));
         //System.out.println("Corr: " + Math.abs(corrMat[g1.ID][g2.ID]) + ",DS:" + DS + ",CD:" + CD + ",FM:" + family);
         return temp;
     }
     //Computes Disease Similarity Score (now using cosine similarity)
     private static double computeScore(HashMap<Integer,Double> score1, HashMap<Integer,Double> score2)
     {
-        //If we have no information, report as -1 (unknown, will replace with median)TODO
-        if(score1==null && score2==null)
+         if(score1==null && score2==null)
             return -1;
 
         ArrayList<Double> vecOne = new ArrayList<Double>();
@@ -157,7 +157,7 @@ public class Functions
                 }
                 else {
                     vecOne.add(score1.get(x));
-                    vecTwo.add(MEDIAN_DISEASE_SCORE);
+                    vecTwo.add(0.0);
                 }
             }
         }
@@ -170,7 +170,7 @@ public class Functions
                 else
                 {
                     vecTwo.add(score2.get(y));
-                    vecOne.add(MEDIAN_DISEASE_SCORE);
+                    vecOne.add(0.0);
                 }
             }
         }
@@ -202,13 +202,13 @@ public class Functions
     private static double chromDist(Gene g1, Gene g2)
     {
         if(g1.chromosome==-1 || g2.chromosome ==-1)
-            return 0.5;//Be indifferent in the abscence of information
+            return -1;//Be indifferent in the abscence of information
         if(g1.chromosome!=g2.chromosome)
-            return 1;
+            return -1;
         else
         {
             if(g1.chromosomeStart==-1 || g2.chromosomeStart==-1 || g1.chromosomeStop==-1 || g2.chromosomeStop==-1)
-                return 0.5;
+                return -1;
             if(((max(g1.chromosomeStop,g2.chromosomeStop)-min(g1.chromosomeStart,g2.chromosomeStart))/(CHROMOSOME_LENGTHS[g1.chromosome-1])) > 1)
             {
                 //System.out.println(g1.chromosome);
@@ -234,7 +234,7 @@ public class Functions
     private static double sameFamily(Gene g1, Gene g2)
     {
         if(g1.familyID==null || g2.familyID==null)
-            return 0.5;//We don't have family ID information for this gene so be indifferent
+            return -1;//We don't have family ID information for this gene so be indifferent
         for(int i = 0; i < g1.familyID.length;i++)
         {
             for(int j = 0; j < g2.familyID.length;j++)
@@ -264,86 +264,19 @@ public class Functions
         String giFile = dir + "/" + files[3]; //other genetic data (chromosome/gene family)
 
 
-        /*****************THIS IS TO GET AN AVERAGE DISEASE SCORE FOR INDIFFERENCE*************/
-
-
-        //Read through Gene-Disease Association file
-        BufferedReader b2 = new BufferedReader(new FileReader(gdFile));
-        HashMap<String,HashMap<Integer,Double>> allScores = new HashMap<String,HashMap<Integer,Double>>();
-        int numSamples = 500000; //Number of samples to obtain in order to compute distribution of gene-disease association scores
-                                // (too many samples if you do genes x genes-1)
-        while(b2.ready())
-        {
-            if(b2.readLine().startsWith("gene"))
-                break;
-        }
-        int count = 0;
-
-        //Read in the gene-disease file line-by-line
-        while(b2.ready())
-        {
-            String [] line = b2.readLine().split("\t");
-            String symbol = line[1];
-            int disease = Integer.parseInt(line[3].split(":")[1].substring(1,line[3].split(":")[1].length()));
-            double score = Double.parseDouble(line[5]);
-
-            //Create a new hashmap entry if we haven't seen this gene previously
-            if(allScores.get(symbol)==null)
-            {
-                HashMap<Integer,Double> now = new HashMap<Integer,Double>();
-                now.put(disease,score);
-                allScores.put(symbol,now);
-            }
-            //Just add this new disease pairing to the old hashmap
-            else
-            {
-                HashMap<Integer,Double> now = allScores.get(symbol);
-                now.put(disease,score);
-                allScores.put(symbol,now);
-            }
-
-        }
-        b2.close();
-        ArrayList<String> temp = new ArrayList<String>(allScores.keySet());
-        //System.out.println(temp.size());
-        Random rand = new Random();
-        double mean = 0;
-        //Get a random pair of genes and compute their gene-disease distance score
-        for(int i = 0; i < numSamples;i++)
-        {
-
-            String gene1 = temp.get(rand.nextInt(temp.size()));
-            String gene2 = temp.get(rand.nextInt(temp.size()));
-            HashMap<Integer,Double> score1 = allScores.get(gene1);
-            HashMap<Integer,Double> score2 = allScores.get(gene2);
-            while(score1==null || score2==null)
-            {
-                gene1 = temp.get(rand.nextInt(temp.size()));
-                gene2 = temp.get(rand.nextInt(temp.size()));
-                score1 = allScores.get(gene1);
-                score2 = allScores.get(gene2);
-            }
-            double rN = computeScore(score1,score2);
-            //maxDiseaseScore to normalize the distribution
-            if(maxDiseaseScore < rN)
-                maxDiseaseScore = rN;
-            mean+=rN;
-        }
-        //Mean of the distribution
-        mean=mean/numSamples;
-        b2.close();
-        //null out the HashMap to save memory
-        allScores = null;
-        averageDiseaseScore = mean;
-
         /******************END AVERAGE DISEASE CODE*********************************************/
-        //Should we normalize the disease score?
-        normalizeDisease = false;
         //Constant indices of each piece of information from the Gene Information file//
         int familyInd = 2;
         int chromInd = 3;
         int symId = 0;
         /*******************************************************************************/
+
+
+
+        /******************************LOAD IN GENE FAMILY AND CHROMOSOME LENGTH INFORMATION***************************/
+
+        System.out.print("Loading Gene Family and Chromosome Info...");
+
         ArrayList<Gene> g = new ArrayList<Gene>();
         BufferedReader b = new BufferedReader(new FileReader(giFile));
         b.readLine();
@@ -378,36 +311,45 @@ public class Functions
 
         }
         b.close();
-        b = new BufferedReader(new FileReader(fcFile));
 
-        //Read fold change file between different phenotypic groups for each gene
-        //First compute the maximumFoldChange value
-        while(b.ready())
-        {
-            String fol = b.readLine().split("\t")[1];
-            if(fol.contains("Inf") || fol.contains("NA"))
-                continue;
-            else
-            if(Math.abs(Double.parseDouble(fol)) > maxFoldChange)
-                maxFoldChange = Math.abs(Double.parseDouble(fol));
-        }
-        b.close();
+        System.out.println("Done");
+
+        /*********************************************END GENE INFO LOADING**************************************/
+
+
+        /********************************************READ GENE OUTCOME INTENSITY*********************************/
+        //Read mutual information file between genes and specific outcome of interest
+        //No normalization needed in the new scheme
+
+        System.out.print("Loading Gene-Outcome Intensity Scores...");
         b = new BufferedReader(new FileReader(fcFile));
+        ArrayList<Double> miValues = new ArrayList<Double>();
+        int count = 0;
         HashMap<String,Double> fcs = new HashMap<String,Double>();
-        //Load HashMap with all foldChange values
         while(b.ready())
         {
-            String [] line = b.readLine().split("\t");
-            if(line[1].equals("-Inf"))
-                fcs.put(line[0],-1.0);
-            else if(line[1].equals("Inf"))
-                fcs.put(line[0],1.0);
-            else if(line[1].equals("NA"))
-                fcs.put(line[0],0.0);
-            else
-                fcs.put(line[0],Double.parseDouble(line[1]));
+            String [] fol = b.readLine().split("\t");
+            String name = fol[0];
+
+            double mi = Double.parseDouble(fol[1]);
+            fcs.put(name,mi);
+            miValues.add(mi);
+            count++;
         }
+        double [] miArr = new double[count];
+        for(int i = 0; i < count;i++)
+            miArr[i] = miValues.get(i);
+        meanIntensity = StatUtils.mean(miArr);
+        stdIntensity = StatUtils.sd(miArr);
         b.close();
+        System.out.println("Done");
+        /*************************************************FINISHED READING***************************************/
+
+
+
+        /**********************************************GENE DISEASE INTENSITY***********************************/
+
+        System.out.print("Loading Gene Disease Intensity Scores...");
         HashMap<String,HashMap<Integer,Double>> geneDisease = new HashMap<String,HashMap<Integer,Double>>();
 
 
@@ -440,17 +382,17 @@ public class Functions
 
         }
 
-        //Find the maximum disease Intensity score for normalization purposes
-        //dIntensityScore finds the value for the disease of interest
-        for(String x: geneDisease.keySet())
-        {
-            HashMap<Integer,Double> t = geneDisease.get(x);
-            if(dIntensityScore(t,diseaseID) > maxDiseaseIntensity)
-                maxDiseaseIntensity = dIntensityScore(t,diseaseID);
-        }
-
 
         b.close();
+
+        System.out.println("Done");
+
+        /*******************************************************END GENE DISEASE MAPPING***********************************/
+
+
+
+        /******************************************************GENE EXPRESSION LOADING AND PARSING*****************************/
+        System.out.print("Loading Gene Expression Data...");
         b = new BufferedReader(new FileReader(expFile));
         b.readLine();
         int idCount = 0;
@@ -470,10 +412,11 @@ public class Functions
             if(fcs.get(symbol)!=null)
             {
                 curr.foldChange = fcs.get(symbol);
-                fcs.remove(symbol);
+             //   fcs.remove(symbol);
             }
             else
             {
+                System.out.println("No Mututal Information score for Gene:" + symbol);
                 curr.foldChange = 0;
             }
 
@@ -518,7 +461,7 @@ public class Functions
         }
         chromosomeStuff = null;
         geneDisease = null;
-        fcs = null;
+        //fcs = null;
         families = null;
         b = new BufferedReader(new FileReader(expFile));
         b.readLine();
@@ -540,37 +483,348 @@ public class Functions
         }
         b.close();
 
-        System.out.println("Computing Correlations...");
+
+        System.out.println("Done");
+        System.out.print("Computing Correlations...");
         n = dat.length;
-        System.out.println(n);
 
         corrMat = new float[(dat.length*(dat.length-1))/2];
-        indep = new byte[(dat.length*(dat.length-1))/2];
+       // indep = new byte[(dat.length*(dat.length-1))/2];
 
 
         //If we're using Pref-Div just to filter out genes to get a set for analysis, don't need to construct independence test object
         //This is only for latent variable prediction
-        if(!filter)
-            convertToDataSet(dat,g);
-        else
-            data = dat;
-        System.out.println("MFC: " + maxFoldChange);
-        System.out.println("MDS: " + maxDiseaseIntensity);
+        nf = new DecimalFormat("0.####");
+        data = dat;
          out = new PrintStream("gene_disease_distribution.txt");
-         out2 = new PrintStream("intensity_distribution.txt");
-         System.out.println(numSamples);
-        for(int i = 0; i < numSamples;i++)
+         PrintStream geneNames = new PrintStream("all_genes.txt");
+         /*for(int i = 0; i < numSamples;i++)
         {
             Gene gene1 = g.get(rand.nextInt(g.size()));
             Gene gene2 = g.get(rand.nextInt(g.size()));
             computeDistance(gene1,gene2);
+        }*/
+
+
+
+
+        float [] dataIntensity = new float[g.size()];
+        float [] dataTheory = new float[g.size()]; //TODO Generalize this to N user defined theory sources for separate theory function
+        for(int i = 0; i < g.size();i++)
+        {
+            dataIntensity[i] = (float)g.get(i).foldChange;
+            double disScore = 0;
+            if(g.get(i).diseaseScores!=null)
+            {
+                for(int j = 0; j < diseaseID.length;j++)
+                {
+                    if(g.get(i).diseaseScores.get(diseaseID[j])!=null)
+                        disScore+=g.get(i).diseaseScores.get(diseaseID[j]);
+                }
+
+                disScore=disScore/diseaseID.length;
+            }
+            else
+                disScore = -1;
+            dataTheory[i]  = (float)disScore;
+
         }
+        dataIntensity = NPNIgnore(dataIntensity,-1);
+
+        dataTheory = NPNIgnore(dataTheory,-1);
+
+        double intenseMean = mean(dataIntensity);
+        double intenseSD = sd(dataIntensity,intenseMean);
+
+        for(int i = 0; i < g.size();i++)
+        {
+            if(dataTheory[i]!=-1.0)
+            {
+                double realTheory = dataTheory[i]*intenseSD+intenseMean;
+                geneNames.println(g.get(i).symbol + "\t" + nf.format(dataIntensity[i]) + "\t" + nf.format(realTheory));
+
+            }
+            else
+            {
+                geneNames.println(g.get(i).symbol + "\t" + nf.format(dataIntensity[i]) + "\t" + nf.format(dataTheory[i]));
+            }
+            for(int j = i+1; j < g.size();j++)
+            {
+                computeDistance(g.get(i),g.get(j));
+            }
+        }
+
+        corrMat = null;
+        dataIntensity = null;
+        dataTheory = null;
+
+
+        System.out.println("Done");
+        System.out.print("Loading STRING data...");
+        b = new BufferedReader(new FileReader(dir+"/"+files[4]));
+        int stringSources = 0;
+        HashMap<String,int[]> str = new HashMap<String,int[]>();
+        while(b.ready())
+        {
+            String [] line = b.readLine().split("\t");
+            if(fcs.get(line[0])!=null && fcs.get(line[1])!=null) {
+
+
+                int[] temp = new int[line.length - 2];
+                for (int i = 2; i < line.length; i++) {
+
+                    if(line[i].equals("NA"))
+                        temp[i-2] = -1;
+                    else
+                        temp[i-2] = Integer.parseInt(line[i]);
+
+                }
+                stringSources = line.length-2;
+                str.put(line[0]+","+line[1],temp);
+            }
+        }
+        b.close();
+
+        System.out.println("Done");
+        fcs = null;
+
+        System.out.print("Creating all sources dataset...");
+        b = new BufferedReader(new FileReader("gene_disease_distribution.txt"));
+        PrintStream exp = new PrintStream("all_dissimilarity_sources.txt"); //Data Driven dissimialrity is the first column, 2 through N columns are the theory-driven measurements
+        for(int i = 0; i < g.size();i++)
+        {
+            for(int j = i+1;j < g.size();j++)
+            {
+                String line = b.readLine();
+                exp.print(line + "\t");
+                int [] temp = str.get(g.get(i).symbol+","+g.get(j).symbol);
+                if(temp==null)
+                {
+                    for(int k = 0; k < stringSources;k++)
+                    {
+                        exp.print("-1\t");
+                    }
+                }
+                else
+                {
+                    for(int k = 0; k < stringSources;k++)
+                        exp.print(nf.format(temp[k])+"\t");
+                }
+                exp.println();
+            }
+        }
+        System.out.println("Done");
+        str = null;
+
+        geneNames.flush();
+        geneNames.close();
         out.flush();
         out.close();
         return g;
     }
 
+    public static float [] getTheoryMatrix(String theoryFile)
+    {
+        try{
+            BufferedReader b = new BufferedReader(new FileReader(theoryFile));
+            String [] line = b.readLine().split("\t");
+            theorySources = line.length;
+            b.close();
+        }
+        catch(Exception e)
+        {
+            System.err.println("Couldn't open file to count number of sources");
+        }
+        int numGenes = 8098; //TODO load numGenes using other function
+        int length = (numGenes*(numGenes-1))/2;
+        for(int i = 0; i < theorySources;i++)
+        try {
+            System.out.println("Normalizing theory source " + i);
+            float [] temp = new float[length];
+            boolean [] keep = new boolean[length];
+            int total = 0;
+            BufferedReader b = new BufferedReader(new FileReader(theoryFile));
+            PrintStream out = new PrintStream("_temp_" + i + ".txt");
+            for(int j = 0; j < length;j++)
+            {
+                String line = b.readLine();
+                String x = line.split("\t")[i];
+                    temp[j] = Float.parseFloat(x);
+            }
+            float [] npn = NPNIgnore(temp,-1);
+            long time = System.nanoTime();
+            System.out.print("Printing Out normalized data to file...");
+            if(npn!=null)
+            {
+                for(int j = 0; j< npn.length;j++)
+                {
+                    out.println(npn[j]);
+                }
+            }
+            else
+            {
+                for(int j = 0; j < temp.length;j++)
+                {
+                    out.println(temp[j]);
+                }
+            }
+            time = System.nanoTime()-time;
+            System.out.println("Done: " + time/Math.pow(10,9));
+            out.flush();
+            out.close();
+        }
+        catch(Exception e)
+        {
+            e.printStackTrace();
+            System.err.println("Unable to read in theory file");
+            return null;
+        }
 
+        //Assume unique values greater than 5 = continuous columns
+        //Input: File name for the all theory data file,
+        // non-paranormal transform each NON-DISCRETE column,
+        // get mean z-score for each row,
+        // map it to the normal distribution given by the distribution of correlations
+        //return this vector
+        return null;
+    }
+
+
+    private static double mean(float[] t)
+    {
+        double mean = 0;
+        for(int i = 0; i < t.length;i++)
+            mean+=t[i];
+        return mean/t.length;
+    }
+
+    private static double sd(float [] t, double mean)
+    {
+        double sd = 0;
+        for(int i = 0; i< t.length;i++)
+        {
+            sd += Math.pow(t[i]-mean,2);
+        }
+        return Math.sqrt(sd/(t.length-1));
+    }
+
+    private static float[] ranks(float[] x) {
+
+        TreeMap<Float,Integer> temp = new TreeMap<Float,Integer>();
+        for(int i = 0; i < x.length;i++)
+        {
+            if(temp.get(x[i])!=null)
+                temp.put(x[i],temp.get(x[i])+1);
+            else
+                temp.put(x[i],1);
+        }
+        if(temp.keySet().size() <= maxIntDiscrete)
+            return null;
+        HashMap<Float,Float>ranks = new HashMap<Float,Float>();
+        int total = 1;
+        for(Float f:temp.navigableKeySet())
+        {
+            //put the average of total+count-1 and total
+            int count = temp.get(f);
+            float avg = (float)((total+count-1+total)/2.0);
+            ranks.put(f,avg);
+            total+=count;
+        }
+
+        /*ArrayIndexComparator c = new ArrayIndexComparator(x);
+        Integer [] ranks = c.createIndexArray();
+        Arrays.sort(ranks,c);*/
+
+
+        for(int i = 0; i < x.length;i++) {
+            x[i] = ranks.get(x[i]);
+
+        }
+
+        return x;
+    }
+
+
+    //TODO Needs debugged! Data Intensity Score looks whack
+    //Runs NPN on t, ignoring those elements of t that equal val
+    private static float [] NPNIgnore(float [] t, float val)
+    {
+        boolean [] keep = new boolean[t.length];
+        int total = 0;
+        for(int j = 0; j < t.length;j++)
+        {
+            if(t[j]!=val) {
+                keep[j] = true;
+                total++;
+            }
+        }
+        float [] npn = new float[total];
+        total = 0;
+        for(int j =0; j < t.length;j++)
+        {
+            if(keep[j])
+            {
+                npn[total] = t[j];
+                total++;
+            }
+        }
+         npn = NPN(npn);
+        if(npn!=null)
+        {
+            total = 0;
+            for (int j = 0; j < t.length; j++) {
+                if (keep[j]) {
+                    t[j] = npn[total];
+                    total++;
+                }
+            }
+        }
+        return t;
+    }
+    private static float [] NPN(float [] t)
+    {
+
+         double n = t.length;
+        final double delta = 1.0 / (4.0 * Math.pow(n, 0.25) * Math.sqrt(Math.PI * Math.log(n)));
+        final NormalDistribution normalDistribution = new NormalDistribution();
+
+
+            System.out.print("Computing ranks...");
+            long time = System.nanoTime();
+            t = ranks(t);
+            if(t==null)
+                return null;
+            time = System.nanoTime()-time;
+            System.out.println("Done: " + time/Math.pow(10,9));
+
+
+        System.out.print("Replacing ranks with normal distribution ICP...");
+            time = System.nanoTime();
+            for (int i = 0; i < t.length; i++) {
+                t[i] /= n;
+                if (t[i] < delta) t[i] = (float)delta;
+                if (t[i] > (1. - delta)) t[i] = (float)(1. - delta);
+                t[i] = (float)normalDistribution.inverseCumulativeProbability((double)t[i]);
+            }
+
+
+        time = System.nanoTime()-time;
+        System.out.println("Done: " + time/Math.pow(10,9));
+
+        double mu1 = mean(t);
+        double std1 = sd(t,mu1);
+        System.out.print("Normalizing by standard deviation...");
+        time = System.nanoTime();
+            for (int i = 0; i < t.length; i++) {
+                t[i] /= std1;
+                //   x[i] *= std1;
+                //     x[i] += mu1;
+            }
+        time = System.nanoTime()-time;
+        System.out.println("Done: " + time/Math.pow(10,9));
+
+            return t;
+    }
     //Loads in the correlation matrix from a file, and returns it as a 1D Array
     private static float [] loadCorrelations(double [][] data, String file)
     {
@@ -713,10 +967,8 @@ public class Functions
         mean=mean/numSamples;
         b2.close();
         allScores = null;
-        averageDiseaseScore = mean;
 
         /******************END AVERAGE DISEASE CODE*********************************************/
-        normalizeDisease =false;
         int familyInd = 2;
         int chromInd = 3;
         int symId = 0;
@@ -795,12 +1047,7 @@ public class Functions
 
 
         }
-        for(String x: geneDisease.keySet())
-        {
-            HashMap<Integer,Double> t = geneDisease.get(x);
-            if(dIntensityScore(t,diseaseID) > maxDiseaseIntensity)
-                maxDiseaseIntensity = dIntensityScore(t,diseaseID);
-        }
+
         b.close();
         b = new BufferedReader(new FileReader(expFile));
         b.readLine();
@@ -910,33 +1157,6 @@ public class Functions
         return indT.isIndependent(indT.getVariable(one.symbol),indT.getVariable(two.symbol),indT.getVariable(gen.symbol));
     }
 
-    //Return true if one and two are independnet, false otherwise
-    public static boolean computePValue(Gene one, Gene two)
-    {
-       // System.out.println(one + "," + two);
-        int ii = -1;
-        int jj = -1;
-        if(one.ID < two.ID)
-        {
-            ii =  one.ID;
-            jj = two.ID;
-        }
-        else
-        {
-            ii = two.ID;
-            jj = one.ID;
-        }
-        int index = (n*(n-1)/2) - (n-ii)*((n-ii)-1)/2 + jj - ii - 1;
-        if(indep[index]==(byte)0) {
-            indep[index] = indT.isIndependent(indT.getVariable(one.symbol),indT.getVariable(two.symbol)) ? (byte)1:(byte)-1;
-        }
-        if(indep[index]==(byte)1)
-            return true;
-        else
-            return false;
-
-    }
-
     //Return subset of a DataSet d based on the genes in the filename and in the list of clinical variables
     public static DataSet subsetData(DataSet d,String filename,ArrayList<String>clinical)
     {
@@ -956,4 +1176,6 @@ public class Functions
             return null;
         }
     }
+
+
 }

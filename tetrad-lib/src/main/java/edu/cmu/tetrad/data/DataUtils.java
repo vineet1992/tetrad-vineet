@@ -1710,8 +1710,8 @@ public final class DataUtils {
 
             for (int i = 0; i < x.length; i++) {
                 x[i] /= std;
-                x[i] *= std1;
-                x[i] += mu1;
+             //   x[i] *= std1;
+           //     x[i] += mu1;
             }
 
             X.assignColumn(j, new TetradVector(x));

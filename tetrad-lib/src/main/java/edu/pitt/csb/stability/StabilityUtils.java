@@ -101,7 +101,6 @@ public class StabilityUtils {
                         DataSet dataSubSamp = subsamples[s];
                         DataGraphSearch curGs = gs.copy();
                         Graph g = curGs.search(dataSubSamp);
-                        System.out.println(dataSubSamp.getVariableNames() + "\n" + g.getNodes());
                         DoubleMatrix2D curAdj = MixedUtils.skeletonToMatrix(g,dataSubSamp); //set weights so that undirected stability works
                         addToMat(thetaMat, curAdj);
                     }
@@ -175,7 +174,6 @@ public class StabilityUtils {
             protected void compute(){
                 if (to - from <= chunk) {
                     for (int s = from; s < to; s++) {
-                        System.out.println("Running: " + s);
                         DataSet dataSubSamp = data.subsetRows(samps[s]).copy();
 
                         DataGraphSearch curGs = gs.copy();

@@ -1,4 +1,7 @@
 package edu.pitt.csb.Pref_Div;
+import edu.cmu.tetrad.data.DataUtils;
+import org.apache.commons.math3.stat.StatUtils;
+
 import java.util.*;
 import java.io.*;
 
@@ -9,24 +12,25 @@ public class PrefExperiment
 		boolean diverseB = false;
 		double [] i_a = {0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1};
 		//double [] i_a = {0,0.25,0.5,0.75,1};
-		PrintStream out2 = new PrintStream("intensity_values.txt");
-		double intensity_a = 0.3;
+		double intensity_a = 0.3; //TODO Will be set via a subsampling procedure
 		double radius = 0.25;
+
 		double accuracy = 0.5;
-		int [] diseaseID = {6142}; //Breast Cancer
-		String [] files = new String[4];
-		files[0] = "TCGA_BRCA_FILES/expression_transposed_npn.txt";
-		files[1] = "TCGA_BRCA_FILES/foldChanges_new.txt";
+		int [] diseaseID = {6142}; //Breast Cancer //TODO needs to be a parameter for the algorithm
+		String [] files = new String[5];
+		//files[0] = "TCGA_BRCA_FILES/expression_transposed_npn.txt";
+		files[0] = "MUC1_RNA_Seq.txt";
+		files[1] = "MI_Genes.txt";
+		//files[1] = "TCGA_BRCA_FILES/foldChanges_new.txt"; //TODO Need to compute this file here locally
 		files[2] = "all_gene_disease_associations.tsv";
 		files[3] = "final_gene_data.txt";
+		files[4] = "Data Files/string_parsed.txt";
 		ArrayList<Gene> g = Functions.loadGeneData(".",files,diseaseID,true);
-		for(Gene x: g)
-		{
-			x.intensityValue = Functions.computeIntensity(x,intensity_a,diseaseID);
-			out2.println(x.symbol+"\t"+x.intensityValue); //Print all intensity values out to file
-		}
+
+		//Functions.getTheoryMatrix("all_sources.txt");
+
+		System.exit(0);
 		int [] topK = {50,100,500};
-		
 		double [] constants = {0,0.25,0.5,0.75,1.0};
 		
 		for(int k = 0; k < topK.length;k++) //Loop over sizes of returned results (Top-K)
@@ -36,7 +40,6 @@ public class PrefExperiment
 						for(Gene x: g)
 						{
 							x.intensityValue = Functions.computeIntensity(x,intensity_a,diseaseID);
-							out2.println(x.symbol+"\t"+x.intensityValue); //Print all intensity values out to file
 						}
 						//Sort by intensity
 						Collections.sort(g,Gene.IntensityComparator);

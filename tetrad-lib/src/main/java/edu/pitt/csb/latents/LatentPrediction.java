@@ -820,7 +820,6 @@ s.setRun(runNumber);
             protected void compute() {
                 if (to - from <= chunk) {
                     for (int s = from; s < to; s++) {
-                        System.out.println(data.getVariableNames());
                         DataSet temp = data.subsetColumns(subsets[s]);
                         ArrayList<Pair> origLatents = new ArrayList<Pair>();
                         try {

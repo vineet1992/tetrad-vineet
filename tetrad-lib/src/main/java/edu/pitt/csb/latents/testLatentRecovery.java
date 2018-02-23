@@ -30,11 +30,11 @@ public class testLatentRecovery {
     public static void main(String [] args)throws Exception
     {
         boolean numEdgesRandom = true;
-        boolean prune = false;
-        boolean requireFullEdge = false;
-        boolean noDiscreteLatents = true;
+        boolean prune = false; // prune latent predictions that don't hold up to the explain away test
+        boolean requireFullEdge = false; //Require the edge to be present in the full dataset to count
+        boolean noDiscreteLatents = true; //Don't allow discrete variables to be latents (no discrete variables in the TCGA)
         int numLambdas = 40;
-        int numVariables = 100;
+        int numVariables = 50;
         int numLatents = 10;
         int numEdges = 50;
         int sampleSize = 1000;

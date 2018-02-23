@@ -21,7 +21,9 @@ import java.io.PrintStream;
 import java.util.Arrays;
 
 /**
- * Created by vinee_000 on 10/13/2017.
+ * This class can actually be used for both Microarray analysis and RNA-Seq analysis
+ *  It will run STEPS and PC Stable on the full dataset to get neighbor estimates for the specified target
+ *  It will also run a Leave one out Full Cross Validation (STEPS and PCS on each training dataset)
  */
 public class STEPS_RNA_SEQ {
     public static void main(String [] args)throws Exception
@@ -98,9 +100,13 @@ public class STEPS_RNA_SEQ {
         System.out.println("Done");
         PrintStream out = new PrintStream(args[1]);
         out.println(g2);
+        IndependenceTest iTest = new IndTestMultinomialAJ(d,0.05);
+        PcStable pcs = new PcStable(iTest);
+        pcs.setInitialGraph(g2);
+        Graph g3 = pcs.search();
         out.flush();
         out.close();
-        out = new PrintStream(args[2]);
+        out = new PrintStream(stabOut);
         for(int i = 0; i < d.getNumColumns();i++)
         {
             out.print(d.getVariable(i).getName());
@@ -122,10 +128,11 @@ public class STEPS_RNA_SEQ {
             }
         }
 
-
-
+        out = new PrintStream("PCS_" + graphOut);
+        out.println(g3);
         out.flush();
         out.close();
+
 
         //This portion tells us how good the modeling procedure is on this dataset (cross-validation of the full procedure)
 
@@ -133,7 +140,6 @@ public class STEPS_RNA_SEQ {
         {
 
             System.out.println("Cross Validation for Subsample " + i + " out of " + subs.length + "...");
-            //TODO fix this up and possibly repeat STEPS procedure on each subsample? Not sure what to do here exactly
             //Only select the features that are stable across subsamples, and that are connected when running MGM on full train
             DataSet train = subs[i];
             s = new STEPS(train,lambda,g,ns,true);
