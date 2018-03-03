@@ -25,17 +25,18 @@ public class priorTest {
     {
         boolean numEdgesRandom = true;
         double amountPrior = .1;
-        boolean reliable = false;
-        boolean diffNumPrior = false;
+        boolean reliable = false; //Are all priors reliable?
+        boolean diffNumPrior = false; //Does each prior provide with the same number of edges?
+        boolean correctEdges = false; //Determines whether or not we will use correct edges only for unreliable priors as well or not
         boolean pureRandom = false; //Only for different number of edges given by each prior, this sets the priors to be purely random with reliability computed after the fact
-        int reliableExperts = 3;
+        int reliableExperts = 1; //How many priors are reliable?
         int numExperts = 5;
         int numLambdas = 40;
         int numVariables = 100;
         int numEdges = 75;
         int sampleSize = 500;
         int numSubsamples = 10;
-        int numRuns = 25;
+        int numRuns = 15;
         int index = 0;
         int numCategories = 4;
         double gamma = 0.05;
@@ -257,9 +258,9 @@ public class priorTest {
           //  else if(reliable&&diffNumPrior)
             //    priors = simulatePriorDim(c.getTrueGraph(),numExperts,priors,c.getDataSet(0)); TODO
             else
-                priors = simulatePriorUnreli(c.getTrueGraph(),amountPrior,numExperts,c.getDataSet(0),reliableExperts);
+                priors = simulatePriorUnreli(c.getTrueGraph(),amountPrior,numExperts,c.getDataSet(0),reliableExperts,correctEdges);
             boolean done = false;
-            if (!diffNumPrior)
+            if (!diffNumPrior && correctEdges)
                  checkPriors(c.getTrueGraph(),c.getDataSet(0),priors,i,true);
             else
                 checkPriors(c.getTrueGraph(),c.getDataSet(0),priors,i,false);
@@ -626,7 +627,7 @@ public class priorTest {
         return temp;
     }
     //Generates unreliable priors, currently generates the entire set of priors from scratch, can't deal with potentially generated priors TODO
-    public static TetradMatrix [] simulatePriorUnreli(Graph g, double ap, int numExperts, DataSet d, int numReliable) {
+    public static TetradMatrix [] simulatePriorUnreli(Graph g, double ap, int numExperts, DataSet d, int numReliable, boolean correctEdges) {
         Random rand = new Random();
         TetradMatrix[] temp = new TetradMatrix[numExperts];
         for (int i = 0; i < numExperts; i++)
@@ -634,8 +635,11 @@ public class priorTest {
             TetradMatrix curr = new TetradMatrix(g.getNumNodes(), g.getNumNodes());
             temp[i] = curr;
         }
-        List<Node> list = g.getNodes();
-        for(Edge e:g.getEdges()) {
+
+        if(correctEdges) //The priors only generate information about correct edges, reliable ones just give better information
+        {
+            List<Node> list = g.getNodes();
+            for (Edge e : g.getEdges()) {
 
                 if (rand.nextDouble() < ap) {
                     for (int i = 0; i < numExperts; i++) {
@@ -643,7 +647,7 @@ public class priorTest {
                         int x = d.getColumn(d.getVariable(e.getNode1().getName()));
                         int y = d.getColumn(d.getVariable(e.getNode2().getName()));
                         double randDoub = 0;
-                        if(i < numReliable) //This is a reliable expert
+                        if (i < numReliable) //This is a reliable expert
                             randDoub = rand.nextDouble() * .3 + .6;
                         else //Unreliable experts gives a uniformly distributed number from 0 to 1
                             randDoub = rand.nextDouble();
@@ -652,6 +656,49 @@ public class priorTest {
                     }
                 }
             }
+        }
+        else
+        {
+            //Sets the priors for reliable experts (only true edges)
+            int count = 0;
+            for(Edge e: g.getEdges())
+            {
+                if(rand.nextDouble() < ap)
+                {
+                    for(int i = 0; i < numExperts;i++)
+                    {
+                        if( i < numReliable)
+                        {
+                            int x = d.getColumn(d.getVariable(e.getNode1().getName()));
+                            int y = d.getColumn(d.getVariable(e.getNode2().getName()));
+                            double randDoub = rand.nextDouble()*.3+0.6;
+                            temp[i].set(x,y,randDoub);
+                            temp[i].set(y,x,randDoub);
+
+                        }
+                    }
+                    count++;
+                }
+            }
+
+            //Sets the priors for unreliable experts (purely random edges)
+            for(int j = 0; j < count;j++)
+            {
+                int x = rand.nextInt(d.getNumColumns());
+                int y = rand.nextInt(d.getNumColumns());
+                while(x==y)
+                    y = rand.nextInt(d.getNumColumns());
+                for(int k = numReliable; k < numExperts;k++)
+                {
+                    double randDoub = rand.nextDouble()*0.3+0.6;
+                    temp[k].set(x,y,randDoub);
+                    temp[k].set(y,x,randDoub);
+                }
+            }
+            //For the reliable experts, we randomly pick ap percent of true edges and set them to a probability
+            //For the unreliable experts, we randomly pick (ap*num true edges) and set them to a probability
+
+        }
         return temp;
     }
     public static TetradMatrix [] simulatePriorDim(Graph g, double ap, int numExperts,TetradMatrix [] currPrior,DataSet d)

@@ -1,5 +1,9 @@
 package edu.pitt.csb.Pref_Div;
 
+import edu.cmu.tetrad.data.DataSet;
+import edu.cmu.tetrad.util.StatUtils;
+import javafx.collections.transformation.SortedList;
+
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -18,20 +22,37 @@ public class PrefDiv {
     public ArrayList<Gene> G = new ArrayList<Gene>();
     public ArrayList<Gene> B = new ArrayList<Gene>();
     public HashMap<Gene,List<Gene>> clusters;
+    private float [] corrMat;
+    private float [] theoryMat;
     public double topKIntensity;
    private double []diverse;
+   private double alpha;
+   private int preSampleSize = 5000;
+   private DataSet data;
    private boolean clustering = false;
-    
-    public PrefDiv(ArrayList<Gene> items, int topK, double accuracy, double radius, double topKIntensity) throws IOException {
+   private boolean computeCorrs;
+   private ArrayList<Float> sampledCorrs;
+
+   //TODO clustering is fine, need to decide if variables in the same cluster are allowed to be in the Top K together?
+    public PrefDiv(ArrayList<Gene> items, int topK, double accuracy, double radius, double topKIntensity,float [] theory,double alpha,DataSet data,boolean computeAllCorrs) {
     	this.topK = topK;
     	this.accuracy = accuracy;
     	this.radius = radius;
     	this.items = items;
     	this.result = new ArrayList<Gene>();
     	this.topKIntensity = topKIntensity;
+    	this.theoryMat = theory;
+    	if(computeAllCorrs)
+    	    corrMat = Functions.computeAllCorrelations(items,data);
+    	else {
+            corrMat = new float[(items.size() * (items.size() - 1)) / 2];
+        }
+    	 this.alpha = alpha;
+    	this.data = data;
+    	this.computeCorrs = computeAllCorrs;
     }
     
-	public PrefDiv(double[]d, ArrayList<Gene> items, int topK, double accuracy, double radius, double topKIntensity) throws IOException {
+	public PrefDiv(double[]d, ArrayList<Gene> items, int topK, double accuracy, double radius, double topKIntensity) {
     	this.diverse = d;
 		this.topK = topK;
     	this.accuracy = accuracy;
@@ -45,6 +66,10 @@ public class PrefDiv {
     //============================================================
     
 
+    public void setPreSampleSize(int ss)
+    {
+        this.preSampleSize = ss;
+    }
     public void setCluster(boolean clust)
     {
         clustering = clust;
@@ -59,8 +84,11 @@ public class PrefDiv {
     
     
     public ArrayList<Gene> diverset() {
-    	
-        System.out.println("original item size = " + this.items.size());
+
+	    if(!computeCorrs)
+	        sampleCorrelations();
+	    long time = System.nanoTime();
+      //  System.out.println("original item size = " + this.items.size());
     	
     	if(this.items.size() == topK){   		
             this.result = items;
@@ -105,6 +133,7 @@ public class PrefDiv {
             temp = eliminate(temp, radius);
 
             result.addAll(temp);
+
 
             // Use B according to accuracy
             if (i != 0)
@@ -151,7 +180,7 @@ public class PrefDiv {
 
         int addUp = this.topK - result.size();
         if (addUp > 0) {
-        	System.out.println("addUp size = " + addUp);
+      //  	System.out.println("addUp size = " + addUp);
             for (int i = 0; i < addUp; i++) {
                 result.add(G.get(i));
             }
@@ -160,11 +189,19 @@ public class PrefDiv {
         G.clear();
         this.result.addAll(result);
 
+        for(int x = 0; x < result.size();x++)
+        {
+            if(clusters.get(result.get(x))==null)
+                clusters.put(result.get(x),null);
+        }
+
+        time = System.nanoTime()-time;
+       // System.out.println("Acutal Pref-Div Time: " + time/Math.pow(10,9));
         return result;
    
     }
 
-    //Identify lower intensity genes to removed from input, since another similar gene is already in input
+    //Identify lower intensity genes to be removed from input, since another similar gene is already in input
     public ArrayList<Gene> eliminate(ArrayList<Gene> input, double radius){
         ArrayList<Gene> output = new ArrayList<Gene>(input);
         ArrayList<Gene> finalOutput = new ArrayList<Gene>();
@@ -263,6 +300,51 @@ public class PrefDiv {
     }
     
 
+    private void sampleCorrelations()
+    {
+        Random rand = new Random();
+        sampledCorrs = new ArrayList<Float>();
+        double [][] temp = data.getDoubleData().transpose().toArray();
+        int [] indices = new int[preSampleSize];
+        float [] preCorrs = new float[preSampleSize];
+        for(int i = 0; i < this.preSampleSize;i++)
+        {
+            int x = 0;
+            int y = 0;
+            while(x==y)
+            {
+                x = rand.nextInt(items.size());
+                y = rand.nextInt(items.size());
+            }
+            if(x > y)
+            {
+                int t = x;
+                x = y;
+                y = t;
+            }
+            int index = Functions.getIndex(x,y,items.size());
+            float corr = (float)Math.abs(StatUtils.correlation(temp[data.getColumn(data.getVariable(items.get(x).symbol))],temp[data.getColumn(data.getVariable(items.get(y).symbol))]));
+            indices[i] = index;
+            preCorrs[i] = corr;
+            sampledCorrs.add(corr);
+
+        }
+        preCorrs = Functions.NPN(preCorrs,true);
+        for(int i = 0; i < preCorrs.length;i++)
+        {
+            corrMat[indices[i]] = preCorrs[i];
+        }
+
+        Collections.sort(sampledCorrs);
+    }
+    private float corrOnTheFly(int i, int j)
+    {
+        double [][] temp = data.getDoubleData().transpose().toArray();
+        float corr = (float)Math.abs(StatUtils.correlation(temp[data.getColumn(data.getVariable(items.get(i).symbol))],temp[data.getColumn(data.getVariable(items.get(j).symbol))]));
+        corr = Functions.NPNonTheFly(corr,sampledCorrs);
+        corrMat[Functions.getIndex(i,j,items.size())] = corr;
+        return corr;
+    }
     public static boolean compareFloatArr(float[] fArr1,float[] fArr2){
     	if(fArr1.length != fArr2.length)
     		return false;
@@ -274,17 +356,28 @@ public class PrefDiv {
     }
     
     public double distance(Gene gene1, Gene gene2) {
-		double diverse_a = 0.25;
-		double diverse_b = 0.25;
-		double diverse_c = 0.25;
-		if(diverse!=null)
-		{
-			diverse_a = diverse[0];
-			diverse_b = diverse[1];
-			diverse_c = diverse[2];
-		}
-    	
-		return Functions.computeDistance(gene1,gene2,diverse_a,diverse_b,diverse_c);
+
+        int i = gene1.ID;
+        int j = gene2.ID;
+        if(gene1.ID > gene2.ID)
+        {
+            int temp = i;
+            i = j;
+            j = temp;
+        }
+        float c = corrMat[Functions.getIndex(i,j,items.size())];
+        if(!computeCorrs)
+        {
+            if(c==0.0f)
+            {
+                c = corrOnTheFly(i,j);
+            }
+
+        }
+        if(theoryMat[Functions.getIndex(i,j,items.size())]==-1)
+            return c;
+        else
+            return c*alpha + theoryMat[Functions.getIndex(i,j,items.size())]*(1-alpha);
     }
 
 

@@ -61,7 +61,6 @@ public TetradMatrix cov;
         for (int i = 0; i < parameters.getInt("numRuns"); i++) {
             SemPm pm = new SemPm(graph);
             SemIm im = new SemIm(pm);
-            System.out.println(im);
             int numNodes = numDeter;
             ArrayList<Node> used = new ArrayList<Node>();
             Random rando = new Random();
@@ -79,7 +78,6 @@ public TetradMatrix cov;
                 }
                 used.add(curr);
                curr =  im.getVariableNode("X" + (node+1));
-                im.setErrVar(curr,0.01);
 
             }
             if(parameters.getInt("faithful")==1)

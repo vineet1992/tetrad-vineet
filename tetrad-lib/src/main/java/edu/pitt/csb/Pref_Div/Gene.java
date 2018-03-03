@@ -8,7 +8,7 @@ public class Gene
     {
         ID = d;
     }
-    public String toString()
+   /* public String toString()
     {
         String x = "ID: " + Integer.toString(ID) + "\n";
         x+= "Fold Change: " + Double.toString(foldChange) + "\n";
@@ -17,7 +17,11 @@ public class Gene
         x+= "Chromosome Number: " + chromosome + ", from " + chromosomeStart + " to " + chromosomeStop + "\n";
         x+= "Disease Scores: " + diseaseScores;
         return x;
-    }
+    }*/
+   public String toString()
+   {
+       return symbol;
+   }
     int ID; //unique ID for the gene
     public double foldChange; //denotes the fold change in values from control to tumor patients
     public String symbol; //denotes the official Gene Symbol for this Gene
@@ -27,6 +31,8 @@ public class Gene
     long chromosomeStop; //denotes the stopping base pair for this gene
     HashMap<Integer,Double> diseaseScores; //Denotes all
     double intensityValue;
+    double dataIntensity;
+    double theoryIntensity;
 
 
     public double compareTo(Gene p) {
@@ -46,5 +52,4 @@ public class Gene
             }
         }
     };
-
 }

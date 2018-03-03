@@ -1,5 +1,8 @@
 package edu.pitt.csb.Pref_Div;
+import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.data.DataUtils;
+import edu.cmu.tetrad.search.Fci;
+import edu.pitt.csb.mgm.MixedUtils;
 import org.apache.commons.math3.stat.StatUtils;
 
 import java.util.*;
@@ -7,70 +10,217 @@ import java.io.*;
 
 public class PrefExperiment
 {
+
+
+	//TODO Add if target variable is null, just use the highest variance genes as the intensity score
+	//TODO if disease IDs are null, just use the data for intensity
 	public static void main(String [] args) throws Exception
 	{
-		boolean diverseB = false;
-		double [] i_a = {0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1};
-		//double [] i_a = {0,0.25,0.5,0.75,1};
-		double intensity_a = 0.3; //TODO Will be set via a subsampling procedure
-		double radius = 0.25;
-
-		double accuracy = 0.5;
-		int [] diseaseID = {6142}; //Breast Cancer //TODO needs to be a parameter for the algorithm
+		//PARAMS
+		int numAlphas = 20;
+		int ns = 20;
+		double threshold = 0.0;
+		double accuracy = 0;
+		double radius = 0.5; //NEED to figure out how to set this in a principled way TODO
+		int [] topK = {50};
+		int [] diseases = {6142};
+		boolean normalizeFiles = false;
+		boolean loocv = false;
+		boolean approxCorrelations = true;
+		String dataFile = "";
+		String intensityFile = "";
+		String dissimilarityFile = "";
+		String outputFile = "";
+		String clusterFile = "";
+		String target = "";
 		String [] files = new String[5];
 		//files[0] = "TCGA_BRCA_FILES/expression_transposed_npn.txt";
-		files[0] = "MUC1_RNA_Seq.txt";
-		files[1] = "MI_Genes.txt";
+		files[0] = "MUC1_RNA_Seq.txt"; //File with only gene expression, rows are genes, columns are samples
+		//files[1] = "MI_Genes.txt";
 		//files[1] = "TCGA_BRCA_FILES/foldChanges_new.txt"; //TODO Need to compute this file here locally
-		files[2] = "all_gene_disease_associations.tsv";
-		files[3] = "final_gene_data.txt";
-		files[4] = "Data Files/string_parsed.txt";
-		ArrayList<Gene> g = Functions.loadGeneData(".",files,diseaseID,true);
 
-		//Functions.getTheoryMatrix("all_sources.txt");
+		//Constant theory files if using the default theory matrices
+		files[1] = "all_gene_disease_associations.tsv";
+		files[2] = "final_gene_data.txt";
+		files[3] = "Data Files/string_parsed.txt";
+		/////////////////////////////////////////////////////////////
 
-		System.exit(0);
-		int [] topK = {50,100,500};
-		double [] constants = {0,0.25,0.5,0.75,1.0};
-		
+
+		int index = 0;
+		while(index < args.length)
+		{
+			try {
+				if (args[index].equals("-ns")) {
+					ns = Integer.parseInt(args[index + 1]);
+					index += 2;
+				} else if (args[index].equals("-na")) {
+					numAlphas = Integer.parseInt(args[index + 1]);
+					index += 2;
+				} else if (args[index].equals("-A")) {
+					accuracy = Double.parseDouble(args[index + 1]);
+					index += 2;
+				} else if (args[index].equals("-r")) {
+					radius = Double.parseDouble(args[index + 1]);
+					index += 2;
+				} else if (args[index].equals("-topK")) {
+					index++;
+					ArrayList<Integer> temp = new ArrayList<Integer>();
+					while (!args[index].startsWith("-")) {
+						temp.add(Integer.parseInt(args[index]));
+						index++;
+					}
+					Integer[] t = (Integer[]) temp.toArray();
+					topK = new int[t.length];
+					for (int i = 0; i < t.length; i++)
+						topK[i] = t[i];
+				} else if (args[index].equals("-D")) {
+					index++;
+					ArrayList<Integer> temp = new ArrayList<Integer>();
+					while (!args[index].startsWith("-")) {
+						temp.add(Integer.parseInt(args[index]));
+						index++;
+					}
+					Integer[] t = (Integer[]) temp.toArray();
+					diseases = new int[t.length];
+					for (int i = 0; i < t.length; i++)
+						diseases[i] = t[i];
+				} else if (args[index].equals("-normal")) {
+					normalizeFiles = true;
+					index++;
+				} else if (args[index].equals("-t")) {
+					target = args[index + 1];
+					index += 2;
+				} else if (args[index].equals("-data")) {
+					dataFile = args[index + 1];
+					index += 2;
+				} else if (args[index].equals("-in")) {
+					intensityFile = args[index + 1];
+					index += 2;
+				} else if (args[index].equals("-dis")) {
+					dissimilarityFile = args[index + 1];
+					index += 2;
+				} else if (args[index].equals("-out")) {
+					outputFile = args[index + 1];
+					index += 2;
+				} else if (args[index].equals("-outCluster")) {
+					clusterFile = args[index + 1];
+					index += 2;
+				}
+				else if(args[index].equals("-g"))
+				{
+					threshold = Double.parseDouble(args[index+1]);
+					index+=2;
+				}
+				else if(args[index].equals("-loocv"))
+				{
+					loocv = true;
+					index++;
+				}
+				else if(args[index].equals("-approx"))
+				{
+					approxCorrelations = true;
+					index++;
+				}
+			}
+			catch(ArrayIndexOutOfBoundsException e)
+			{
+				System.err.println("No Argument given after: " + args[index]);
+				System.exit(-1);
+			}
+			catch(Exception e)
+			{
+				System.err.println("Unable to parse argument for: " + args[index]);
+				System.exit(-1);
+			}
+		}
+
+		if(target.equals(""))
+		{
+			System.err.println("Can't compute intensity values without a target, usage: (-t <target>)");
+			System.exit(-1);
+		}
+		if(dataFile.equals(""))
+		{
+			System.err.println("No data file specified, usage: (-data <filename>)");
+			System.exit(-1);
+		}
+		if(outputFile.equals(""))
+		{
+			outputFile = "OUT_" + dataFile;
+		}
+
+		if(clusterFile.equals(""))
+		{
+			clusterFile = "CLUST_" + dataFile;
+		}
+
+		DataSet data = null;
+		try {
+			data = MixedUtils.loadDataSet2(dataFile);
+		}
+		catch(Exception e)
+		{
+			System.err.println("Unable to load data from: " + dataFile);
+			e.printStackTrace();
+			System.exit(-1);
+		}
+		float [] dissimilarity;
+		ArrayList<Gene> g;
+		if(dissimilarityFile=="" || intensityFile=="")//Use Default Theory computations (user only specifies the data file)
+		{
+			System.out.print("Creating Gene Data...");
+			g = Functions.loadGeneData(".",files,diseases,true);
+			System.out.println("Done");
+			System.out.print("Creating Theory Data...");
+			dissimilarity = Functions.createTheoryMatrix("all_dissimilarity_sources.txt");
+			System.out.println("Done");
+		}
+		else { //Use user specified, files
+			System.out.print("Loading Gene Data...");
+			g = Functions.loadGeneData(intensityFile, normalizeFiles);
+			System.out.println("Done");
+			System.out.print("Loading Theory Matrix...");
+			dissimilarity = Functions.loadTheoryMatrix(dissimilarityFile,normalizeFiles);
+			System.out.println("Done");
+		}
+		//ArrayList<Gene> g = Functions.loadGeneData(".",files,diseases,true);
 		for(int k = 0; k < topK.length;k++) //Loop over sizes of returned results (Top-K)
 					{
-
-						//Compute the intensity value of all genes, based on "alpha" parameter, and the input disease ID for disease of interest
-						for(Gene x: g)
-						{
-							x.intensityValue = Functions.computeIntensity(x,intensity_a,diseaseID);
-						}
-						//Sort by intensity
-						Collections.sort(g,Gene.IntensityComparator);
-						System.out.println(k);
+						System.out.println("Running Pref Div for Top-" + topK[k] + " Genes");
 						//Print out to the file for each size of returned results
-						PrintStream out = new PrintStream("output_" + k + ".txt");
-						PrintStream out3 = new PrintStream("clusters_" + k + ".txt");
+						PrintStream out = new PrintStream(k + "_" + outputFile);
+						PrintStream out3 = new PrintStream(k + "_" + clusterFile);
 						//Run Pref-Div algorithm to find a diverse and relevant gene set
-						PrefDiv pd = new PrefDiv(g,topK[k],accuracy,radius,PrefDiv.findTopKIntensity(g,topK[k]));
-						pd.setCluster(true);
-						ArrayList<Gene> Result = pd.diverset();
+						RunPrefDiv r = new RunPrefDiv(dissimilarity,g,data,target,loocv);
+						r.setNS(ns);
+						r.setAccuracy(accuracy);
+						r.setNumAlphas(numAlphas);
+						r.setDiseases(diseases);
+						r.setRadius(radius);
+						r.setTopK(topK[k]);
+						r.setThreshold(threshold);
+						r.setApproxCorrelations(approxCorrelations);
 
-						//Print out some statistics about the result
-						System.out.println("PD diversity = " + pd.averageDistance());
-						System.out.println("PD normalizedIntensity = " + pd.normalizedIntensity());
-						System.out.println("PD Coverage = " + pd.coverage());
-						//Print the output gene list to file
+						ArrayList<Gene> Result = r.runPD();
+
 						for(Gene stuff: Result)
 						{
 							out.println(stuff.symbol);
 						}
-						for(Gene stuff:pd.clusters.keySet())
+						for(Gene stuff:r.getClusters().keySet())
 						{
-							List<Gene> temp = pd.clusters.get(stuff);
-							out3.print(stuff.symbol + "\t");
-							for(int i = 0; i < temp.size();i++)
-							{
-								if(i==temp.size()-1)
-									out3.println(temp.get(i).symbol);
-								else
-									out3.print(temp.get(i).symbol+"\t");
+							List<Gene> temp = r.getClusters().get(stuff);
+							if(temp==null)
+								out3.println(stuff.symbol);
+							else
+								out3.print(stuff.symbol + "\t");
+							if(temp!=null) {
+								for (int i = 0; i < temp.size(); i++) {
+									if (i == temp.size() - 1)
+										out3.println(temp.get(i).symbol);
+									else
+										out3.print(temp.get(i).symbol + "\t");
+								}
 							}
 						}
 						out3.flush();
@@ -78,74 +228,5 @@ public class PrefExperiment
 						out.flush();
 						out.close();
 					}
-		
-		/*
-		if(!diverseB)
-		{
-			for(int i = 0; i < i_a.length; i ++)
-			{
-				for(int j = 0; j < topK.length;j++)
-				{
-					for(Gene x: g)
-					{
-						x.intensityValue = Functions.computeIntensity(x,intensity_a,diseaseID);
-						out2.println(x.symbol+"\t"+x.intensityValue);
-					}
-					Collections.sort(g,Gene.IntensityComparator);
-						PrintStream out = new PrintStream("output_" + i + "_" + j + ".txt");
-						PrefDiv pd = new PrefDiv(g,topK[j],i_a[i],radius,PrefDiv.findTopKIntensity(g,topK[j]));
-						pd.diverset();
-						ArrayList<Gene> Result = pd.getResultGenes();
-						System.out.println("PD diversity = " + pd.averageDistance());
-						System.out.println("PD normalizedIntensity = " + pd.normalizedIntensity());
-						System.out.println("PD Coverage = " + pd.coverage());
-						for(Gene stuff: Result)
-						{
-							out.println(stuff.symbol);
-						}
-						out.flush();
-							out.close();
-				}
-			}
-		}
-		/*else
-		{
-			for(int a = 0; a < 4 ;a++) //choose a score to parametrize
-			{
-				for(int b = 0; b < 5; b++ )//choose a value (0.25,0.5,0.75,1.0)
-				{
-					double [] diverse = new double[3];
-					diverse[0] = (1-constants[b])/3;
-					diverse[1] = diverse[0];
-					diverse[2] = diverse[1];
-					if(a!=3)
-					{
-						diverse[a] = constants[b];
-					}
-					
-					
-					for(Gene x: g)
-						x.intensityValue = Functions.computeIntensity(x,intensity_a,diseaseID);
-					Collections.sort(g,Gene.IntensityComparator);
-					for(int k = 0; k < topK.length;k++)
-					{
-						System.out.println(a + "_" + b + "_" + k);
-						PrintStream out = new PrintStream("output_" + a + "_" + b + "_" + k + ".txt");
-						PrefDiv pd = new PrefDiv(diverse,g,topK[k],accuracy,radius,PrefDiv.findTopKIntensity(g,topK[k]));
-						pd.diverset();
-						ArrayList<Gene> Result = pd.getResultGenes();
-						System.out.println("PD diversity = " + pd.averageDistance());
-						System.out.println("PD normalizedIntensity = " + pd.normalizedIntensity());
-						System.out.println("PD Coverage = " + pd.coverage());
-						for(Gene stuff: Result)
-						{
-							out.println(stuff.symbol);
-						}
-						out.flush();
-							out.close();
-					}
-				}
-			}
-		}*/
 	}
 }

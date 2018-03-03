@@ -16,7 +16,9 @@ import edu.pitt.csb.stability.DataGraphSearch;
 import edu.pitt.csb.stability.SearchWrappers;
 import edu.pitt.csb.stability.StabilityUtils;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.PrintStream;
 import java.util.Arrays;
 
@@ -28,6 +30,7 @@ import java.util.Arrays;
 public class STEPS_RNA_SEQ {
     public static void main(String [] args)throws Exception
     {
+        String stepsFile = "HV_No_Mayo.out"; //Allows reloading of the work that has already been done to avoid extra STEPS runs
         DelimiterType d2 = DelimiterType.TAB;
         DataSet d = MixedUtils.loadDataSet2(args[0],d2);
         String graphOut = args[1];
@@ -62,19 +65,46 @@ public class STEPS_RNA_SEQ {
         {
             lambda[i] = .1+(.7/numLambdas)*i;
         }
-        STEPS s = new STEPS(d,lambda,g,d.getNumRows(),true);
-        System.out.print("Running StEPS...");
-        Graph g2 = s.runStepsPar();
-        System.out.println("Done");
-        double [][] stab = s.stabilities;
-        double [] l = s.lastLambda;
+        double [] l = null;
+        double [][] stab = null;
+        Graph g2 = null;
+        BufferedReader b = new BufferedReader(new FileReader(stepsFile));
 
-        System.out.println("Lambdas Chosen: " + Arrays.toString(s.lastLambda));
+        if(!stepsFile.equals("")) {
+
+            String line = "";
+            while (true) {
+                line = b.readLine();
+                if (line.startsWith("Lambdas"))
+                    break;
+            }
+        }
+            /*
+            String [] stuff = line.split("\\[")[1].split(",");
+            l = new double[]{Double.parseDouble(stuff[0]),Double.parseDouble(stuff[1].trim()),Double.parseDouble(stuff[2].replace("]","").trim())};
+            MGM m = new MGM(d,l);
+            m.learnEdges(1000);
+            g2 = m.graphFromMGM();
+            stab = StabilityUtils.StabilitySearchPar(d,new SearchWrappers.MGMWrapper(lambda)).toArray();
+
+
+
+        }
+else {
+            STEPS s = new STEPS(d, lambda, g, d.getNumRows(), true);
+            System.out.print("Running StEPS...");
+            g2 = s.runStepsPar();
+            System.out.println("Done");
+            stab = s.stabilities;
+            l = s.lastLambda;
+        }
+
+        System.out.println("Lambdas Chosen: " + Arrays.toString(l));
 
 
         //This first segment tells us what the model will look like using the full dataset
-        double [] params = {s.lastLambda[0],s.lastLambda[1],s.lastLambda[2]};
-        DataGraphSearch gs = new SearchWrappers.MGMWrapper(params);
+        double [] params = {l[0],l[1],l[2]};
+        DataGraphSearch gs = new SearchWrappers.MGMWrapper(params);*/
         int [][] samps = StabilityUtils.generateSubsamples(d.getNumRows());
         DataSet [] subs = new DataSet[ns];
         for(int i = 0; i < ns;i++) {
@@ -95,9 +125,7 @@ public class STEPS_RNA_SEQ {
             temp.flush();
             temp.close();
         }
-        System.out.print("Finding Full Data Stabilities...");
-        DoubleMatrix2D edges = StabilityUtils.StabilitySearchPar(d,gs,subs);
-        System.out.println("Done");
+        /*
         PrintStream out = new PrintStream(args[1]);
         out.println(g2);
         IndependenceTest iTest = new IndTestMultinomialAJ(d,0.05);
@@ -133,6 +161,8 @@ public class STEPS_RNA_SEQ {
         out.flush();
         out.close();
 
+        */
+        //TODO Remove these comments marks
 
         //This portion tells us how good the modeling procedure is on this dataset (cross-validation of the full procedure)
 
@@ -142,10 +172,40 @@ public class STEPS_RNA_SEQ {
             System.out.println("Cross Validation for Subsample " + i + " out of " + subs.length + "...");
             //Only select the features that are stable across subsamples, and that are connected when running MGM on full train
             DataSet train = subs[i];
-            s = new STEPS(train,lambda,g,ns,true);
-            Graph gOut = s.runStepsPar();
-            double [][] stabs = s.stabilities;
-            double [] lam = {s.lastLambda[0],s.lastLambda[1],s.lastLambda[2]};
+
+
+            double [] lam = null;
+            double [][] stabs = null;
+            Graph gOut = null;
+            if(!stepsFile.equals(""))
+            {
+                String line = "";
+                while(b.ready())
+                {
+                    line = b.readLine();
+                    if(line.startsWith("Lambdas"))
+                        break;
+                }
+                if(!line.startsWith("Lambdas"))
+                {
+                    String [] stuff = line.split("\\[")[1].split(",");
+                    lam = new double[]{Double.parseDouble(stuff[0]),Double.parseDouble(stuff[1].trim()),Double.parseDouble(stuff[2].replace("]","").trim())};
+                    MGM m = new MGM(train,lam);
+                    m.learnEdges(1000);
+                    gOut = m.graphFromMGM();
+                    stabs = StabilityUtils.StabilitySearchPar(train,new SearchWrappers.MGMWrapper(lam)).toArray();
+
+                }
+
+            }
+
+
+            if(lam==null) {
+                STEPS s = new STEPS(train, lambda, g, ns, true);
+                gOut = s.runStepsPar();
+                stabs = s.stabilities;
+                lam = new double[]{s.lastLambda[0], s.lastLambda[1], s.lastLambda[2]};
+            }
             PrintStream p = new PrintStream(subDir + "/Neighbors_" + i + ".txt");
             PrintStream p2 = new PrintStream(subDir + "/Neighbors_PCS_" + i + ".txt");
             PrintStream p3 = new PrintStream(subDir + "/Neighbors_PCS_Causes_" + i + ".txt");
@@ -163,9 +223,7 @@ public class STEPS_RNA_SEQ {
             {
                 int x = d.getColumn(d.getVariable(n.getName()));
                 int y = d.getColumn(d.getVariable(target));
-
-                if(stabs[x][y] > 0.5 || stabs[y][x] > 0.5)
-                    p.println(n.getName() + "\t" + stabs[x][y]);
+                 p.println(n.getName() + "\t" + stabs[x][y]);
             }
 
 //PCS Adjacencies
@@ -173,9 +231,7 @@ public class STEPS_RNA_SEQ {
             {
                 int x = d.getColumn(d.getVariable(n.getName()));
                 int y = d.getColumn(d.getVariable(target));
-
-                if(stabs[x][y] > 0.5 || stabs[y][x] > 0.5)
-                    p2.println(n.getName() + "\t" + stabs[x][y]);
+                 p2.println(n.getName() + "\t" + stabs[x][y]);
             }
 
 
@@ -184,9 +240,7 @@ public class STEPS_RNA_SEQ {
             {
                 int x = d.getColumn(d.getVariable(n.getName()));
                 int y = d.getColumn(d.getVariable(target));
-
-                if(stabs[x][y] > 0.5 || stabs[y][x] > 0.5)
-                    p3.println(n.getName() + "\t" + stabs[x][y]);
+                p3.println(n.getName() + "\t" + stabs[x][y]);
             }
 
 
