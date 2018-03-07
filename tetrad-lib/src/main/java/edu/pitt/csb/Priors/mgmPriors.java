@@ -9,6 +9,7 @@ import edu.cmu.tetrad.regression.RegressionDataset;
 import edu.cmu.tetrad.regression.RegressionResult;
 import edu.cmu.tetrad.util.ForkJoinPoolInstance;
 import edu.cmu.tetrad.util.TetradMatrix;
+import edu.pitt.csb.Pref_Div.ArrayIndexComparator;
 import edu.pitt.csb.mgm.MGM;
 import edu.pitt.csb.mgm.MGM_Priors;
 import edu.pitt.csb.mgm.MixedUtils;
@@ -528,6 +529,54 @@ public class mgmPriors {
         return tao;
     }
 
+    //Uses FDR Adjustment
+    public static double [] adjustPValues(double [] pValues)
+    {
+        int n = pValues.length;
+        int [] pValOrder = new int[pValues.length]; //i from the R code
+        for(int j = 0; j < pValOrder.length;j++)
+        {
+            pValOrder[j] = n-j;
+        }
+        ArrayIndexComparator c = new ArrayIndexComparator(pValues);
+        Integer [] inds = c.createIndexArray();
+        Arrays.sort(inds,Collections.reverseOrder(c));
+        int [] inds2 = new int[inds.length]; //o from the R code
+        for(int i = 0; i < inds.length;i++)
+            inds2[i] = inds[i];
+
+        c = new ArrayIndexComparator(inds2);
+        Integer[] ro = c.createIndexArray();
+        Arrays.sort(ro,c);
+
+        double q = 0;
+        for(int i = 0; i < pValues.length;i++)
+        {
+            q += 1/(double)(i+1);
+        }
+        q = 1;
+        double [] temp = new double[n];
+        for(int i = 0; i < temp.length;i++)
+        {
+            temp[i] = q*n*pValues[inds2[i]]/(double)pValOrder[i];
+        }
+        double minSoFar = 1;
+        for(int i = 0; i < temp.length;i++)
+        {
+            if(temp[i] > minSoFar)
+                temp[i] = minSoFar;
+            else
+            {
+                minSoFar = temp[i];
+            }
+        }
+        double [] result = new double[pValues.length];
+        for(int i = 0; i < result.length;i++)
+        {
+            result[i] = temp[ro[i]];
+        }
+        return result;
+    }
     //Generates a random hard prior with the same number of entries as sourcePrior[][][k] (The kth expert)
     private TetradMatrix generateRandomPrior(int k)
     {
