@@ -14,10 +14,13 @@ public class constructPriorSources {
     public static void main(String [] args)throws Exception {
 
 
-        boolean onlyPAM = true;
+        boolean createPathway = true;
+        boolean createPAM = false;
+        String priorDirectory = "pathway_lists_large";
+        String outDirectory = "prior_sources";
+        String expFile = "genes_with_clinical.txt";
 
-
-        BufferedReader b = new BufferedReader(new FileReader("genes_with_clinical.txt"));
+        BufferedReader b = new BufferedReader(new FileReader(expFile));
         b.readLine();
         ArrayList<String> vars = new ArrayList<String>();
         while (b.ready()) {
@@ -30,49 +33,26 @@ public class constructPriorSources {
 
 
 
-        File temp = new File("prior_sources");
+        File temp = new File(outDirectory);
         if (!temp.exists())
             temp.mkdirs();
-        if(!onlyPAM) {
-            File f = new File("pathway_lists");
+        if(createPathway) {
+            File f = new File(priorDirectory);
             for (File t : f.listFiles()) {
                 String[] name = t.getName().split("_");
-                PrintStream out = new PrintStream("prior_sources/" + name[0]);
+                PrintStream out = new PrintStream(outDirectory + "/" + name[0]);
                 createPrior(t, out, vars);
 
             }
         }
-        BufferedReader b2 = new BufferedReader(new FileReader("PAM50.txt"));
-        PrintStream out = new PrintStream("prior_sources/Prior_PAM50.txt");
-        ArrayList<String> pam50 = new ArrayList<String>();
-        while (b2.ready()) {
-            pam50.add(b2.readLine());
-        }
-        int ind = vars.indexOf("Subtype");
-        for (int i = 0; i < vars.size(); i++) {
-            for (int j = 0; j < vars.size(); j++) {
-                if ((i == ind && pam50.contains(vars.get(j))) || (j == ind && pam50.contains(vars.get(i)))) {
-                    if (j == vars.size() - 1)
-                        out.println(1);
-                    else
-                        out.print(1 + "\t");
-                } else {
-                    if (j == vars.size() - 1)
-                        out.println(0);
-                    else
-                        out.print(0 + "\t");
-                }
-            }
-        }
-        for (int k = 1; k < 6; k++)
-        {
-            b2 = new BufferedReader(new FileReader("Irr_PAM50_" + k + ".txt"));
-            out = new PrintStream("prior_sources/Irr_PAM50_" + (k-1) + ".txt");
-            pam50 = new ArrayList<String>();
+        if(createPAM) {
+            BufferedReader b2 = new BufferedReader(new FileReader("PAM50.txt"));
+            PrintStream out = new PrintStream(outDirectory +"/Prior_PAM50.txt");
+            ArrayList<String> pam50 = new ArrayList<String>();
             while (b2.ready()) {
                 pam50.add(b2.readLine());
             }
-            ind = vars.indexOf("Subtype");
+            int ind = vars.indexOf("Subtype");
             for (int i = 0; i < vars.size(); i++) {
                 for (int j = 0; j < vars.size(); j++) {
                     if ((i == ind && pam50.contains(vars.get(j))) || (j == ind && pam50.contains(vars.get(i)))) {
@@ -88,10 +68,34 @@ public class constructPriorSources {
                     }
                 }
             }
+            for (int k = 1; k < 6; k++) {
+                b2 = new BufferedReader(new FileReader("Irr_PAM50_" + k + ".txt"));
+                out = new PrintStream(outDirectory + "/Irr_PAM50_" + (k - 1) + ".txt");
+                pam50 = new ArrayList<String>();
+                while (b2.ready()) {
+                    pam50.add(b2.readLine());
+                }
+                ind = vars.indexOf("Subtype");
+                for (int i = 0; i < vars.size(); i++) {
+                    for (int j = 0; j < vars.size(); j++) {
+                        if ((i == ind && pam50.contains(vars.get(j))) || (j == ind && pam50.contains(vars.get(i)))) {
+                            if (j == vars.size() - 1)
+                                out.println(1);
+                            else
+                                out.print(1 + "\t");
+                        } else {
+                            if (j == vars.size() - 1)
+                                out.println(0);
+                            else
+                                out.print(0 + "\t");
+                        }
+                    }
+                }
+            }
+            out.flush();
+            out.close();
+            b2.close();
         }
-        out.flush();
-        out.close();
-        b2.close();
     }
     public static void createPrior(File pathway, PrintStream out, ArrayList<String> vars) throws Exception
     {

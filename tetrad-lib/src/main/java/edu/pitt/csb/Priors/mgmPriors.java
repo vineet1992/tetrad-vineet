@@ -524,6 +524,7 @@ public class mgmPriors {
             index++;
         }
         pValues[tr] = index/(double)normalizationSamples;
+        pValues = adjustPValues(pValues);
         tao = tao/StatUtils.mean(hist);
 
         return tao;

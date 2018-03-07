@@ -92,6 +92,7 @@ public class Functions
 
 
     //Compute intensities for all genes according to the appropriate method depending upon mixed or cont-cont interaction types
+    //Requires that theory intensity is specified a priori for each gene object in g1
     public static ArrayList<Gene> computeAllIntensities(ArrayList<Gene> g1, double a, DataSet data, String target)
     {
         boolean cont = data.getVariable(target) instanceof ContinuousVariable;

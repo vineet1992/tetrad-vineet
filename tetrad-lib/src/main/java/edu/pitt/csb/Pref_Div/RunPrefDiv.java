@@ -32,7 +32,6 @@ public class RunPrefDiv {
     private double radius = 0.5; //TODO decide if we should use the radius or the max cluster size
     private int numAlphas = 20;
     private double alphaLimit = 1;
-    private int [] diseaseIDs;
     private int maxIntDiscrete = 5;
     private double g = 0.05; //Stability threshold
     private ArrayList<Gene> lastGeneSet;
@@ -99,11 +98,6 @@ public class RunPrefDiv {
     {
         this.numAlphas = na;
     }
-    public void setDiseases(int [] IDs)
-    {
-        this.diseaseIDs = IDs;
-    }
-
     public ArrayList<Gene> runPD()
     {
         //Loop over alpha values
@@ -184,6 +178,7 @@ public class RunPrefDiv {
                        // System.out.println(s + " Computing all correlations " + time/Math.pow(10,9));
 
                         time = System.nanoTime();
+                        Collections.sort(curr,Gene.IntensityComparator);
                         PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,PrefDiv.findTopKIntensity(curr,topK),dissimilarity,alp,dataSubSamp,approxCorrelations);
                         p.setCluster(true);
                         ArrayList<Gene> result = p.diverset();
@@ -218,6 +213,8 @@ public class RunPrefDiv {
 
         pool.invoke(new StabilityAction(chunk, 0, subs.length));
         ArrayList<Gene> curr = Functions.computeAllIntensities(genes,alp,data,target);
+        //TODO CURR MUST BE SORTED BEFORE CONTINUING!!!
+        Collections.sort(curr,Gene.IntensityComparator);
         PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,PrefDiv.findTopKIntensity(curr,topK),dissimilarity,alp,data,approxCorrelations);
         p.setCluster(true);
         lastGeneSet = p.diverset();

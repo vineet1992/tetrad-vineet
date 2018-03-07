@@ -34,17 +34,17 @@ public class realDataPriorTest {
         //Pathway Prior = run with just all of the pathways to compute weighting
 
 
-        boolean runNoPrior = false;
-        boolean runIrrelevantPrior = false;
-        boolean runRelevantPrior = false;
-        boolean doNumPriors = false;
-        boolean runOnlyRelevant = false;
-        boolean runBoth = false; //Pathway Priors
-        boolean tumors = false;
+        boolean runNoPrior = false; //No Priors at all for PAM50
+        boolean runIrrelevantPrior = false; //Only the Irrelevant PAM50 Priors
+        boolean runRelevantPrior = false; //Both Relevant PAM50 and Irrelevant PAM50
+        boolean doNumPriors = false; //Use a different number of priors, as specified by the below parameter
+        boolean runOnlyRelevant = false; //Only the Relevant PAM50 Prior
+        boolean runBoth = true; //Pathway Priors
+        boolean tumors = true; //tumor or normal samples?
         boolean erPositive = false;
         boolean erNegative = false;
         int type = -1;
-        boolean computeMetrics = false;
+       // boolean computeMetrics = false;
         boolean useStabilities = false;
 
         int numLambda = 40;

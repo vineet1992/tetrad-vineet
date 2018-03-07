@@ -46,6 +46,7 @@ public class addClinicalData
             b.readLine();
             geneCount++;
         }
+        System.out.println(geneCount);
         b.close();
         b = new BufferedReader(new FileReader("expression_subset.txt"));
         b.readLine();

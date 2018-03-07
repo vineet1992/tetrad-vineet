@@ -19,7 +19,7 @@ public class PrefExperiment
 		//PARAMS
 		int numAlphas = 20;
 		int ns = 20;
-		double threshold = 0.0;
+		double threshold = 0.1;
 		double accuracy = 0;
 		double radius = 0.5; //NEED to figure out how to set this in a principled way TODO
 		int [] topK = {50};
@@ -195,7 +195,6 @@ public class PrefExperiment
 						r.setNS(ns);
 						r.setAccuracy(accuracy);
 						r.setNumAlphas(numAlphas);
-						r.setDiseases(diseases);
 						r.setRadius(radius);
 						r.setTopK(topK[k]);
 						r.setThreshold(threshold);

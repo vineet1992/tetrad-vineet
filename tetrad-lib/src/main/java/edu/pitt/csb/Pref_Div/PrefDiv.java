@@ -372,7 +372,6 @@ public class PrefDiv {
             {
                 c = corrOnTheFly(i,j);
             }
-
         }
         if(theoryMat[Functions.getIndex(i,j,items.size())]==-1)
             return c;
