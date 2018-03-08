@@ -24,12 +24,14 @@ public class priorTest {
     public static void main(String [] args) throws Exception
     {
         boolean numEdgesRandom = true;
-        double amountPrior = .6;
-        boolean reliable = false; //Are all priors reliable?
+        boolean excludeUnreliable = true; //Should piMGM exclude priors below p-value threshold
+        double reliabilityThreshold = 0.05; //piMGM will exclude priors with adjusted p-value < 0.05
+        double amountPrior = .3;
+        boolean reliable = true; //Are all priors reliable?
         boolean diffNumPrior = false; //Does each prior provide with the same number of edges?
         boolean correctEdges = false; //Determines whether or not we will use correct edges only for unreliable priors as well or not
         boolean pureRandom = false; //Only for different number of edges given by each prior, this sets the priors to be purely random with reliability computed after the fact
-        int reliableExperts = 3; //How many priors are reliable?
+        int reliableExperts = 5; //How many priors are reliable?
         int numExperts = 5;
         int numLambdas = 40;
         int numVariables = 100;
@@ -305,6 +307,8 @@ public class priorTest {
                         steps = s.runStepsPar();
                     if(foundIt) {
                         m = new mgmPriors(numSubsamples, initLambdas, c.getDataSet(0), priors, c.getTrueGraph(),false,subsamples);
+                        if(excludeUnreliable)
+                            m.excludeUnreliablePriors(reliabilityThreshold);
                         mgmprior = m.runPriors();
                     }
 
@@ -363,6 +367,8 @@ public class priorTest {
                                     p3.println(Arrays.toString(m.pValues));
                                     p3.println(Arrays.toString(m.normalizedExpertWeights));
                                 }
+                                if(excludeUnreliable)
+                                    p3.println(m.lastHavePrior.length);
                                 p3.flush();
                                 p3.close();
                             }
@@ -383,6 +389,8 @@ public class priorTest {
                                     p3.println(Arrays.toString(mtemp.pValues));
                                     p3.println(Arrays.toString(mtemp.normalizedExpertWeights));
                                 }
+                                if(excludeUnreliable)
+                                    p3.println(m.lastHavePrior.length);
                                 p3.flush();
                                 p3.close();
                             }

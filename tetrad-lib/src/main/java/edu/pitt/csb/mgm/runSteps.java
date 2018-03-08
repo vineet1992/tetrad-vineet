@@ -3,6 +3,8 @@ package edu.pitt.csb.mgm;
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.data.DelimiterType;
 import edu.cmu.tetrad.graph.Graph;
+import edu.cmu.tetrad.search.IndependenceTest;
+import edu.cmu.tetrad.search.PcStable;
 import edu.pitt.csb.mgm.MixedUtils;
 import edu.pitt.csb.mgm.STEPS;
 
@@ -17,15 +19,15 @@ public class runSteps {
     {
         int index = 0;
         String directory = ".";
-        String file = "";
+        String file = "Just_rankings_data.txt";
         String stabilityFile = "";
         String graphFile = "";
         int ns = 20;
-        double g = 0.01;
+        double g = 0.005;
         int numLambdas = 40;
-        double lambdaLow = 0.1;
-        double lambdaHigh = 0.9;
-        boolean LOO = true;
+        double lambdaLow = 0.05;
+        double lambdaHigh = 0.95;
+        boolean LOO = false;
         int maxCategoriesForDiscrete = 4;
         ArrayList<String> varsToRemove = new ArrayList<String>();
         while (index < args.length) {
@@ -114,6 +116,10 @@ public class runSteps {
         out.println(g2);
         out.flush();
         out.close();
+        IndependenceTest ii = new IndTestMultinomialAJ(d,0.05);
+        PcStable p = new PcStable(ii);
+        p.setInitialGraph(g2);
+        System.out.println(p.search());
         out = new PrintStream(directory + "/" + stabilityFile);
         for(int i = 0; i < d.getNumColumns();i++)
         {
@@ -135,6 +141,7 @@ public class runSteps {
                     out.println();
             }
         }
+
         out.flush();
         out.close();
     }

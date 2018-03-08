@@ -40,7 +40,7 @@ public class realDataPriorTest {
         boolean doNumPriors = false; //Use a different number of priors, as specified by the below parameter
         boolean runOnlyRelevant = false; //Only the Relevant PAM50 Prior
         boolean runBoth = true; //Pathway Priors
-        boolean tumors = true; //tumor or normal samples?
+        boolean tumors = false; //tumor or normal samples?
         boolean erPositive = false;
         boolean erNegative = false;
         int type = -1;

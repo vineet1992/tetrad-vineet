@@ -27,6 +27,7 @@ import java.util.concurrent.RecursiveAction;
  */
 public class mgmPriors {
 
+    //TODO NEED TO DEBUG EXCLUDING PRIORS
 
     Random rand = new Random();
     private final double normalEpsilon = 0.5;
@@ -59,6 +60,8 @@ public class mgmPriors {
     private TetradMatrix stability;
     private boolean logging = false;
     private boolean normalize = true;
+    private boolean excludeUnreliablePriors = false;
+    private double unreliableThreshold = 0.05;
     private int normalizationSamples = 20000;
     public double [][] edgeScores;
 
@@ -73,10 +76,14 @@ public class mgmPriors {
     {
         normalize = b;
     }
-    public void setNormalizationSamples(int x)
-    {
+    public void setNormalizationSamples(int x){
         normalizationSamples = x;
     }
+        public void excludeUnreliablePriors(double threshold)
+        {
+            excludeUnreliablePriors = true;
+            unreliableThreshold = threshold;
+        }
     public mgmPriors(int numSubsamples, double[] initLambdas, DataSet data, TetradMatrix[] priors) {
         this.numSubsamples = numSubsamples;
         this.pValues = new double[priors.length];
@@ -239,6 +246,8 @@ public class mgmPriors {
         double [] normalTao = new double[priors.length];
         double[] alpha = new double[priors.length];
         double[] weights = new double[priors.length];
+        boolean [] keepPriors = new boolean[priors.length];
+        int priorCount = 0;
         for (int tr = 0; tr < priors.length; tr++) //for each source of prior information
         {
             TetradMatrix currPrior = priors[tr];
@@ -248,11 +257,36 @@ public class mgmPriors {
 
             tao[tr] = getTao(phi[tr], counts,tr);
 
-            if(normalize)
-                normalTao[tr] = normalizeTao(tao[tr],counts,tr);
+            if(normalize) {
+                normalTao[tr] = normalizeTao(tao[tr], counts, tr);
+                if(!excludeUnreliablePriors || pValues[tr] < unreliableThreshold) {
+                    priorCount++;
+                    keepPriors[tr] = true;
+                }
+            }
             //How confident are we about source tr?
             //tao = average deviation between our predicted probability from prior (phi) and actual counts u
         }
+        TetradMatrix [] priorsToKeep = new TetradMatrix[priorCount];
+        if(!excludeUnreliablePriors && priorCount!=priors.length)
+        {
+            System.err.println("Mistake in establishing unreliable priors...Exiting");
+            System.exit(-1);
+        }
+        priorCount = 0;
+        for(int i = 0; i < priors.length;i++) {
+            if (keepPriors[i]) {
+                priorsToKeep[priorCount] = priors[i];
+                priorCount++;
+            }
+        }
+        priors = priorsToKeep;
+        if(excludeUnreliablePriors)
+        {
+            havePriors = findPrior(priors);
+        }
+
+
         if(normalize)
         {
             normalizedTao = normalTao;

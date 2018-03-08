@@ -23,7 +23,7 @@ public class priorTestResults{
 public static void main(String [] args) throws Exception
     {
        // String [] algs = {"mgm_priors","mgm_priors_split"};
-        String [] algs = {"mgm_priors","mgm_priors_split","STEPS","oracle","oracle_one","mgm_one_steps"};
+        String [] algs = {"mgm_priors","STEPS","oracle","oracle_one","mgm_one_steps"};
         String [] type = {"CC","CD","DD","ALL"};
         int numSubsamples = 10;
         double [] priors = {0.1,0.3,0.6};
@@ -43,7 +43,7 @@ public static void main(String [] args) throws Exception
 
 
         //only matters for gathering weights
-       int numRuns = 20;
+       int numRuns = 15;
         int rexp = 3; //number of reliable experts to use for analysis
             for(int s = 0; s < sampleSize.length;s++)
             {
@@ -166,9 +166,9 @@ public static void main(String [] args) throws Exception
                                         out.print(algs[j] + "_" + priors[i] + "_" + reliableExperts[re] + "\t");
                                         for (int k = 0; k < type.length; k++) {
                                             BufferedReader b;
-                                            if(reliableExperts[re]==5)
-                                                b = new BufferedReader(new FileReader(algs[j] + "_" + priors[i] + "_" + numExperts[e] + "_" + numVars + "_" + sampleSize[s] + "_10.txt"));
-                                            else
+                                          //  if(reliableExperts[re]==5)
+                                           //     b = new BufferedReader(new FileReader(algs[j] + "_" + priors[i] + "_" + numExperts[e] + "_" + numVars + "_" + sampleSize[s] + "_10.txt"));
+                                           // else
                                                 b = new BufferedReader(new FileReader(algs[j] + "_" + priors[i] + "_"+ reliableExperts[re] + "_" + numExperts[e] + "_" + numVars + "_" + sampleSize[s] + "_10.txt"));
                                             b.readLine();
                                             ArrayList<Double> results = new ArrayList<Double>();
@@ -194,7 +194,7 @@ public static void main(String [] args) throws Exception
                             int i = 0;
                             out.print(algs[j] + "\t");
                             for (int k = 0; k < type.length; k++) {
-                                BufferedReader b = new BufferedReader(new FileReader(algs[j] + "_" + priors[i] + "_" + 5 + "_" + numVars + "_" + sampleSize[s] + "_10.txt"));
+                                BufferedReader b = new BufferedReader(new FileReader(algs[j] + "_" + priors[i] + "_5_5_" + numVars + "_" + sampleSize[s] + "_10.txt"));
                                 b.readLine();
                                 ArrayList<Double> results = new ArrayList<Double>();
                                 while (b.ready()) {
