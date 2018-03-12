@@ -26,12 +26,12 @@ public class priorTest {
         boolean numEdgesRandom = true;
         boolean excludeUnreliable = true; //Should piMGM exclude priors below p-value threshold
         double reliabilityThreshold = 0.05; //piMGM will exclude priors with adjusted p-value < 0.05
-        double amountPrior = .6;
-        boolean reliable = true; //Are all priors reliable?
+        double amountPrior = .1;
+        boolean reliable = false; //Are all priors reliable?
         boolean diffNumPrior = false; //Does each prior provide with the same number of edges?
         boolean correctEdges = false; //Determines whether or not we will use correct edges only for unreliable priors as well or not
         boolean pureRandom = false; //Only for different number of edges given by each prior, this sets the priors to be purely random with reliability computed after the fact
-        int reliableExperts = 5; //How many priors are reliable?
+        int reliableExperts = 3; //How many priors are reliable?
         int numExperts = 5;
         int numLambdas = 40;
         int numVariables = 100;

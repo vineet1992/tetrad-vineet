@@ -259,13 +259,27 @@ public class mgmPriors {
 
             if(normalize) {
                 normalTao[tr] = normalizeTao(tao[tr], counts, tr);
-                if(!excludeUnreliablePriors || pValues[tr] < unreliableThreshold) {
-                    priorCount++;
-                    keepPriors[tr] = true;
-                }
             }
             //How confident are we about source tr?
             //tao = average deviation between our predicted probability from prior (phi) and actual counts u
+        }
+        pValues = adjustPValues(pValues);
+
+        for(int tr = 0; tr < priors.length;tr++)
+        {
+            if(!excludeUnreliablePriors || pValues[tr] < unreliableThreshold) {
+                priorCount++;
+                keepPriors[tr] = true;
+            }
+        }
+        if(priorCount==0) //If none were significant, then use all of them
+        {
+            System.out.println("No reliable priors identified, using all of them");
+            for(int tr = 0; tr < priors.length;tr++)
+            {
+                keepPriors[tr] = true;
+                priorCount++;
+            }
         }
         TetradMatrix [] priorsToKeep = new TetradMatrix[priorCount];
         if(!excludeUnreliablePriors && priorCount!=priors.length)
@@ -558,7 +572,6 @@ public class mgmPriors {
             index++;
         }
         pValues[tr] = index/(double)normalizationSamples;
-        pValues = adjustPValues(pValues);
         tao = tao/StatUtils.mean(hist);
 
         return tao;
@@ -615,15 +628,19 @@ public class mgmPriors {
     //Generates a random hard prior with the same number of entries as sourcePrior[][][k] (The kth expert)
     private TetradMatrix generateRandomPrior(int k)
     {
+        ArrayList<Double>priorValues = new ArrayList<Double>();
         int count = 0;
         for(int i = 0; i < priors[0].rows();i++)
         {
             for(int j = i+1; j < priors[0].rows();j++)
             {
-                if(sourcePrior[i][j][k])
+                if(sourcePrior[i][j][k]) {
+                    priorValues.add(priors[k].get(i,j));
                     count++;
+                }
             }
         }
+
         TetradMatrix t = new TetradMatrix(priors[0].rows(),priors[0].rows());
         while(count >0)
         {
@@ -634,8 +651,8 @@ public class mgmPriors {
                 x = rand.nextInt(priors[0].rows());
                 y = rand.nextInt(priors[0].rows());
             }
-            t.set(x,y,1);
-            t.set(y,x,1);
+            t.set(x,y,priorValues.get(count-1));
+            t.set(y,x,priorValues.get(count-1));
             count--;
         }
         return t;
