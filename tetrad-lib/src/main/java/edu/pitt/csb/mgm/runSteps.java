@@ -3,6 +3,7 @@ package edu.pitt.csb.mgm;
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.data.DelimiterType;
 import edu.cmu.tetrad.graph.Graph;
+import edu.cmu.tetrad.search.FciMaxP;
 import edu.cmu.tetrad.search.IndependenceTest;
 import edu.cmu.tetrad.search.PcStable;
 import edu.pitt.csb.mgm.MixedUtils;
@@ -19,11 +20,11 @@ public class runSteps {
     {
         int index = 0;
         String directory = ".";
-        String file = "Just_rankings_data.txt";
+        String file = "Data_So_Far.txt";
         String stabilityFile = "";
         String graphFile = "";
         int ns = 20;
-        double g = 0.005;
+        double g = 0.05;
         int numLambdas = 40;
         double lambdaLow = 0.05;
         double lambdaHigh = 0.95;
@@ -109,6 +110,7 @@ public class runSteps {
         if(graphFile.equals(""))
             graphFile = "Graph_" + file;
 
+        System.out.println(d);
         STEPS s = new STEPS(d,lambda,g,d.getNumRows(),LOO);
         Graph g2 = s.runStepsPar();
         double [][] stab = s.stabilities;
@@ -117,7 +119,7 @@ public class runSteps {
         out.flush();
         out.close();
         IndependenceTest ii = new IndTestMultinomialAJ(d,0.05);
-        PcStable p = new PcStable(ii);
+        FciMaxP p = new FciMaxP(ii);
         p.setInitialGraph(g2);
         System.out.println(p.search());
         out = new PrintStream(directory + "/" + stabilityFile);
