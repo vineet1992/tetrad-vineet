@@ -142,9 +142,16 @@ public class MGM extends ConvexProximal implements GraphSearch{
         //Data is checked for 0 or 1 indexing and for missing levels and N(0,1) Standardizes continuous data
         fixData();
 
+        //Initialize all parameters to zeros
         initParameters();
 
+
+
+        //Sets continuous variable weights to standard deviation and discrete variable weights to p*(1-p) for each category
         calcWeights();
+
+
+        //Creates dummy variables for each category of discrete variables (stored in dDat)
         makeDummy();
     }
 
@@ -345,11 +352,17 @@ public class MGM extends ConvexProximal implements GraphSearch{
         for(int i = 0; i < p; i++){
             weights.set(i, StatUtils.sd(xDat.viewColumn(i).toArray()));
         }
+        //Continuous variable weights are standard deviations
+
+
+        //Discrete variable weights for each variable-category pair are p(1-p) where p is the percentage of times that category appears
+        System.out.println(yDat);
         for(int j = 0; j < q; j++){
             double curWeight = 0;
             for(int k = 0; k < l[j] ; k++){
                 double curp = yDat.viewColumn(j).copy().assign(Functions.equals(k+1)).zSum()/(double) n;
                 curWeight += curp*(1-curp);
+                System.out.println(k + "," + curp + "," + curWeight);
             }
             weights.set(p+j, Math.sqrt(curWeight));
         }

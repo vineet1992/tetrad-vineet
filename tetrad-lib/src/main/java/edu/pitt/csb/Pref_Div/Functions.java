@@ -867,6 +867,8 @@ public class Functions
                     float[] theories = new float[line.length];
                     for (int j = 0; j < line.length ; j++)
                         theories[j] = Float.parseFloat(line[j]);
+
+                  //JUST USING THE MEAN AS THE FINAL VALUE
                     float mean = 0;
                     for (int j = 0; j < theories.length; j++) {
                         if (theories[j] != -1)
@@ -887,11 +889,13 @@ public class Functions
             try {
                 BufferedReader b = new BufferedReader(new FileReader(theoryFile));
                 String[] line = b.readLine().split("\t");
-                theorySources = line.length;
+                theorySources = line.length; //How many theory sources do we have?
                 b.close();
             } catch (Exception e) {
                 System.err.println("Couldn't open file to count number of sources");
             }
+
+            //Normalize one theory source at a time and write them out to a temporary file
            for (int i = 0; i < theorySources; i++) {
                try {
                    System.out.println("Normalizing theory source " + i);
@@ -927,7 +931,7 @@ public class Functions
                    return null;
                }
            }
-
+           //Write the final results back to the file with NPN normalized data
             try {
                 float[] result = new float[length];
                 BufferedReader[] b2 = new BufferedReader[theorySources];
@@ -961,8 +965,9 @@ public class Functions
         }
     }
 
-
-    //Creates the distance matrix using only theory sources
+//TODO take in an array of which elements are discrete and then transform the 0,1 elements to appropriate values
+    //Already taking care of discrete values in NPN, need to transform these to extremes
+// Creates the distance matrix using only theory sources
     public static float [] createTheoryMatrix(String theoryFile)
     {
         try{

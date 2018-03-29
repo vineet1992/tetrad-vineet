@@ -50,6 +50,7 @@ import nu.xom.Elements;
 import nu.xom.ParsingException;
 import nu.xom.Serializer;
 import nu.xom.Text;
+import org.apache.commons.math3.distribution.NormalDistribution;
 
 /**
  * Basic graph utilities.
@@ -58,6 +59,8 @@ import nu.xom.Text;
  */
 public final class GraphUtils {
 
+
+    public static HashMap<String,Integer> clusters;
     /**
      * Arranges the nodes in the graph in a circle.
      *
@@ -279,6 +282,105 @@ public final class GraphUtils {
         return randomGraph(nodes, numLatentConfounders, numEdges, maxDegree,
                 maxIndegree, maxOutdegree, connected);
     }
+
+    /**Similar method to randomGraphForwardEdges but here we want to specify the total number of components (pathways/subgraphs),
+     * the number of components connected to the target,
+    * the approximate size of each of the components,
+     * whether or not there should be connections between components (later, for now assume no)
+     *
+**/
+    //TODO Fix edge cases, don't let a component have less than 0 edges or something
+    public static Graph randomGraphForwardEdgesClusters(int numNodes, int numComponents,
+                                                        int numConnectedComponents,int numEdges,boolean evenDistribution,
+                                                        boolean connected, int maxDegree, int maxIndegree, int maxOutdegree)
+    {
+
+        clusters = new HashMap<>();
+        int []nodesPerGraph = new int[numComponents];
+        int []edgesPerGraph = new int[numComponents];
+        if(evenDistribution) {
+            int ng = (numNodes - 1) / numComponents; //Don't include target variable in this calculation
+            int effectiveEdges = numEdges - numConnectedComponents; //Remove those edges that are necessary to connect to the target
+            int eg = effectiveEdges / numComponents;
+            int extraNodes = (numNodes - 1) % numComponents;
+            int extraEdges = effectiveEdges % numComponents;
+            for (int i = 0; i < numComponents; i++) {
+                if (extraNodes != 0) {
+                    nodesPerGraph[i] = ng + 1;
+                    extraNodes--;
+                } else
+                    nodesPerGraph[i] = ng;
+                if (extraEdges != 0) {
+                    edgesPerGraph[i] = eg + 1;
+                    extraEdges--;
+                } else
+                    edgesPerGraph[i] = eg;
+            }
+        }else
+        {
+            NormalDistribution n_nodes = new NormalDistribution((numNodes-1)/numComponents,(numNodes-1)/(numComponents*3));
+            int effectiveEdges = numEdges-numConnectedComponents;
+            NormalDistribution n_edges = new NormalDistribution(effectiveEdges/numComponents,effectiveEdges/(3*numComponents));
+            int nodesSum = 0;
+            int edgesSum = 0;
+            for(int i = 0; i < numComponents;i++)
+            {
+                nodesPerGraph[i] = (int)n_nodes.sample();
+                while(nodesPerGraph[i] < 0)
+                    nodesPerGraph[i] = (int) n_nodes.sample();
+                edgesPerGraph[i] = (int)n_edges.sample();
+                while(edgesPerGraph[i] < 0)
+                    edgesPerGraph[i] = (int) n_edges.sample();
+            }
+        }
+        System.out.println(Arrays.toString(nodesPerGraph));
+        System.out.println(Arrays.toString(edgesPerGraph));
+
+
+
+        Graph [] components = new Graph[numComponents];
+        int nodeCount = 0;
+        for(int i = 0; i < numComponents;i++)
+        {
+            List<Node> nodes = new ArrayList<>();
+
+            for (int j = 0; j < nodesPerGraph[i]; j++) {
+                nodes.add(new GraphNode("X" + (j + nodeCount)));
+                clusters.put("X" + (j+nodeCount),i);
+            }
+            nodeCount+=nodesPerGraph[i];
+            components[i]  = randomGraph(nodes, 0, edgesPerGraph[i], maxDegree,
+                    maxIndegree, maxOutdegree, connected);
+        }
+        Graph finalGraph = new EdgeListGraphSingleConnections();
+        finalGraph.addNode(new GraphNode("Target"));
+        Random rand = new Random();
+        for(int i = 0; i < numComponents;i++)
+        {
+            for(int j = 0; j <components[i].getNodes().size();j++)
+                finalGraph.addNode(components[i].getNodes().get(j));
+            for(Edge e: components[i].getEdges())
+                finalGraph.addEdge(e);
+            if(i < numConnectedComponents) {
+                List<Node> temp = components[i].getNodes();
+                Node toAdd = temp.get(rand.nextInt(temp.size()));
+                while(components[i].getAdjacentNodes(toAdd).size() < 1)
+                    toAdd = temp.get(rand.nextInt(temp.size()));
+                finalGraph.addDirectedEdge(finalGraph.getNode(toAdd.getName()),finalGraph.getNode("Target"));
+            }
+        }
+
+
+        //If even distribution then we just divide numNodes by numComponents to get the number of nodes in each subgraph
+        //Randomly choose numConnectedComponents of these to be connected to the target variable
+        //Randomly choose one node from each of the above connected components to be connected to the target variable
+
+        return finalGraph;
+
+
+        //TODO if connected, randomly add edges between components as well
+    }
+
 
     public static Graph randomGraphRandomForwardEdges(List<Node> nodes, int numLatentConfounders,
             int numEdges, int maxDegree,

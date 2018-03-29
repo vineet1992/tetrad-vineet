@@ -166,9 +166,9 @@ public static void main(String [] args) throws Exception
                                         out.print(algs[j] + "_" + priors[i] + "_" + reliableExperts[re] + "\t");
                                         for (int k = 0; k < type.length; k++) {
                                             BufferedReader b;
-                                          //  if(reliableExperts[re]==5)
-                                           //     b = new BufferedReader(new FileReader(algs[j] + "_" + priors[i] + "_" + numExperts[e] + "_" + numVars + "_" + sampleSize[s] + "_10.txt"));
-                                           // else
+                                            if(reliableExperts[re]==5)
+                                                b = new BufferedReader(new FileReader(algs[j] + "_" + priors[i] + "_" + numExperts[e] + "_" + numVars + "_" + sampleSize[s] + "_10.txt"));
+                                            else
                                                 b = new BufferedReader(new FileReader(algs[j] + "_" + priors[i] + "_"+ reliableExperts[re] + "_" + numExperts[e] + "_" + numVars + "_" + sampleSize[s] + "_10.txt"));
                                             b.readLine();
                                             ArrayList<Double> results = new ArrayList<Double>();
@@ -194,7 +194,7 @@ public static void main(String [] args) throws Exception
                             int i = 0;
                             out.print(algs[j] + "\t");
                             for (int k = 0; k < type.length; k++) {
-                                BufferedReader b = new BufferedReader(new FileReader(algs[j] + "_" + priors[i] + "_5_5_" + numVars + "_" + sampleSize[s] + "_10.txt"));
+                                BufferedReader b = new BufferedReader(new FileReader(algs[j] + "_" + priors[i] + "_5_" + numVars + "_" + sampleSize[s] + "_10.txt"));
                                 b.readLine();
                                 ArrayList<Double> results = new ArrayList<Double>();
                                 while (b.ready()) {

@@ -1,6 +1,7 @@
 package edu.pitt.csb.Pref_Div;
 
 import edu.cmu.tetrad.data.DataSet;
+import edu.cmu.tetrad.search.Fgs;
 import edu.cmu.tetrad.util.StatUtils;
 import javafx.collections.transformation.SortedList;
 
@@ -195,6 +196,14 @@ public class PrefDiv {
                 clusters.put(result.get(x),null);
         }
 
+        List<Gene> toRemove = new ArrayList<Gene>();
+        for(Gene g: clusters.keySet())
+        {
+            if(!result.contains(g))
+                toRemove.add(g);
+        }
+        for(int i = 0; i < toRemove.size();i++)
+            clusters.remove(toRemove.get(i));
         time = System.nanoTime()-time;
        // System.out.println("Acutal Pref-Div Time: " + time/Math.pow(10,9));
         return result;

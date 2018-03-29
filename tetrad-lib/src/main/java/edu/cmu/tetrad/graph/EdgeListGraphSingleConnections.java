@@ -981,6 +981,28 @@ public class EdgeListGraphSingleConnections implements Graph {
 //        return adj;
     }
 
+    public void renameNode(String og, String target)
+    {
+        //Change the node name
+        //Update edgeLists
+        //Update namesHash
+        List<Edge> temp = edgeLists.get(this.getNode(og));
+        for(int i = 0; i < temp.size();i++)
+        {
+            if(temp.get(i).getNode1().getName().equals(og))
+                temp.get(i).getNode1().setName(target);
+            else
+                temp.get(i).getNode2().setName(target);
+        }
+        Node n = namesHash.get(og);
+        edgeLists.remove(n);
+
+        this.getNode(og).setName(target);
+        edgeLists.put(getNode(target),temp);
+        namesHash.remove(og);
+        n.setName(target);
+        namesHash.put(target,n);
+    }
     /**
      * Removes the edge connecting the two given nodes.
      */

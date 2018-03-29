@@ -14,6 +14,7 @@ public class PrefExperiment
 
 	//TODO Add if target variable is null, just use the highest variance genes as the intensity score
 	//TODO if disease IDs are null, just use the data for intensity
+	//TODO Are all of the prior information sources giving dissimilarity scores or similarity scores???
 	public static void main(String [] args) throws Exception
 	{
 		//PARAMS

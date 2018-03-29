@@ -14,8 +14,8 @@ public class constructPriorSources {
     public static void main(String [] args)throws Exception {
 
 
-        boolean createPathway = true;
-        boolean createPAM = false;
+        boolean createPathway = false;
+        boolean createPAM = true;
         String priorDirectory = "pathway_lists_large";
         String outDirectory = "prior_sources";
         String expFile = "genes_with_clinical.txt";

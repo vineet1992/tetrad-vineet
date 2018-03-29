@@ -208,6 +208,7 @@ public class mgmPriors {
         }
         if(normalize)
         {
+            pValues = adjustPValues(pValues);
             normalizedTao = normalTao;
             double [] normAlpha = getAlpha(normalTao);
             normalizedExpertWeights = getWeights(normAlpha);

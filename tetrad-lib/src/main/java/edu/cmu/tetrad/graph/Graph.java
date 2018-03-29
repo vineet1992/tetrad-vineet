@@ -660,6 +660,10 @@ public interface Graph extends TetradSerializable {
     void removeTriplesNotInGraph();
 
     List<Node> getSepset(Node n1, Node n2);
+
+    /*
+     *  Change the node named original in this graph to the name change
+     */
 }
 
 

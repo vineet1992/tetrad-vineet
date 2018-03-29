@@ -5,11 +5,13 @@ import cern.colt.matrix.DoubleMatrix2D;
 import cern.jet.math.*;
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.graph.Graph;
+import edu.cmu.tetrad.graph.Node;
 import edu.cmu.tetrad.util.ForkJoinPoolInstance;
 import edu.pitt.csb.mgm.MixedUtils;
 import edu.pitt.csb.stability.DataGraphSearch;
 import edu.pitt.csb.stability.StabilityUtils;
 
+import java.io.PrintStream;
 import java.util.*;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
@@ -40,9 +42,12 @@ public class RunPrefDiv {
     private boolean approxCorrelations = false;
     private boolean useClusterStability = false; //cluster stability, or gene wise stability
 
+    private ArrayList<String> stabPS;//PrintStream to output file where we have run\talpha\tstability
+    private boolean includeAccuracy = false; //When writing the stability output to file, should we include an accuracy score for each stability data point
+    private List<Node> targets = null; //The set of target genes (for computing accuracy score when ground truth is known)
+    private int run; //purely for printing to the stability output file
     private boolean loocv = false;
     private int [][] subs;
-
 
 
     public RunPrefDiv(float [] dissimilarity, ArrayList<Gene> genes, DataSet data,String target,boolean leaveOneOut)
@@ -52,8 +57,15 @@ public class RunPrefDiv {
         this.dissimilarity = dissimilarity;
         this.target = target;
         this.loocv = leaveOneOut;
+        this.stabPS = null;
     }
 
+    public int [][] getSubs()
+    {
+        return subs;
+    }
+
+    public void setSubs(int [][] subs){this.subs = subs;}
     public HashMap<Gene,List<Gene>> getClusters()
     {
         return lastClusters;
@@ -98,6 +110,11 @@ public class RunPrefDiv {
     {
         this.numAlphas = na;
     }
+    public void setStabilityOutput(boolean includeAccuracy){this.stabPS = new ArrayList<String>(); this.includeAccuracy=includeAccuracy;}
+    public ArrayList<String> getStabilityOutput(){return stabPS;}
+    public void setTargets(List<Node> targets){this.targets = targets;}
+    public void setRun(int r){run = r;}
+
     public ArrayList<Gene> runPD()
     {
         //Loop over alpha values
@@ -106,10 +123,12 @@ public class RunPrefDiv {
         //Otherwise increment by alphaStep and continue searching
 
         System.out.print("Generating Subsamples...");
-        if(loocv)
-            subs = StabilityUtils.generateSubsamples(data.getNumRows());
-        else
-            subs = StabilityUtils.generateSubsamples(numSubs,data.getNumRows());
+        if(subs==null) {
+            if (loocv)
+                subs = StabilityUtils.generateSubsamples(data.getNumRows());
+            else
+                subs = StabilityUtils.generateSubsamples(numSubs, data.getNumRows());
+        }
         System.out.println("Done");
         double [] alphas = new double[numAlphas+1];
         for(int i = 0; i < alphas.length;i++)
@@ -117,23 +136,72 @@ public class RunPrefDiv {
             alphas[i] = i*alphaLimit/(double)numAlphas;
         }
 
+        ArrayList<Gene> finalSet = null;
         for(int i = alphas.length-1; i >=0;i--)
         {
             System.out.print("Running Pref-Div for Alpha value: " + alphas[i] + " ...");
             double stab = stabilityPD(alphas[i]);
-
+            if(stabPS!=null) {
+                if(includeAccuracy)
+                    stabPS.add(run + "\t" + alphas[i] + "\t" + stab + "\t" + getAccuracy(targets,lastGeneSet)[1] + "\t" + getAccuracy(targets,lastGeneSet)[2] + "\t" + lastGeneSet + "\t" + targets + "\t" + lastClusters);
+                else
+                    stabPS.add(run + "\t" + alphas[i] + "\t" + stab + "\t" + lastClusters);
+            }
             System.out.println("Stability = " + (stab) + ", Done");
-            if(1-stab < g) {
+            if(1-stab < g && stabPS==null) { //Continue to search alpha values if you want to output stabilities for them
                 System.out.println("Underneath threshold of " + g + ", Returning this set");
                 return lastGeneSet;
+            }
+            else if(1-stab < g && finalSet==null)
+            {
+                finalSet = lastGeneSet;
             }
         }
 
 
+        if(finalSet!= null) {
+            lastGeneSet = finalSet;
+            return finalSet;
+        }
         return lastGeneSet;
 
     }
 
+    private double [] getAccuracy(List<Node> targets, ArrayList<Gene> result)
+    {
+        double [] output = new double[3];
+        double tp = 0;
+        double fp = 0;
+        double fn = 0;
+        for(int i = 0; i < targets.size();i++)
+        {
+            boolean found = false;
+            for(int j = 0; j < result.size();j++)
+            {
+                if(targets.get(i).getName().equals(result.get(j).symbol))
+                    found = true;
+            }
+            if(found)
+                tp++;
+            else
+                fn++;
+        }
+        for(int i = 0; i < result.size();i++)
+        {
+            boolean found = false;
+            for(int j = 0; j < targets.size();j++)
+            {
+                if(targets.get(j).getName().equals(result.get(i).symbol))
+                    found = true;
+            }
+            if(!found)
+                fp++;
+        }
+        output[1] = tp/(tp+fp);
+        output[2] = tp/(tp+fn);
+        output[0] = 2*output[1]*output[2]/(output[1]+output[2]);
+        return output;
+    }
     private double stabilityPD(final double alp)
     {
 
@@ -219,6 +287,7 @@ public class RunPrefDiv {
         p.setCluster(true);
         lastGeneSet = p.diverset();
         lastClusters = p.clusters;
+
         //do this elsewhere
         //thetaMat.assign(thetaMat.copy().assign(Functions.minus(1.0)), Functions.mult).assign(Functions.mult(-2.0));
         if(useClusterStability)
@@ -296,8 +365,8 @@ public class RunPrefDiv {
                 double [][] costs = computeCostMatrix(one,two);
                 HungarianAlgorithm ha = new HungarianAlgorithm(costs);
 
-                int [] result = ha.execute();
 
+                int [] result = ha.execute();
                 costs = normalizedCosts(costs);
                 for(int k = 0; k < result.length;k++)
                 {

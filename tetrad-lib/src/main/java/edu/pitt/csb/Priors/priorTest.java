@@ -29,7 +29,7 @@ public class priorTest {
         double amountPrior = .1;
         boolean reliable = false; //Are all priors reliable?
         boolean diffNumPrior = false; //Does each prior provide with the same number of edges?
-        boolean correctEdges = false; //Determines whether or not we will use correct edges only for unreliable priors as well or not
+        boolean correctEdges = true; //Determines whether or not we will use correct edges only for unreliable priors as well or not
         boolean pureRandom = false; //Only for different number of edges given by each prior, this sets the priors to be purely random with reliability computed after the fact
         int reliableExperts = 3; //How many priors are reliable?
         int numExperts = 5;
@@ -45,10 +45,10 @@ public class priorTest {
         boolean saveData = true;
         boolean reuseData = true;
         boolean rerunAlgorithms = false;
+        boolean onlyPrior = false;
         String directory = ".";
    //     String [] algs = {"mgm_one_steps","oracle_one","STEPS","oracle","mgm_priors","mgm_priors_split"};
-   //     String [] algs = {"mgm_one_steps","STEPS"};
-         String[] algs = {"mgm_priors","oracle_one","STEPS","oracle","mgm_one_steps"};
+
         while(index < args.length)
         {
 
@@ -120,8 +120,26 @@ public class priorTest {
                 reliableExperts = Integer.parseInt(args[index+1]);
                 index+=2;
             }
+            else if(args[index].equals("-reliable"))
+            {
+                reliable = true;
+                index++;
+            }
+            else if(args[index].equals("-op"))
+            {
+                onlyPrior = true;
+                index++;
+            }
+            else
+            {
+                System.out.println("Couldn't parse input argument " + args[index] + "...using default");
+                index++;
+            }
         }
-
+        //     String [] algs = {"mgm_one_steps","STEPS"};
+        String[] algs = {"mgm_priors","oracle_one","STEPS","oracle","mgm_one_steps"};
+        if(onlyPrior)
+            algs = new String[]{"mgm_priors"};
         double [] initLambdas = new double[numLambdas];
         double low = .05;
         double high = .9;
