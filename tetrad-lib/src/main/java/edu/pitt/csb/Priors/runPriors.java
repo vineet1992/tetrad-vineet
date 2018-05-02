@@ -72,7 +72,8 @@ public class runPriors {
                     loocv = true;
                     index++;
                 }
-                index++;
+                else
+                    index++;
             }
         }
         catch(ArrayIndexOutOfBoundsException e)
@@ -108,7 +109,6 @@ public class runPriors {
             e.printStackTrace();
             System.exit(-1);
         }
-        d.removeColumn(d.getVariable("Response"));
         boolean addedDummy = false;
         if(d.isContinuous())
         {
@@ -161,7 +161,7 @@ public class runPriors {
                     createPrior(f.listFiles()[i],out,d.getVariableNames());
                     currFile = "temp.txt";
                 }
-                if(addedDummy)
+                else if(addedDummy)
                 {
                     addLines(new File(currFile));
                     priors[i] = new TetradMatrix(realDataPriorTest.loadPrior(new File("temp_2.txt"),d.getNumColumns()));
@@ -177,13 +177,18 @@ public class runPriors {
             if(t.exists())
                 t.deleteOnExit();
 
+            System.out.print("Running piMGM...");
             mgmPriors m = new mgmPriors(ns,initLambdas,d,priors);
             Graph g = m.runPriors();
+            System.out.println("Done");
+            System.out.print("Printing Results...");
             printAllResults(g,m,runName,fileMap);
+            System.out.println("Done");
         }
         catch(Exception e)
         {
-            System.err.println("");
+            System.err.println("Unknown Error");
+            e.printStackTrace();
             System.exit(-1);
         }
 

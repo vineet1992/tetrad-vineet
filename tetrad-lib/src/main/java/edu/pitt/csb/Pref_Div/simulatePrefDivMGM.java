@@ -5,10 +5,7 @@ import edu.cmu.tetrad.algcomparison.simulation.Parameters;
 import edu.cmu.tetrad.calculator.expression.Expression;
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.data.DiscreteVariable;
-import edu.cmu.tetrad.graph.EdgeListGraphSingleConnections;
-import edu.cmu.tetrad.graph.Graph;
-import edu.cmu.tetrad.graph.GraphUtils;
-import edu.cmu.tetrad.graph.Node;
+import edu.cmu.tetrad.graph.*;
 import edu.cmu.tetrad.sem.GeneralizedSemIm;
 import edu.cmu.tetrad.sem.GeneralizedSemPm;
 import edu.cmu.tetrad.util.StatUtils;
@@ -25,33 +22,34 @@ import java.util.*;
 /**
  * Created by vinee_000 on 3/2/2018.
  */
-public class simulatePrefDivData {
+public class simulatePrefDivMGM {
 
-
+//TODO Clean this code up into functions
 
 
     public static void main(String [] args) {
-        int numRuns = 15;
-        int numGenes = 100;
-        int sampleSize = 200;
+        int numRuns = 10;
+        int numGenes = 2000;
+        int sampleSize = 500;
         int ns = 20;
-        int minTargetParents = 5;
-        double[] noises = {-3,-2,-1,-0.5,-0.25,0};
-        for (int nn = 0; nn < noises.length; nn++) {
-            double intensityNoise = 0.4;
-            double dissimilarityNoise = 0.4;
+        int minTargetParents = 10;
+       // double[] noises = {0.001, 0.1, 0.25, 0.5,0.75,1.0};
+      //  double [] noises = {0.01,0.25,0.5,0.75,1};
+       // for (int nn = 0; nn < noises.length; nn++) {
+            double intensityNoise = 0.5;
+            double dissimilarityNoise = 0.5;
             boolean targetContinuous = true;
             boolean clusterSimulation = false;
             boolean evenDistribution = false;
             boolean clusterStability = false;
-            int numComponents = 10;
+            int numComponents = 75;
             double stabilityThreshold = 0.1;
             double percentMissing = 0;
             int numCategories = 4;
 
-            double radius = noises[nn];
+            double radius = -1;
             double accuracy = 0.5;
-            int topK = minTargetParents;
+            int topK = 50;
 
             int index = 0;
             while (index < args.length) {
@@ -92,7 +90,19 @@ public class simulatePrefDivData {
                 } else if (args[index].equals("-clusterStab")) {
                     clusterStability = true;
                     index++;
-                } else {
+                } else if(args[index].equals("-topK")) {
+                    topK = Integer.parseInt(args[index+1]);
+                    index+=2;
+                }  else if(args[index].equals("-A"))
+                {
+                    accuracy = Double.parseDouble(args[index+1]);
+                    index+=2;
+                }else if(args[index].equals("-radius"))
+                {
+                    radius = Double.parseDouble(args[index+1]);
+                    index+=2;
+                }else
+                {
                     System.err.println("Unidentified argument: " + args[index]);
                     System.exit(-1);
                 }
@@ -101,9 +111,9 @@ public class simulatePrefDivData {
 
             String runName = "";
             if (clusterSimulation)
-                runName = numGenes + "_" + sampleSize + "_" + ns + "_" + minTargetParents + "_" + intensityNoise + "_" + targetContinuous + "_" + stabilityThreshold + "_" + numComponents + "_" + radius + "_" + evenDistribution + "_" + clusterStability; //Name to append at the beginning of all output files
+                runName = "MGM_" + numGenes + "_" + sampleSize + "_" + ns + "_" + minTargetParents + "_" + intensityNoise + "_" + targetContinuous + "_" + stabilityThreshold + "_" + radius + "_" + accuracy + "_"+ numComponents + "_" + evenDistribution + "_" + clusterStability; //Name to append at the beginning of all output files
             else
-                runName = numGenes + "_" + sampleSize + "_" + ns + "_" + minTargetParents + "_" + intensityNoise + "_" + targetContinuous + "_" + stabilityThreshold + "_" + radius + "_" + clusterStability; //Name to append at the beginning of all output files
+                runName = "MGM_" + numGenes + "_" + sampleSize + "_" + ns + "_" + minTargetParents + "_" + intensityNoise + "_" + targetContinuous + "_" + stabilityThreshold + "_" + radius + "_" + accuracy + "_" + clusterStability; //Name to append at the beginning of all output files
             boolean saveData = true;
 
             //out variables refer to outputs
@@ -147,6 +157,9 @@ public class simulatePrefDivData {
 
             ArrayList<String> accuracyResults = new ArrayList<String>();
             ArrayList<String> stabilityResults = new ArrayList<String>();
+
+
+
             File resultAccFile = new File("Results/Result_" + runName + "_accuracy" + ".txt");
             if (resultAccFile.exists()) {
                 try {
@@ -166,9 +179,9 @@ public class simulatePrefDivData {
             try {
                 out = new PrintStream("Results/Result_" + runName + "_accuracy" + ".txt");
                 if (clusterSimulation)
-                    out.println("Run\tPredicted_Features\tActual_Features\tPrecision\tRecall\tCluster_Precision\tCluster_Recall\tCluster_Accuracy");
+                    out.println("Run\tPredicted_Features\tActual_Features\tPredicted_Neighborhood\tPrecision\tRecall\tCluster_Precision\tCluster_Recall\tGraph_Precision\tGraph_Recall\tNeighborhood_Precision\tNeighborhood_Recall");
                 else
-                    out.println("Run\tPredicted_Features\tActual_Features\tPrecision\tRecall");
+                    out.println("Run\tPredicted_Features\tActual_Features\tPredicted_Neighborhood\tPrecision\tRecall\tGraph_Precision\tGraph_Recall\tNeighborhood_Precision\tNeighborhood_Recall");
 
             } catch (Exception e) {
                 System.err.println("Unable to create accuracy file");
@@ -186,9 +199,9 @@ public class simulatePrefDivData {
                 }
                 stabPS = new PrintStream("Results/Result_" + runName + "_stabilities.txt");
                 if (outStabAcc)
-                    stabPS.println("Run\tAlpha\tStability\tPrecision\tRecall\tPredicted\tActual\tClusters");
+                    stabPS.println("Run\tAlpha\tStability\tPrecision\tRecall\tPredicted\tActual\tClusters\tGraph_Precision\tGraph_Recall");
                 else
-                    stabPS.println("Run\tAlpha\tStability\tClusters");
+                    stabPS.println("Run\tAlpha\tStability\tClusters\tGraph_Precision\tGraph_Recall");
             } catch (Exception e) {
                 System.err.println("Unable to create stability file");
                 System.exit(-1);
@@ -202,7 +215,22 @@ public class simulatePrefDivData {
                 DataSet d = null;
                 File graphFile = null;
 
+                Graph estGraph = null;
 
+
+                File resultGraph = new File("Results/Result_" + runName + "_" + j + "_graph" + ".txt");
+                if(resultGraph.exists())
+                {
+                    try{
+                        estGraph = GraphUtils.loadGraphTxt(resultGraph);
+                    }
+                    catch(Exception e)
+                    {
+                        System.err.println("Error reading estimated graph from file");
+                        e.printStackTrace();
+                        System.exit(-1);
+                    }
+                }
                 if (clusterSimulation)
                     graphFile = new File("Graphs/Graph_" + numGenes + "_" + minTargetParents + "_" + numComponents + "_" + evenDistribution + "_" + j + ".txt");
                 else
@@ -384,7 +412,7 @@ public class simulatePrefDivData {
                 for (int i = 0; i < genes.size(); i++) {
                     genes.get(i).theoryIntensity = allCorrs[i];
                 }
-                System.out.println("Correlations: " + Arrays.toString(allCorrs));
+               // System.out.println("Correlations: " + Arrays.toString(allCorrs));
 
                 File priorFileDis = null;
                 if (clusterSimulation)
@@ -498,6 +526,7 @@ public class simulatePrefDivData {
                 r.setRadius(radius);
                 r.setAccuracy(accuracy);
                 r.setNS(ns);
+                r.setTrueGraph(g);
                 r.setTopK(topK);
                 r.setThreshold(stabilityThreshold);
                 r.setStabilityOutput(outStabAcc);
@@ -505,13 +534,16 @@ public class simulatePrefDivData {
                 r.setRun(j);
                 r.usePartialCorrelation(false);
                 if (accuracyResults.size() <= j) {
-                    ArrayList<Gene> result = r.runPD();
-                    System.out.println("Top Genes: " + result);
-                    System.out.println("Clusters: " + r.getClusters());
+                    Graph gOut = r.getCausalGraph(target);
+                    estGraph = gOut;
+                    ArrayList<Gene> result = r.getLastGeneSet();
+                    double [][] stab = r.getLastStabilities();
+                   // System.out.println("Top Genes: " + result);
+                   // System.out.println("Clusters: " + r.getClusters());
                     if (clusterSimulation)
-                        accuracyResults.add(j + "\t" + result + "\t" + g.getAdjacentNodes(g.getNode(target)) + "\t" + getAccuracy(result, target, g)[1] + "\t" + getAccuracy(result, target, g)[2] + "\t" + simpleClusterAccuracy(result, target, g, clusters)[0] + "\t" + simpleClusterAccuracy(result, target, g, clusters)[1] + "\t" + averageClusterSim(result, target, g, clusters, r.getClusters()));
+                        accuracyResults.add(j + "\t" + result + "\t" + g.getAdjacentNodes(g.getNode(target)) + "\t" + gOut.getAdjacentNodes(gOut.getNode(target)) + "\t" + getAccuracy(gOut, target, g)[1] + "\t" + getAccuracy(gOut, target, g)[2] + "\t" + simpleClusterAccuracy(gOut, target, g, clusters)[0] + "\t" + simpleClusterAccuracy(gOut, target, g, clusters)[1] + "\t" + graphAccuracy(gOut,g)[0] + "\t" + graphAccuracy(gOut,g)[1] + "\t" + neighborAccuracy(gOut,g,target)[0] + "\t" + neighborAccuracy(gOut,g,target)[1]);
                     else
-                        accuracyResults.add(j + "\t" + result + "\t" + g.getAdjacentNodes(g.getNode(target)) + "\t" + getAccuracy(result, target, g)[1] + "\t" + getAccuracy(result, target, g)[2]);
+                        accuracyResults.add(j + "\t" + result + "\t" + g.getAdjacentNodes(g.getNode(target)) + "\t" + gOut.getAdjacentNodes(gOut.getNode(target)) + "\t" + getAccuracy(gOut, target, g)[1] + "\t" + getAccuracy(gOut, target, g)[2] + "\t" + graphAccuracy(gOut,g)[0] + "\t" + graphAccuracy(gOut,g)[1]);
 
                     stabilityResults.addAll(r.getStabilityOutput());
                     if (subs == null)
@@ -563,6 +595,10 @@ public class simulatePrefDivData {
                     }
                     temp.flush();
                     temp.close();
+                    temp = new PrintStream(resultGraph);
+                    temp.println(estGraph);
+                    temp.flush();
+                    temp.close();
                 } catch (Exception e) {
                     System.err.println("Couldn't write information to files " + j);
                     e.printStackTrace();
@@ -597,12 +633,74 @@ public class simulatePrefDivData {
                 System.exit(-1);
             }
 
-        }
+        //}
     }
 
 
 
-    public static double averageClusterSim(ArrayList<Gene> result, String target, Graph g, HashMap<String,Integer> clusters,HashMap<Gene,List<Gene>> predClusts)
+
+    public static double [] neighborAccuracy(Graph gOut, Graph actual, String target)
+    {
+        double tp = 0;
+        double fp = 0;
+        double fn = 0;
+        List<Node> est = gOut.getAdjacentNodes(gOut.getNode(target));
+        List<Node> truth = actual.getAdjacentNodes(actual.getNode(target));
+
+        for(int i = 0; i < est.size();i++)
+        {
+            boolean found = false;
+            for(int j = 0; j < truth.size();j++)
+            {
+                if(truth.get(j).getName().equals(est.get(i).getName())) {
+                    tp++;
+                    found = true;
+                }
+            }
+            if(!found)
+                fp++;
+        }
+
+        for(int i = 0; i < truth.size();i++)
+        {
+            boolean found = false;
+            for(int j = 0; j < est.size();j++)
+            {
+                if(truth.get(i).getName().equals(est.get(j).getName()))
+                    found = true;
+            }
+            if(!found)
+                fn++;
+        }
+        return new double[]{tp/(tp+fp),tp/(tp+fn)};
+    }
+    public static double [] graphAccuracy(Graph gOut, Graph actual)
+    {
+        double tp = 0;
+        double fp = 0;
+        double fn = 0;
+        for(Edge e:gOut.getEdges())
+        {
+            if(e.getNode1().getName().equals("Dummy")||e.getNode2().getName().equals("Dummy"))
+                continue;
+            if(actual.getEdge(actual.getNode(e.getNode1().getName()),actual.getNode(e.getNode2().getName()))!=null)
+                tp++;
+            else if(actual.getEdge(actual.getNode(e.getNode2().getName()),actual.getNode(e.getNode1().getName()))!=null)
+                tp++;
+            else
+                fp++;
+
+        }
+        for(Edge e: actual.getEdges())
+        {
+            if(gOut.getNode(e.getNode1().getName())==null || gOut.getNode(e.getNode2().getName())==null)
+                continue;
+            if(gOut.getEdge(gOut.getNode(e.getNode1().getName()),gOut.getNode(e.getNode2().getName()))==null && gOut.getEdge(gOut.getNode(e.getNode2().getName()),gOut.getNode(e.getNode1().getName()))==null)
+                fn++;
+        }
+        return new double[]{tp/(tp+fp),tp/(tp+fn)};
+    }
+    public static double averageClusterSim(Graph result, String target, Graph g, HashMap<String,Integer> clusters,HashMap<Gene,List<Gene>> predClusts)
     {
         //average tanimoto set similarity across clusters that were correctly identified (true connected components)
         //if same connected component was identified twice, merge these clusters
@@ -666,16 +764,17 @@ public class simulatePrefDivData {
     //You only get a single TP even if you pick multiple representatives from the same correct cluster, whereas you get multiple fp if you pick more than one
     //representative from he same wrong cluster
     //E.G. Selected Vars are from clusters (1,3,6) True vars are from clusters (8,13,6) Prec = 1/3, Rec = 1/3
-    public static double [] simpleClusterAccuracy(ArrayList<Gene> result,String target, Graph g,HashMap<String,Integer> clusters)
+    public static double [] simpleClusterAccuracy(Graph gOut,String target, Graph g,HashMap<String,Integer> clusters)
     {
         List<Node> trueParents = g.getAdjacentNodes(g.getNode(target));
         double tp = 0;
         double fp = 0;
         double fn = 0;
         ArrayList<Integer> estimated = new ArrayList<Integer>();
+        List<Node> result = gOut.getAdjacentNodes(gOut.getNode(target));
         for(int i = 0; i < result.size();i++)
         {
-            estimated.add(clusters.get(result.get(i).symbol));
+            estimated.add(clusters.get(result.get(i).getName()));
         }
         HashSet<Integer> truth = new HashSet<Integer>();
         for(int i = 0; i < trueParents.size();i++)
@@ -702,18 +801,19 @@ public class simulatePrefDivData {
         return output;
 
     }
-    public static double[] getAccuracy(ArrayList<Gene> result,String target,Graph g)
+    public static double[] getAccuracy(Graph result,String target,Graph g)
     {
         double tp = 0;
         double fp = 0;
         double fn = 0;
         double [] output = new double[3]; //Accuracy, Precision,Recall
         List<Node> truth = g.getAdjacentNodes(g.getNode(target));
-        for(int i = 0; i < result.size();i++)
+        List<Node> est = result.getAdjacentNodes(result.getNode(target));
+        for(int i = 0; i < est.size();i++)
         {
             boolean found = false;
             for(Node n: truth)
-                if(result.get(i).symbol.equals(n.getName()))
+                if(est.get(i).getName().equals(n.getName()))
                     found = true;
             if(found)
                 tp++;
@@ -723,9 +823,9 @@ public class simulatePrefDivData {
         for(int i = 0; i < truth.size();i++)
         {
             boolean found = false;
-            for(int j = 0; j < result.size();j++)
+            for(int j = 0; j < est.size();j++)
             {
-                if(result.get(j).symbol.equals(truth.get(i).getName()))
+                if(est.get(j).getName().equals(truth.get(i).getName()))
                     found = true;
             }
             if(!found)

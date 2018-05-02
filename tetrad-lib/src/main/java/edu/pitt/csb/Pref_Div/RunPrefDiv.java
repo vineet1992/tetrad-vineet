@@ -3,11 +3,16 @@ package edu.pitt.csb.Pref_Div;
 import cern.colt.matrix.DoubleFactory2D;
 import cern.colt.matrix.DoubleMatrix2D;
 import cern.jet.math.*;
+import edu.cmu.tetrad.algcomparison.simulation.MixedLeeHastieSimulation;
 import edu.cmu.tetrad.data.DataSet;
+import edu.cmu.tetrad.data.DiscreteVariable;
+import edu.cmu.tetrad.graph.Edge;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.Node;
 import edu.cmu.tetrad.util.ForkJoinPoolInstance;
+import edu.pitt.csb.mgm.MGM;
 import edu.pitt.csb.mgm.MixedUtils;
+import edu.pitt.csb.mgm.STEPS;
 import edu.pitt.csb.stability.DataGraphSearch;
 import edu.pitt.csb.stability.StabilityUtils;
 
@@ -35,12 +40,16 @@ public class RunPrefDiv {
     private int numAlphas = 20;
     private double alphaLimit = 1;
     private int maxIntDiscrete = 5;
+    private double lambdaLow = 0.05;
+    private double lambdaHigh = 0.95;
     private double g = 0.05; //Stability threshold
     private ArrayList<Gene> lastGeneSet;
     private HashMap<Gene,List<Gene>> lastClusters;
     private String target;
     private boolean approxCorrelations = false;
     private boolean useClusterStability = false; //cluster stability, or gene wise stability
+    private boolean partialCorr = false; //Use partial correlations instead of correlation for continuous variables
+    private double [][] lastStepsStabilities;
 
     private ArrayList<String> stabPS;//PrintStream to output file where we have run\talpha\tstability
     private boolean includeAccuracy = false; //When writing the stability output to file, should we include an accuracy score for each stability data point
@@ -48,6 +57,8 @@ public class RunPrefDiv {
     private int run; //purely for printing to the stability output file
     private boolean loocv = false;
     private int [][] subs;
+    private boolean getCausalAccuracy = false;
+    private Graph trueGraph;
 
 
     public RunPrefDiv(float [] dissimilarity, ArrayList<Gene> genes, DataSet data,String target,boolean leaveOneOut)
@@ -65,6 +76,7 @@ public class RunPrefDiv {
         return subs;
     }
 
+    public double[][]getLastStabilities(){return lastStepsStabilities;}
     public void setSubs(int [][] subs){this.subs = subs;}
     public HashMap<Gene,List<Gene>> getClusters()
     {
@@ -113,7 +125,10 @@ public class RunPrefDiv {
     public void setStabilityOutput(boolean includeAccuracy){this.stabPS = new ArrayList<String>(); this.includeAccuracy=includeAccuracy;}
     public ArrayList<String> getStabilityOutput(){return stabPS;}
     public void setTargets(List<Node> targets){this.targets = targets;}
+    public void setTrueGraph(Graph truth){this.trueGraph = truth;}
     public void setRun(int r){run = r;}
+    public ArrayList<Gene> getLastGeneSet(){return lastGeneSet;}
+    public void usePartialCorrelation(boolean pc){partialCorr = pc;}
 
     public ArrayList<Gene> runPD()
     {
@@ -142,9 +157,14 @@ public class RunPrefDiv {
             System.out.print("Running Pref-Div for Alpha value: " + alphas[i] + " ...");
             double stab = stabilityPD(alphas[i]);
             if(stabPS!=null) {
-                if(includeAccuracy)
-                    stabPS.add(run + "\t" + alphas[i] + "\t" + stab + "\t" + getAccuracy(targets,lastGeneSet)[1] + "\t" + getAccuracy(targets,lastGeneSet)[2] + "\t" + lastGeneSet + "\t" + targets + "\t" + lastClusters);
-                else
+                if(includeAccuracy) {
+                    if(getCausalAccuracy) {
+                        Graph graph = learnGraph();
+                        stabPS.add(run + "\t" + alphas[i] + "\t" + stab + "\t" + getAccuracy(targets, lastGeneSet)[1] + "\t" + getAccuracy(targets, lastGeneSet)[2] + "\t" + lastGeneSet + "\t" + targets + "\t" + lastClusters + "\t" + graphAccuracy(graph)[0] + "\t" + graphAccuracy(graph)[1] + "\t" + simulatePrefDivMGM.neighborAccuracy(graph,trueGraph,target)[0] + "\t" + simulatePrefDivMGM.neighborAccuracy(graph,trueGraph,target)[1]);
+                    }else
+                        stabPS.add(run + "\t" + alphas[i] + "\t" + stab + "\t" + getAccuracy(targets, lastGeneSet)[1] + "\t" + getAccuracy(targets, lastGeneSet)[2] + "\t" + lastGeneSet + "\t" + targets + "\t" + lastClusters);
+
+                }else
                     stabPS.add(run + "\t" + alphas[i] + "\t" + stab + "\t" + lastClusters);
             }
             System.out.println("Stability = " + (stab) + ", Done");
@@ -167,6 +187,108 @@ public class RunPrefDiv {
 
     }
 
+
+    public double [] graphAccuracy(Graph gOut)
+    {
+
+        double tp = 0;
+        double fp = 0;
+        double fn = 0;
+        for(Edge e:gOut.getEdges())
+        {
+            if(e.getNode1().getName().equals("Dummy")||e.getNode2().getName().equals("Dummy"))
+                continue;
+            if(trueGraph.getEdge(trueGraph.getNode(e.getNode1().getName()),trueGraph.getNode(e.getNode2().getName()))!=null)
+                tp++;
+            else if(trueGraph.getEdge(trueGraph.getNode(e.getNode2().getName()),trueGraph.getNode(e.getNode1().getName()))!=null)
+                tp++;
+            else
+                fn++;
+
+        }
+        for(Edge e: trueGraph.getEdges())
+        {
+            if(gOut.getNode(e.getNode1().getName())==null || gOut.getNode(e.getNode2().getName())==null)
+                continue;
+            if(gOut.getEdge(gOut.getNode(e.getNode1().getName()),gOut.getNode(e.getNode2().getName()))==null && gOut.getEdge(gOut.getNode(e.getNode2().getName()),gOut.getNode(e.getNode1().getName()))==null)
+                fp++;
+        }
+        return new double[]{tp/(tp+fp),tp/(tp+fn)};
+    }
+    public Graph learnGraph()
+    {
+        ArrayList<Node> names = new ArrayList<Node>();
+        for(Gene x:lastGeneSet)
+        {
+            names.add(data.getVariable(x.symbol));
+        }
+        if(target!=null && !target.equals(""))
+            names.add(data.getVariable(target));
+
+        DataSet temp = data.subsetColumns(names);
+        if(!temp.isMixed())
+        {
+            temp.addVariable(new DiscreteVariable("Dummy"));
+            int col = temp.getColumn(temp.getVariable("Dummy"));
+            Random rand = new Random();
+            for(int i = 0; i < temp.getNumRows();i++)
+            {
+                temp.setInt(i,col,rand.nextInt(2));
+            }
+        }
+        double [] lambdas = new double[numAlphas];
+        for(int i = 0; i < numAlphas;i++)
+        {
+            lambdas[i] = ((i+1)*(lambdaHigh-lambdaLow)/numAlphas);
+        }
+        DataSet [] subsamples = new DataSet[subs.length];
+        for(int i = 0; i < subs.length;i++)
+        {
+            subsamples[i] = temp.subsetRows(subs[i]);
+        }
+        STEPS s = new STEPS(temp,lambdas,g,subsamples);
+        Graph output = s.runStepsPar();
+        return output;
+    }
+    public Graph getCausalGraph(String target)
+    {
+        getCausalAccuracy = true;
+        ArrayList<Gene> g2 = runPD();
+        ArrayList<Node> names = new ArrayList<Node>();
+        for(Gene x:g2)
+        {
+            names.add(data.getVariable(x.symbol));
+        }
+        if(target!=null && !target.equals(""))
+             names.add(data.getVariable(target));
+
+        DataSet temp = data.subsetColumns(names);
+        if(!temp.isMixed())
+        {
+            temp.addVariable(new DiscreteVariable("Dummy"));
+            int col = temp.getColumn(temp.getVariable("Dummy"));
+            Random rand = new Random();
+            for(int i = 0; i < temp.getNumRows();i++)
+            {
+                temp.setInt(i,col,rand.nextInt(2));
+            }
+        }
+        double [] lambdas = new double[numAlphas];
+        for(int i = 0; i < numAlphas;i++)
+        {
+            lambdas[i] = ((i+1)*(lambdaHigh-lambdaLow)/numAlphas);
+        }
+        DataSet [] subsamples = new DataSet[subs.length];
+        for(int i = 0; i < subs.length;i++)
+        {
+            subsamples[i] = temp.subsetRows(subs[i]);
+        }
+        STEPS s = new STEPS(temp,lambdas,g,subsamples);
+        Graph output = s.runStepsPar();
+        lastGeneSet = g2;
+        lastStepsStabilities = s.stabilities;
+        return output;
+    }
     private double [] getAccuracy(List<Node> targets, ArrayList<Gene> result)
     {
         double [] output = new double[3];
@@ -237,7 +359,7 @@ public class RunPrefDiv {
 
                         DataSet dataSubSamp = data.subsetRows(subs[s]);
 
-                        ArrayList<Gene> curr = Functions.computeAllIntensities(genes,alp,dataSubSamp,target);
+                        ArrayList<Gene> curr = Functions.computeAllIntensities(genes,alp,dataSubSamp,target,partialCorr);
                         long time = System.nanoTime();
                         //PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,PrefDiv.findTopKIntensity(curr,topK),dissimilarity,alp,dataSubSamp,true);
                         //p.setCluster(true);
@@ -247,7 +369,7 @@ public class RunPrefDiv {
 
                         time = System.nanoTime();
                         Collections.sort(curr,Gene.IntensityComparator);
-                        PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,PrefDiv.findTopKIntensity(curr,topK),dissimilarity,alp,dataSubSamp,approxCorrelations);
+                        PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,PrefDiv.findTopKIntensity(curr,topK),dissimilarity,alp,dataSubSamp,approxCorrelations,partialCorr);
                         p.setCluster(true);
                         ArrayList<Gene> result = p.diverset();
                         allClusters.add(p.clusters);
@@ -280,10 +402,9 @@ public class RunPrefDiv {
         final int chunk = 1000;
 
         pool.invoke(new StabilityAction(chunk, 0, subs.length));
-        ArrayList<Gene> curr = Functions.computeAllIntensities(genes,alp,data,target);
-        //TODO CURR MUST BE SORTED BEFORE CONTINUING!!!
+        ArrayList<Gene> curr = Functions.computeAllIntensities(genes,alp,data,target,partialCorr);
         Collections.sort(curr,Gene.IntensityComparator);
-        PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,PrefDiv.findTopKIntensity(curr,topK),dissimilarity,alp,data,approxCorrelations);
+        PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,PrefDiv.findTopKIntensity(curr,topK),dissimilarity,alp,data,approxCorrelations,partialCorr);
         p.setCluster(true);
         lastGeneSet = p.diverset();
         lastClusters = p.clusters;

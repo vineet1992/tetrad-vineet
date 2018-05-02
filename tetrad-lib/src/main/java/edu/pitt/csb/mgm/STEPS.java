@@ -893,7 +893,7 @@ System.out.println("Lambdas: " + Arrays.toString(lambda));
         //  System.out.println("b:" + b);
         A:while(true) //go until we break by having instability better than threshold
         {
-              // System.out.println("Lambda: " + lambda[currIndex]);
+               System.out.println("Lambda: " + lambda[currIndex]);
                 double [] lambdaCurr = {lambda[currIndex],lambda[currIndex],lambda[currIndex]};
                 DoubleMatrix2D adjMat;
                 if(subsamples!=null)
@@ -1248,7 +1248,6 @@ System.out.println("Lambdas: " + Arrays.toString(lambda));
         d.removeColumn(d.getVariable("IL-10_mDC"));
         //d.removeColumn(d.getVariable("IL-10_ratio"));
         //d.removeColumn(d.getVariable("IL-12_ratio"));
-        System.out.println(d);
        // System.exit(0);
         int numLambdas = 40;
         double [] initLambdas = new double[numLambdas];
@@ -1256,7 +1255,6 @@ System.out.println("Lambdas: " + Arrays.toString(lambda));
         {
             initLambdas[i] = .05 + .8*i/numLambdas;
         }
-        System.out.println(Arrays.toString(initLambdas));
         STEPS s = new STEPS(d,initLambdas,.07,5);
         Graph g = s.runSteps();
         PrintStream out = new PrintStream("steps.txt");

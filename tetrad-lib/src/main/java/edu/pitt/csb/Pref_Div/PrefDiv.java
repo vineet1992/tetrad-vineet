@@ -32,10 +32,12 @@ public class PrefDiv {
    private DataSet data;
    private boolean clustering = false;
    private boolean computeCorrs;
+   private boolean partialCorr;
    private ArrayList<Float> sampledCorrs;
 
    //TODO clustering is fine, need to decide if variables in the same cluster are allowed to be in the Top K together?
-    public PrefDiv(ArrayList<Gene> items, int topK, double accuracy, double radius, double topKIntensity,float [] theory,double alpha,DataSet data,boolean computeAllCorrs) {
+    //TODO Don't think it make ssense to use partial correlation for the quick approximation calculation?
+    public PrefDiv(ArrayList<Gene> items, int topK, double accuracy, double radius, double topKIntensity,float [] theory,double alpha,DataSet data,boolean computeAllCorrs,boolean partialCorr) {
     	this.topK = topK;
     	this.accuracy = accuracy;
     	this.radius = radius;
@@ -43,8 +45,9 @@ public class PrefDiv {
     	this.result = new ArrayList<Gene>();
     	this.topKIntensity = topKIntensity;
     	this.theoryMat = theory;
+    	this.partialCorr = partialCorr;
     	if(computeAllCorrs)
-    	    corrMat = Functions.computeAllCorrelations(items,data);
+    	    corrMat = Functions.computeAllCorrelations(items,data,partialCorr);
     	else {
             corrMat = new float[(items.size() * (items.size() - 1)) / 2];
         }
@@ -382,6 +385,7 @@ public class PrefDiv {
                 c = corrOnTheFly(i,j);
             }
         }
+        c = -1*c;
         if(theoryMat[Functions.getIndex(i,j,items.size())]==-1)
             return c;
         else

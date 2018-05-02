@@ -4,8 +4,8 @@ import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.data.DataWriter;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.GraphUtils;
-import edu.cmu.tetrad.performance.PerformanceTests;
 import edu.cmu.tetrad.search.*;
+import edu.pitt.csb.KCI.KCI_Ind;
 
 import java.io.*;
 

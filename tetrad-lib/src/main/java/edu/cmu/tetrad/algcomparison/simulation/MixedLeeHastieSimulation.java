@@ -23,6 +23,7 @@ import java.util.List;
 public class MixedLeeHastieSimulation implements Simulation {
     private List<DataSet> dataSets;
     private Graph graph;
+    private GeneralizedSemIm instModel;
 
     @Override
     public void simulate(Parameters parameters) {
@@ -109,6 +110,10 @@ public class MixedLeeHastieSimulation implements Simulation {
     }
 
 
+    public GeneralizedSemIm getIm()
+    {
+        return instModel;
+    }
     private DataSet simulateClustered(Graph dag, Parameters parameters,int targetContinuous) {
         HashMap<String, Integer> nd = new HashMap<>();
 
@@ -135,6 +140,7 @@ public class MixedLeeHastieSimulation implements Simulation {
             GeneralizedSemPm pm = MixedUtils.GaussianCategoricalPm(graph, "Split(-1.5,-.5,.5,1.5)");
             GeneralizedSemIm im = MixedUtils.GaussianCategoricalIm(pm);
 
+            instModel = im;
             DataSet ds = im.simulateDataAvoidInfinity(parameters.getInt("sampleSize"), false);
             return MixedUtils.makeMixedData(ds, nd);
         }

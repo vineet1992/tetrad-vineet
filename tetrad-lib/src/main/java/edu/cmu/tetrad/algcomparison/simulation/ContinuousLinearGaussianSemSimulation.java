@@ -32,15 +32,13 @@ public TetradMatrix cov;
     public void simulate(Parameters parameters, Graph g) {
         dataSets = new ArrayList<>();
         Random rand = new Random();
+        graph = g;
         for (int i = 0; i < parameters.getInt("numRuns"); i++) {
             SemPm pm = new SemPm(g);
             SemIm im = new SemIm(pm);
 
             int numNodes = numDeter;
             ArrayList<Node> used = new ArrayList<Node>();
-                Node curr = im.getVariableNode("B");
-                im.setErrVar(curr, rand.nextDouble() * 0.01);
-            System.out.println(im);
             dataSets.add(im.simulateData(parameters.getInt("sampleSize"), false));
         }
 

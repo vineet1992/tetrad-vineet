@@ -20,15 +20,15 @@ public class runSteps {
     {
         int index = 0;
         String directory = ".";
-        String file = "Data_So_Far.txt";
+        String file = "Final_Data_Exercise.txt";
         String stabilityFile = "";
         String graphFile = "";
         int ns = 20;
         double g = 0.05;
-        int numLambdas = 40;
+        int numLambdas = 20;
         double lambdaLow = 0.05;
         double lambdaHigh = 0.95;
-        boolean LOO = false;
+        boolean LOO = true;
         int maxCategoriesForDiscrete = 4;
         ArrayList<String> varsToRemove = new ArrayList<String>();
         while (index < args.length) {

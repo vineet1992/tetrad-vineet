@@ -1,4 +1,4 @@
-package edu.pitt.csb.mgm;
+package edu.pitt.csb.KCI;
 
 import edu.cmu.tetrad.data.DataModel;
 import edu.cmu.tetrad.data.DataSet;
@@ -9,6 +9,8 @@ import edu.cmu.tetrad.search.IndependenceTest;
 import edu.cmu.tetrad.util.TetradMatrix;
 import edu.cmu.tetrad.util.TetradVector;
 import edu.cmu.tetrad.util.dist.ChiSquare;
+import edu.pitt.csb.mgm.EigenDecomposition;
+import edu.pitt.csb.mgm.IndTestMultinomialAJ;
 import org.apache.commons.math3.distribution.GammaDistribution;
 import org.apache.commons.math3.linear.RealVector;
 
@@ -46,14 +48,70 @@ public class KCI implements IndependenceTest {
     private final double lambda = 1E-3;
     private TetradMatrix lamEye;
     private TetradMatrix [] kyArr;
-    private boolean [][] stopTesting;
+    private boolean twoStage; //Are we doing the two stage test? Or just KCI?
+    private boolean [][] stopTesting; //Once we found an edge to have a linear relationship, there's no need to test it for nonlinearity
 //First threshold is p-value for KCI, second is p-value for Likelihood Ratio
     public void setCutoff(int c)
     {
         cutoff = c;
     }
+
+
+    public KCI(DataSet data, double threshold)
+    {
+        twoStage = false;
+        stopTesting = new boolean[data.getNumColumns()][data.getNumColumns()];
+        int T = data.getNumRows();
+        kyArr = new TetradMatrix[data.getNumColumns()];
+        double [][] H = new double[T][T];
+        for(int i = 0; i < T; i ++)
+        {
+            for(int j = 0; j < T; j++)
+            {
+                if(i==j)
+                    H[i][j] = 1.0 - 1.0 / T;
+                else
+                    H[i][j] = -1.0/T;
+            }
+        }
+        Hmat = new TetradMatrix(H);
+        eye = new TetradMatrix(T,T);
+        for(int i = 0; i < T; i ++)
+            eye.set(i,i,1);
+        lamEye = eye.scalarMult(lambda);
+        alpha = threshold;
+        dat = data;
+        forInd = dat.copy();
+        lastP = -1;
+        A:for(int i = 0; i < dat.getNumColumns();i++)
+        {
+            try {
+                double[] curr = new double[dat.getNumRows()];
+                for (int j = 0; j < dat.getNumRows(); j++) {
+                    curr[j] = dat.getDouble(j, i);
+
+                }
+                double m = mean(curr);
+                double std = std(curr, m);
+
+                for (int j = 0; j < dat.getNumRows(); j++) {
+                    dat.setDouble(j, i, (dat.getDouble(j, i) - m) / std);
+                }
+            }
+            catch(Exception e) {
+                continue A;
+            }
+        }
+        chiSquareRand = new ArrayList<Double>();
+        ChiSquare cs = new ChiSquare(1);
+        for(int i = 0; i < 1000*dat.getNumRows();i++)
+        {
+            chiSquareRand.add(cs.nextRandom());
+        }
+    }
     public KCI(DataSet data,double threshold, double threshold2,Graph g,double lamb)
     {
+        twoStage = true;
         stopTesting = new boolean[data.getNumColumns()][data.getNumColumns()];
         int T = data.getNumRows();
         kyArr = new TetradMatrix[data.getNumColumns()];
@@ -210,11 +268,8 @@ public class KCI implements IndependenceTest {
     {
        // System.out.println("Is " + x + " ind of " + y + " given " + z);
         ArrayList<Node> zzzz = new ArrayList<Node>();
-        if(z!=null) {
-            for (Node tempo : z)
-                zzzz.add(ii.getVariable(tempo.getName()));
-        }
-        else
+
+        if(z==null)
         {
             return isIndependentUncon(x,y);
         }
@@ -222,45 +277,49 @@ public class KCI implements IndependenceTest {
         boolean yCont = false;
        /* if(z.size() > cutoff)
             return false;*/
-        try {
+       if(ii!=null) {
+           if(z!=null) {
+               for (Node tempo : z)
+                   zzzz.add(ii.getVariable(tempo.getName()));
+           }
+           try {
 
-            ii.getData().setDouble(1, ii.getData().getColumn(ii.getVariable(x.getName())),ii.getData().getDouble(1, ii.getData().getColumn(ii.getVariable(x.getName()))));
-            xCont = true;
-            // System.out.println(x + ": is Continuous");
-        }
-        catch (Exception e){}
-        try {
-            ii.getData().setDouble(1, ii.getData().getColumn(ii.getVariable(y.getName())),ii.getData().getDouble(1, ii.getData().getColumn(ii.getVariable(y.getName()))));
-            yCont = true;
-            //System.out.println(y + ": is Continuous");
-        }
-        catch(Exception ee){}
-        if(ii.isDependent(ii.getVariable(x.getName()),ii.getVariable(y.getName()),zzzz)) {
-            lastP = ii.getPValue();
-            List<Node> temp = new ArrayList<Node>();
-            if(cutoff==zzzz.size())
-            {
-                stopTesting[ii.getData().getColumn(ii.getVariable(x.getName()))][ii.getData().getColumn(ii.getVariable(y.getName()))] = true;
-                stopTesting[ii.getData().getColumn(ii.getVariable(y.getName()))][ii.getData().getColumn(ii.getVariable(x.getName()))] = true;
-            }
-            if(truth!=null) {
-                for (Node pz : zzzz)
-                    temp.add(truth.getNode(pz.getName()));
-                if (!truth.isDSeparatedFrom(truth.getNode(x.getName()), truth.getNode(y.getName()), temp) && lastP > alpha)
-                    out.println("MULT\t" + lastP + "\t" + temp.size() + "\t" + xCont + "\t" + yCont + "\t" + x.getName() + "\t" + y.getName() + "\t" + temp + "\t" + lambdaMGM);
-                out.flush();
-            }
-            return false;
-        }
-        if(stopTesting[ii.getData().getColumn(ii.getVariable(x.getName()))][ii.getData().getColumn(ii.getVariable(y.getName()))])
-        {
-            lastP = ii.getPValue();
-           // System.out.println(x + "," + y + " was previously dependent so not asking KCI");
-            return true;
-        }
-        lastP = ii.getPValue();
+               ii.getData().setDouble(1, ii.getData().getColumn(ii.getVariable(x.getName())), ii.getData().getDouble(1, ii.getData().getColumn(ii.getVariable(x.getName()))));
+               xCont = true;
+               // System.out.println(x + ": is Continuous");
+           } catch (Exception e) {
+           }
+           try {
+               ii.getData().setDouble(1, ii.getData().getColumn(ii.getVariable(y.getName())), ii.getData().getDouble(1, ii.getData().getColumn(ii.getVariable(y.getName()))));
+               yCont = true;
+               //System.out.println(y + ": is Continuous");
+           } catch (Exception ee) {
+           }
+           if (ii.isDependent(ii.getVariable(x.getName()), ii.getVariable(y.getName()), zzzz)) {
+               lastP = ii.getPValue();
+               List<Node> temp = new ArrayList<Node>();
+               if (cutoff == zzzz.size()) {
+                   stopTesting[ii.getData().getColumn(ii.getVariable(x.getName()))][ii.getData().getColumn(ii.getVariable(y.getName()))] = true;
+                   stopTesting[ii.getData().getColumn(ii.getVariable(y.getName()))][ii.getData().getColumn(ii.getVariable(x.getName()))] = true;
+               }
+               if (truth != null) {
+                   for (Node pz : zzzz)
+                       temp.add(truth.getNode(pz.getName()));
+                   if (!truth.isDSeparatedFrom(truth.getNode(x.getName()), truth.getNode(y.getName()), temp) && lastP > alpha)
+                       out.println("MULT\t" + lastP + "\t" + temp.size() + "\t" + xCont + "\t" + yCont + "\t" + x.getName() + "\t" + y.getName() + "\t" + temp + "\t" + lambdaMGM);
+                   out.flush();
+               }
+               return false;
+           }
+           if (stopTesting[ii.getData().getColumn(ii.getVariable(x.getName()))][ii.getData().getColumn(ii.getVariable(y.getName()))]) {
+               lastP = ii.getPValue();
+               // System.out.println(x + "," + y + " was previously dependent so not asking KCI");
+               return true;
+           }
+           lastP = ii.getPValue();
+       }
         List<Node> temp = new ArrayList<Node>();
-        if(truth!=null) {
+        if(out!=null && truth!=null) {
             for (Node pz : zzzz)
                 temp.add(truth.getNode(pz.getName()));
             if (!truth.isDSeparatedFrom(truth.getNode(x.getName()), truth.getNode(y.getName()), temp) && lastP > alpha)
@@ -289,19 +348,21 @@ public class KCI implements IndependenceTest {
         boolean yCont = false;
        /* if(z.size() > cutoff)
             return false;*/
-        try {
+       if(ii!=null) {
+           try {
 
-            ii.getData().setDouble(1, ii.getData().getColumn(ii.getVariable(x.getName())),ii.getData().getDouble(1, ii.getData().getColumn(ii.getVariable(x.getName()))));
-            xCont = true;
-            // System.out.println(x + ": is Continuous");
-        }
-        catch (Exception e){}
-        try {
-            ii.getData().setDouble(1, ii.getData().getColumn(ii.getVariable(y.getName())),ii.getData().getDouble(1, ii.getData().getColumn(ii.getVariable(y.getName()))));
-            yCont = true;
-            //System.out.println(y + ": is Continuous");
-        }
-        catch(Exception ee){}
+               ii.getData().setDouble(1, ii.getData().getColumn(ii.getVariable(x.getName())), ii.getData().getDouble(1, ii.getData().getColumn(ii.getVariable(x.getName()))));
+               xCont = true;
+               // System.out.println(x + ": is Continuous");
+           } catch (Exception e) {
+           }
+           try {
+               ii.getData().setDouble(1, ii.getData().getColumn(ii.getVariable(y.getName())), ii.getData().getDouble(1, ii.getData().getColumn(ii.getVariable(y.getName()))));
+               yCont = true;
+               //System.out.println(y + ": is Continuous");
+           } catch (Exception ee) {
+           }
+       }
         long time = System.nanoTime();
         boolean unbiased = false;
         boolean GP = unbiased;
@@ -583,7 +644,7 @@ public class KCI implements IndependenceTest {
                 }
                 lastP = sum/(double)T_BS;
                 List<Node> tem = new ArrayList<Node>();
-                if(truth!=null) {
+                if(out!=null && truth!=null) {
                     for (Node pz : z)
                         tem.add(truth.getNode(pz.getName()));
                     if (!truth.isDSeparatedFrom(truth.getNode(x.getName()), truth.getNode(y.getName()), tem) && lastP > alpha)
@@ -619,7 +680,7 @@ public class KCI implements IndependenceTest {
             p_appr =1- g.cumulativeProbability(sta);
             lastP = p_appr;
             List<Node> tem = new ArrayList<Node>();
-            if(truth!=null) {
+            if(out!=null && truth!=null) {
                 for (Node pz : z)
                     tem.add(truth.getNode(pz.getName()));
                 if (!truth.isDSeparatedFrom(truth.getNode(x.getName()), truth.getNode(y.getName()), tem) && lastP > alpha)
@@ -641,29 +702,28 @@ public class KCI implements IndependenceTest {
         boolean yCont = false;
        /* if(z.size() > cutoff)
             return false;*/
-        try {
-
-            ii.getData().setDouble(1, ii.getData().getColumn(ii.getVariable(x.getName())),ii.getData().getDouble(1, ii.getData().getColumn(ii.getVariable(x.getName()))));
-            xCont = true;
-            // System.out.println(x + ": is Continuous");
-        }
-        catch (Exception e){}
-        try {
-            ii.getData().setDouble(1, ii.getData().getColumn(ii.getVariable(y.getName())),ii.getData().getDouble(1, ii.getData().getColumn(ii.getVariable(y.getName()))));
-            yCont = true;
-            //System.out.println(y + ": is Continuous");
-        }
-        catch(Exception ee){}
-        if(ii.isDependent(ii.getVariable(x.getName()),ii.getVariable(y.getName())))
-        {
-            lastP = ii.getPValue();
-            if(cutoff==0)
-            {
-                stopTesting[ii.getData().getColumn(ii.getVariable(x.getName()))][ii.getData().getColumn(ii.getVariable(y.getName()))] = true;
-                stopTesting[ii.getData().getColumn(ii.getVariable(y.getName()))][ii.getData().getColumn(ii.getVariable(x.getName()))] = true;
-            }
-            return false;
-        }
+       if(ii!=null) {
+           try {
+               ii.getData().setDouble(1, ii.getData().getColumn(ii.getVariable(x.getName())), ii.getData().getDouble(1, ii.getData().getColumn(ii.getVariable(x.getName()))));
+               xCont = true;
+               // System.out.println(x + ": is Continuous");
+           } catch (Exception e) {
+           }
+           try {
+               ii.getData().setDouble(1, ii.getData().getColumn(ii.getVariable(y.getName())), ii.getData().getDouble(1, ii.getData().getColumn(ii.getVariable(y.getName()))));
+               yCont = true;
+               //System.out.println(y + ": is Continuous");
+           } catch (Exception ee) {
+           }
+           if (ii.isDependent(ii.getVariable(x.getName()), ii.getVariable(y.getName()))) {
+               lastP = ii.getPValue();
+               if (cutoff == 0) {
+                   stopTesting[ii.getData().getColumn(ii.getVariable(x.getName()))][ii.getData().getColumn(ii.getVariable(y.getName()))] = true;
+                   stopTesting[ii.getData().getColumn(ii.getVariable(y.getName()))][ii.getData().getColumn(ii.getVariable(x.getName()))] = true;
+               }
+               return false;
+           }
+       }
         List<Node> tem = Collections.emptyList();
         //System.out.println(x + " " + y);
         int columnNum = dat.getColumn(x);
@@ -751,18 +811,6 @@ public class KCI implements IndependenceTest {
         double p_val = -1;
         if(!approx) //Bootstrap
         {
-            // System.out.println("Not approximating");
-            try {
-                PrintStream p = new PrintStream("debug.txt");
-                //System.out.println(kx);
-                p.println(kx.plus(kx.transpose()).scalarMult(0.5));
-
-            }
-            catch(Exception e)
-            {
-                lastP = 0;
-                return false;
-            }
             EigenDecomposition ed1;
             EigenDecomposition ed2;
             try {
@@ -834,7 +882,7 @@ public class KCI implements IndependenceTest {
                 //System.out.println("Got to bottom");
                 double pval = (double) sum / T_BS;
                 lastP = pval;
-                if(truth!=null) {
+                if(truth!=null && out!=null) {
                     if (!truth.isDSeparatedFrom(truth.getNode(x.getName()), truth.getNode(y.getName()), tem) && lastP > alpha)
                         out.println("KCI\t" + lastP + "\t0" + "\t" + xCont + "\t" + yCont + "\t" + x.getName() + "\t" + y.getName() + "\t" + tem + "\t" + lambdaMGM);
                     out.flush();
@@ -900,7 +948,7 @@ public class KCI implements IndependenceTest {
             double p_appr = 1 - g.cumulativeProbability(sta);
             lastP = p_appr;
             // System.out.println("Time to approximate p value: " + (System.currentTimeMillis()-time));
-            if(truth!=null) {
+            if(out!=null && truth!=null) {
                 if (!truth.isDSeparatedFrom(truth.getNode(x.getName()), truth.getNode(y.getName()), tem) && lastP > alpha)
                     out.println("KCI\t" + lastP + "\t0" + "\t" + xCont + "\t" + yCont + "\t" + x.getName() + "\t" + y.getName() + "\t" + null + "\t" + lambdaMGM);
                 out.flush();

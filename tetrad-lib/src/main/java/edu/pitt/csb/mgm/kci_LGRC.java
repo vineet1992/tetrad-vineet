@@ -3,6 +3,7 @@ package edu.pitt.csb.mgm;
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.search.IndependenceTest;
 import edu.cmu.tetrad.search.PcStable;
+import edu.pitt.csb.KCI.KCI_Ind;
 
 import java.io.PrintStream;
 

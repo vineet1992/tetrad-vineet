@@ -1,4 +1,4 @@
-package edu.pitt.csb.mgm;
+package edu.pitt.csb.KCI;
 
 import edu.cmu.tetrad.data.DataModel;
 import edu.cmu.tetrad.data.DataSet;
@@ -10,6 +10,9 @@ import edu.cmu.tetrad.search.IndependenceTest;
 import edu.cmu.tetrad.util.TetradMatrix;
 import edu.cmu.tetrad.util.TetradVector;
 import edu.cmu.tetrad.util.dist.ChiSquare;
+import edu.pitt.csb.mgm.EigenDecomposition;
+import edu.pitt.csb.mgm.IndTestMultinomialAJ;
+import edu.pitt.csb.mgm.MixedUtils;
 import org.apache.commons.math3.distribution.GammaDistribution;
 import org.apache.commons.math3.linear.RealVector;
 

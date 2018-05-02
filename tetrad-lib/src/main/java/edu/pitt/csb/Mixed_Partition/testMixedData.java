@@ -1,18 +1,5 @@
 package edu.pitt.csb.Mixed_Partition;
 
-import edu.cmu.tetrad.algcomparison.Comparison;
-import edu.cmu.tetrad.algcomparison.simulation.ContinuousLinearGaussianSemSimulation;
-import edu.cmu.tetrad.algcomparison.simulation.Parameters;
-import edu.cmu.tetrad.data.DataSet;
-import edu.cmu.tetrad.graph.Graph;
-import edu.cmu.tetrad.performance.PerformanceTests;
-import edu.cmu.tetrad.search.CpcStable;
-import edu.cmu.tetrad.util.StatUtils;
-import edu.pitt.csb.mgm.IndTestMultinomialAJ;
-import edu.pitt.csb.mgm.KCI;
-
-import java.io.PrintStream;
-
 /**
  * Created by vinee_000 on 9/5/2017.
  */

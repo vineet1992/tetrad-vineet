@@ -2,15 +2,13 @@ package edu.pitt.csb.mgm;
 
 import edu.cmu.tetrad.algcomparison.Comparison;
 import edu.cmu.tetrad.algcomparison.simulation.ContinuousLinearGaussianSemSimulation;
-import edu.cmu.tetrad.algcomparison.simulation.ContinuousNonlinearNongaussianSimulation;
 import edu.cmu.tetrad.algcomparison.simulation.Parameters;
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.performance.PerformanceTests;
 import edu.cmu.tetrad.search.CpcStable;
-import edu.cmu.tetrad.search.IndTestFisherZ;
-import edu.cmu.tetrad.search.PcStable;
 import edu.cmu.tetrad.util.StatUtils;
+import edu.pitt.csb.KCI.KCI;
 
 import java.io.PrintStream;
 

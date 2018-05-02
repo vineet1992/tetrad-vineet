@@ -21,6 +21,7 @@
 
 package edu.cmu.tetrad.search;
 
+import edu.cmu.tetrad.data.CovarianceMatrixOnTheFly;
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.data.ICovarianceMatrix;
 import edu.cmu.tetrad.graph.Node;
@@ -91,9 +92,6 @@ public class SemBicScore implements Score {
         this.penaltyDiscount = penalty;
         logn = Math.log(sampleSize);
     }
-
-
-
     /**
      * Calculates the sample likelihood and BIC score for i given its parents in a simple SEM model
      */

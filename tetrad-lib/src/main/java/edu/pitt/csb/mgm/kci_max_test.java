@@ -8,6 +8,7 @@ import edu.cmu.tetrad.graph.NodeType;
 import edu.cmu.tetrad.search.DagToPag;
 import edu.cmu.tetrad.search.FciMaxP;
 import edu.cmu.tetrad.search.IndependenceTest;
+import edu.pitt.csb.KCI.KCI;
 
 import java.io.File;
 import java.io.PrintStream;

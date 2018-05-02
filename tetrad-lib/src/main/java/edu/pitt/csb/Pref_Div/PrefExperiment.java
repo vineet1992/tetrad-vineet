@@ -1,6 +1,7 @@
 package edu.pitt.csb.Pref_Div;
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.data.DataUtils;
+import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.search.Fci;
 import edu.pitt.csb.mgm.MixedUtils;
 import org.apache.commons.math3.stat.StatUtils;
@@ -12,9 +13,8 @@ public class PrefExperiment
 {
 
 
-	//TODO Add if target variable is null, just use the highest variance genes as the intensity score
-	//TODO if disease IDs are null, just use the data for intensity
-	//TODO Are all of the prior information sources giving dissimilarity scores or similarity scores???
+	//TODO Add if target variable is null, just use the highest variance genes as the intensity score, implemented need to debug
+	//TODO if disease IDs are null, just use the data for intensity, implemented need to debug
 	public static void main(String [] args) throws Exception
 	{
 		//PARAMS
@@ -24,7 +24,7 @@ public class PrefExperiment
 		double accuracy = 0;
 		double radius = 0.5; //NEED to figure out how to set this in a principled way TODO
 		int [] topK = {50};
-		int [] diseases = {6142};
+		int [] diseases = {6142}; //Default is breast cancer
 		boolean normalizeFiles = false;
 		boolean loocv = false;
 		boolean approxCorrelations = true;
@@ -33,6 +33,7 @@ public class PrefExperiment
 		String dissimilarityFile = "";
 		String outputFile = "";
 		String clusterFile = "";
+		String graphFile = "";
 		String target = "";
 		String [] files = new String[5];
 		//files[0] = "TCGA_BRCA_FILES/expression_transposed_npn.txt";
@@ -107,6 +108,11 @@ public class PrefExperiment
 					clusterFile = args[index + 1];
 					index += 2;
 				}
+				else if(args[index].equals("-graph"))
+				{
+					graphFile = args[index+1];
+					index+=2;
+				}
 				else if(args[index].equals("-g"))
 				{
 					threshold = Double.parseDouble(args[index+1]);
@@ -135,11 +141,11 @@ public class PrefExperiment
 			}
 		}
 
-		if(target.equals(""))
+	/*	if(target.equals(""))
 		{
 			System.err.println("Can't compute intensity values without a target, usage: (-t <target>)");
 			System.exit(-1);
-		}
+		}*/
 		if(dataFile.equals(""))
 		{
 			System.err.println("No data file specified, usage: (-data <filename>)");
@@ -167,7 +173,8 @@ public class PrefExperiment
 		}
 		float [] dissimilarity;
 		ArrayList<Gene> g;
-		if(dissimilarityFile=="" || intensityFile=="")//Use Default Theory computations (user only specifies the data file)
+		files[0] = dataFile;
+		if(dissimilarityFile.equals("") || intensityFile.equals(""))//Use Default Theory computations (user only specifies the data file)
 		{
 			System.out.print("Creating Gene Data...");
 			g = Functions.loadGeneData(".",files,diseases,true);
@@ -175,6 +182,8 @@ public class PrefExperiment
 			System.out.print("Creating Theory Data...");
 			dissimilarity = Functions.createTheoryMatrix("all_dissimilarity_sources.txt");
 			System.out.println("Done");
+			intensityFile = "all_genes.txt";
+			g = Functions.loadGeneData(intensityFile,normalizeFiles);
 		}
 		else { //Use user specified, files
 			System.out.print("Loading Gene Data...");
@@ -190,6 +199,7 @@ public class PrefExperiment
 						System.out.println("Running Pref Div for Top-" + topK[k] + " Genes");
 						//Print out to the file for each size of returned results
 						PrintStream out = new PrintStream(k + "_" + outputFile);
+						PrintStream out2 = new PrintStream(k + "_" + graphFile);
 						PrintStream out3 = new PrintStream(k + "_" + clusterFile);
 						//Run Pref-Div algorithm to find a diverse and relevant gene set
 						RunPrefDiv r = new RunPrefDiv(dissimilarity,g,data,target,loocv);
@@ -200,9 +210,12 @@ public class PrefExperiment
 						r.setTopK(topK[k]);
 						r.setThreshold(threshold);
 						r.setApproxCorrelations(approxCorrelations);
+						Graph causal = r.getCausalGraph(target);
+						ArrayList<Gene> Result = r.getLastGeneSet();
 
-						ArrayList<Gene> Result = r.runPD();
-
+						out2.println(causal);
+						out2.flush();
+						out2.close();
 						for(Gene stuff: Result)
 						{
 							out.println(stuff.symbol);

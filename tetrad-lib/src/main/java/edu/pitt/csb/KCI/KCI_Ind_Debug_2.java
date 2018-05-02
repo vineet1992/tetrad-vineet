@@ -1,9 +1,11 @@
-package edu.pitt.csb.mgm;
+package edu.pitt.csb.KCI;
 
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.GraphUtils;
 import edu.cmu.tetrad.graph.Node;
+import edu.pitt.csb.mgm.IndTestMultinomialAJ;
+import edu.pitt.csb.mgm.MixedUtils;
 
 import java.io.File;
 import java.util.ArrayList;

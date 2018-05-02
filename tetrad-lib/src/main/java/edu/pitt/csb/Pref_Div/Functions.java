@@ -57,8 +57,14 @@ public class Functions
 
 
     //Computes all gene-gene correlations for the current subsample d
-    public static float [] computeAllCorrelations(ArrayList<Gene> items, DataSet d)
+    public static float [] computeAllCorrelations(ArrayList<Gene> items, DataSet d,boolean partialCorr)
     {
+        TetradMatrix c = null;
+        if(partialCorr)
+        {
+            c = new CovarianceMatrix(d).getMatrix();
+            c = c.ginverse();
+        }
         HashMap<Integer,Integer> mapping = new HashMap<Integer,Integer>();
         for(int i = 0; i < items.size();i++)
         {
@@ -70,11 +76,18 @@ public class Functions
         long time = System.nanoTime();
         for(int i = 0; i < items.size();i++)
         {
-            double [] curr = temp[d.getColumn(d.getVariable(items.get(i).symbol))];
+            double [] curr = temp[mapping.get(i)];
             int index = Functions.getIndex(i,i+1,items.size());
             for(int j = i+1;j < items.size();j++)
             {
-                corrs[index] = (float)Math.abs(StatUtils.correlation(curr, temp[mapping.get(j)]));
+                if(partialCorr)
+                {
+                    int x = mapping.get(i);
+                    int y = mapping.get(j);
+                    corrs[index] = (float)(-1*c.get(x,y)/(c.get(x,x)*c.get(y,y)));
+                }
+                else
+                    corrs[index] = (float)Math.abs(StatUtils.correlation(curr, temp[mapping.get(j)]));
                 index++;
             }
 
@@ -91,12 +104,47 @@ public class Functions
     }
 
 
+
+    public static ArrayList<Gene> computeIntensitiesUnsupervised(ArrayList<Gene> g1,double a, DataSet data)
+    {
+        //Only implemented for continuous variables currently
+        float [] vars = new float[g1.size()];
+        double [][] temp = data.getDoubleData().transpose().toArray();
+        for(int i = 0; i < g1.size();i++)
+        {
+            vars[i] = (float)StatUtils.variance(temp[data.getColumn(data.getVariable(g1.get(i).symbol))]);
+        }
+        vars = NPN(vars,false);
+        for(int i = 0; i < g1.size();i++) {
+            try {
+                g1.get(i).foldChange = vars[i];
+                if (g1.get(i).theoryIntensity == -1)
+                    g1.get(i).intensityValue = g1.get(i).foldChange;
+                else
+                    g1.get(i).intensityValue = g1.get(i).theoryIntensity * (1 - a) + a * g1.get(i).foldChange;
+            }
+            catch(Exception e)
+            {
+                if(g1!=null)
+                    System.out.println(g1.get(i));
+                if(vars!=null)
+                    System.out.println(vars.length);
+                e.printStackTrace();
+                System.exit(-1);
+            }
+        }
+        return g1;
+
+    }
     //Compute intensities for all genes according to the appropriate method depending upon mixed or cont-cont interaction types
     //Requires that theory intensity is specified a priori for each gene object in g1
-    public static ArrayList<Gene> computeAllIntensities(ArrayList<Gene> g1, double a, DataSet data, String target)
+    public static ArrayList<Gene> computeAllIntensities(ArrayList<Gene> g1, double a, DataSet data, String target,boolean usePc)
     {
+        if(target==null || target.equals(""))
+        {
+            return computeIntensitiesUnsupervised(g1,a,data);
+        }
         boolean cont = data.getVariable(target) instanceof ContinuousVariable;
-
         int numCats = -1;
         if(!cont) {
             DataSet temp2 = MixedUtils.getDiscreteData(data);
@@ -105,15 +153,24 @@ public class Functions
 
 
 
+        int y = data.getColumn(data.getVariable(target));
         double[][] temp = data.getDoubleData().transpose().toArray();
-
-
+        TetradMatrix c = null;
+        if(usePc && cont) {
+            c = new CovarianceMatrix(data).getMatrix();
+            c = c.ginverse();
+        }
         float [] corrs = new float[g1.size()];
         for(int i = 0; i < g1.size();i++) {
-            if(cont) //Use Correlation
-                corrs[i] = (float)Math.abs(StatUtils.correlation(temp[data.getColumn(data.getVariable(target))], temp[data.getColumn(data.getVariable(g1.get(i).symbol))]));
+            if(usePc && cont)//Use Partial Correlation
+            {
+                int x = data.getColumn(data.getVariable(g1.get(i).symbol));
+                corrs[i] = (float)(-1*c.get(x,y)/Math.sqrt(c.get(x,x)*c.get(y,y)));
+            }
+            else if(cont) //Use Correlation
+                corrs[i] = (float)Math.abs(StatUtils.correlation(temp[y], temp[data.getColumn(data.getVariable(g1.get(i).symbol))]));
             else //Use Mutual Information
-                corrs[i] = (float) mixedMI(temp[data.getColumn(data.getVariable(i))],temp[data.getColumn(data.getVariable(target))],numCats);
+                corrs[i] = (float) mixedMI(temp[data.getColumn(data.getVariable(i))],temp[y],numCats);
         }
         corrs = NPN(corrs,false);
         for(int i = 0; i < g1.size();i++) {
@@ -136,7 +193,6 @@ public class Functions
         }
             return g1;
 
-        //TODO Need to debug this thoroughly
     }
 
 
@@ -751,11 +807,11 @@ public class Functions
 
 
 
-        float [] dataTheory = new float[g.size()]; //TODO Generalize this to N user defined theory sources for separate theory function
+        float [] dataTheory = new float[g.size()];
         for(int i = 0; i < g.size();i++)
         {
             double disScore = 0;
-            if(g.get(i).diseaseScores!=null)
+            if(g.get(i).diseaseScores!=null && diseaseID!=null)
             {
                 for(int j = 0; j < diseaseID.length;j++)
                 {
@@ -770,7 +826,8 @@ public class Functions
             dataTheory[i]  = (float)disScore;
 
         }
-        dataTheory = NPNIgnore(dataTheory,-1,false);
+        if(diseaseID!=null)
+            dataTheory = NPNIgnore(dataTheory,-1,false);
 
         System.out.print("Computing Theory Dissimilarity..");
         long time = System.nanoTime();

@@ -356,13 +356,13 @@ public class MGM extends ConvexProximal implements GraphSearch{
 
 
         //Discrete variable weights for each variable-category pair are p(1-p) where p is the percentage of times that category appears
-        System.out.println(yDat);
+//        System.out.println(yDat);
         for(int j = 0; j < q; j++){
             double curWeight = 0;
             for(int k = 0; k < l[j] ; k++){
                 double curp = yDat.viewColumn(j).copy().assign(Functions.equals(k+1)).zSum()/(double) n;
                 curWeight += curp*(1-curp);
-                System.out.println(k + "," + curp + "," + curWeight);
+  //              System.out.println(k + "," + curp + "," + curWeight);
             }
             weights.set(p+j, Math.sqrt(curWeight));
         }

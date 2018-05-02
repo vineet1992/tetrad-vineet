@@ -1,17 +1,15 @@
-package edu.pitt.csb.mgm;
+package edu.pitt.csb.KCI;
 
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.GraphUtils;
-import edu.cmu.tetrad.graph.Node;
-import edu.cmu.tetrad.performance.PerformanceTests;
 import edu.cmu.tetrad.search.PcStable;
+import edu.pitt.csb.mgm.IndTestMultinomialAJ;
+import edu.pitt.csb.mgm.MixedUtils;
 
 import java.io.File;
 import java.io.PrintStream;
 import java.text.DecimalFormat;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Created by vinee_000 on 3/15/2016.

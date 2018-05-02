@@ -1066,6 +1066,8 @@ public class MixedUtils {
 
         return test;
     }
+
+
     public static int[][] allEdgeStatsLatent(Graph pt, Graph pe)
     {
         HashMap<String,String> nd = new HashMap<String,String>();
@@ -1082,6 +1084,177 @@ public class MixedUtils {
             }
         }
         return allEdgeStatsLatent(pt, pe, nd);
+    }
+
+
+
+    //THIS IS THE CURRENT PAIRWISE TEST FOR THE MGM-FCI-MAX EXPERIMENT
+    //INCLUDES STRUCTURAL HAMMING DISTANCE TODO ADD THESE SCORES
+    public static double [][] newLatentScores(Graph pT, Graph pE, Graph trueDAG,DataSet data, boolean verbose)
+    {
+        HashMap<String,String> nd = new HashMap<String,String>();
+        for(Node n: pE.getNodes())
+        {
+            if(data.getVariable(n.getName()) instanceof DiscreteVariable)
+            {
+                nd.put(n.getName(),"Disc");
+            }
+            else
+            {
+                nd.put(n.getName(),"Norm");
+            }
+        }
+        double[][] stats = new double[4][14];
+        //TPU, FPU, FNU, TNU, CorrOr, TotalOr, BiDirPrec,BiDirRec,
+        int TPU = 0;
+        int FPU = 1;
+        int FNU = 2;
+        int ETP = 3;
+        int EFP = 4;
+        int EFN = 5;
+        int ETN = 6;
+        int SHD = 7;
+
+        for (int i = 0; i < stats.length; i++) {
+            for (int j = 0; j < stats[0].length; j++) {
+                stats[i][j] = 0;
+            }
+        }
+
+        //LOOP THROUGH TRUE EDGES
+        for(Edge e: pT.getEdges())
+        {
+            int edgeType = -1;
+            if (nd.get(e.getNode1().getName()).equals("Norm") && nd.get(e.getNode2().getName()).equals("Norm")) {
+                edgeType = 0;
+            } else if (nd.get(e.getNode1().getName()).equals("Disc") && nd.get(e.getNode2().getName()).equals("Disc")) {
+                edgeType = 2;
+            } else {
+                edgeType = 1;
+            }
+            Edge temp = pE.getEdge(pE.getNode(e.getNode1().getName()),pE.getNode(e.getNode2().getName()));
+            if(temp==null) //False Negative Undirected
+            {
+                stats[edgeType][SHD]+=2;
+                stats[3][SHD]+=2;
+                stats[edgeType][FNU]++;
+                stats[3][FNU]++;
+            }
+            else
+            {
+                stats[edgeType][TPU]++;
+                stats[3][TPU]++;
+                Endpoint [] trueEndpoints = new Endpoint[]{e.getProximalEndpoint(e.getNode1()),e.getDistalEndpoint(e.getNode1())};
+                Endpoint[] estEndpoints = new Endpoint[]{temp.getProximalEndpoint(pE.getNode(e.getNode1().getName())),temp.getDistalEndpoint(pE.getNode(e.getNode1().getName()))};
+                int [] types = getTypes(trueEndpoints,estEndpoints,trueDAG,new String []{e.getNode1().getName(),e.getNode2().getName()});
+                if(types[0]<7) {
+                    stats[edgeType][types[0]]++;
+                    stats[3][types[0]]++;
+                }
+                else if(types[0]==7)
+                {
+                    stats[edgeType][EFN]+=0.5;
+                    stats[3][EFN]+=0.5;
+                }
+                else
+                {
+                    stats[edgeType][EFP]+=0.5;
+                    stats[3][EFP]+=0.5;
+                }
+                if(types[1]<7) {
+                    stats[edgeType][types[0]]++;
+                    stats[3][types[0]]++;
+                }
+                else if(types[1]==7)
+                {
+                    stats[edgeType][EFN]+=0.5;
+                    stats[3][EFN]+=0.5;
+                }
+                else
+                {
+                    stats[edgeType][EFP]+=0.5;
+                    stats[3][EFP]+=0.5;
+                }
+
+                if(types[0]!=ETP)
+                {
+                    stats[edgeType][SHD]++;
+                    stats[3][SHD]++;
+                }
+                if(types[1]!=ETP)
+                {
+                    stats[edgeType][SHD]++;
+                    stats[3][SHD]++;
+                }
+            }
+
+        }
+        for(Edge e:pE.getEdges())
+        {
+            int edgeType = -1;
+            if (nd.get(e.getNode1().getName()).equals("Norm") && nd.get(e.getNode2().getName()).equals("Norm")) {
+                edgeType = 0;
+            } else if (nd.get(e.getNode1().getName()).equals("Disc") && nd.get(e.getNode2().getName()).equals("Disc")) {
+                edgeType = 2;
+            } else {
+                edgeType = 1;
+            }
+            Edge temp = pT.getEdge(pT.getNode(e.getNode1().getName()),pT.getNode(e.getNode2().getName()));
+            if(temp==null) //False Positive Undirected
+            {
+                stats[edgeType][FPU]++;
+                stats[3][FPU]++;
+                stats[edgeType][SHD]+=2;
+                stats[3][SHD]+=2;
+            }
+        }
+
+        return stats;
+    }
+    private static int [] getTypes(Endpoint [] trueEnds, Endpoint[] estEnds, Graph dag, String [] nodes)
+    {
+        int TPU = 0;
+        int FPU = 1;
+        int FNU = 2;
+        int ETP = 3;
+        int EFP = 4;
+        int EFN = 5;
+        int ETN = 6;
+        int HFN = 7;
+        int HFP = 8;
+        int [] result = new int[trueEnds.length];
+        for(int i = 0; i < trueEnds.length;i++)
+        {
+            if(trueEnds[i]==estEnds[i])
+                result[i] = ETP;
+            else
+            {
+                if(trueEnds[i]==Endpoint.CIRCLE)
+                {
+                    if(!dag.existsDirectedPathFromTo(dag.getNode(nodes[0]),dag.getNode(nodes[1])))
+                        result[i]=ETP;
+                    else if(estEnds[i]==Endpoint.ARROW)
+                        result[i]=EFN;
+                    else
+                        result[i]=EFP;
+                }
+                else if(trueEnds[i]==Endpoint.ARROW)
+                {
+                    if(estEnds[i]==Endpoint.CIRCLE)
+                        result[i] = HFP;
+                    else
+                        result[i] = EFP;
+                }
+                else
+                {
+                    if(estEnds[i]==Endpoint.CIRCLE)
+                        result[i]=HFN;
+                    else
+                        result[i] = EFN;
+                }
+            }
+        }
+        return result;
     }
     public static double [][] allEdgeStatsLatentNew(Graph pT,Graph pE,Graph truth, List<Node>latents, DataSet data)
     {
@@ -1136,6 +1309,8 @@ public class MixedUtils {
         int edgeType;
 
         boolean debug = false;
+
+        //LOOPING THROUGH TRUE EDGES
         for (Edge eT : edgesT) {
             Node n1 = pE.getNode(eT.getNode1().getName());
             Node n2 = pE.getNode(eT.getNode2().getName());
@@ -1162,9 +1337,10 @@ public class MixedUtils {
             else
             {
 
-
+                //Estimated = A <-> B
                 if(eE.getEndpoint1()==Endpoint.ARROW && eE.getEndpoint2()==Endpoint.ARROW) {
 
+                    //True = A <-> B
                     if(eT.getEndpoint1()==Endpoint.ARROW && eT.getEndpoint2()==Endpoint.ARROW)
                     {
                         stats[edgeType][LTP]++;

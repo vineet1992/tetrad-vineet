@@ -19,6 +19,7 @@ public class Parameters {
 
         // Defaults
         put("numMeasures", 50);
+        put("faithful",0);
         NormalDistribution n = new NormalDistribution(parameters.get("numMeasures")[0].intValue()*2,parameters.get("numMeasures")[0].intValue()/2);
         put("numEdges", 100);
         put("numLatents", 0);
