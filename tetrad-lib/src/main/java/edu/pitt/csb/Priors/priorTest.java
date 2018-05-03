@@ -24,19 +24,20 @@ public class priorTest {
     public static void main(String [] args) throws Exception
     {
         boolean numEdgesRandom = true;
-        boolean excludeUnreliable = true; //Should piMGM exclude priors below p-value threshold
+        boolean excludeUnreliable = false; //Should piMGM exclude priors below p-value threshold
         double reliabilityThreshold = 0.05; //piMGM will exclude priors with adjusted p-value < 0.05
         double amountPrior = .1;
         boolean reliable = false; //Are all priors reliable?
-        boolean diffNumPrior = false; //Does each prior provide with the same number of edges?
+        boolean diffNumPrior = true; //Does each prior provide with the same number of edges?
         boolean correctEdges = true; //Determines whether or not we will use correct edges only for unreliable priors as well or not
         boolean pureRandom = false; //Only for different number of edges given by each prior, this sets the priors to be purely random with reliability computed after the fact
-        int reliableExperts = 3; //How many priors are reliable?
+        boolean onlyPrior = false;
+        int reliableExperts = 5; //How many priors are reliable?
         int numExperts = 5;
         int numLambdas = 40;
         int numVariables = 100;
         int numEdges = 75;
-        int sampleSize = 500;
+        int sampleSize = 200;
         int numSubsamples = 10;
         int numRuns = 15;
         int index = 0;
@@ -45,7 +46,6 @@ public class priorTest {
         boolean saveData = true;
         boolean reuseData = true;
         boolean rerunAlgorithms = false;
-        boolean onlyPrior = false;
         String directory = ".";
    //     String [] algs = {"mgm_one_steps","oracle_one","STEPS","oracle","mgm_priors","mgm_priors_split"};
 

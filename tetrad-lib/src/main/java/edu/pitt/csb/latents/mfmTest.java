@@ -1,4 +1,4 @@
-package edu.pitt.csb.Priors;
+package edu.pitt.csb.latents;
 
 import edu.cmu.tetrad.algcomparison.simulation.MixedLeeHastieSimulation;
 import edu.cmu.tetrad.algcomparison.simulation.Parameters;
@@ -31,24 +31,26 @@ public class mfmTest {
     {
         boolean numEdgesRandom = true;
         int numLambdas = 40;
-        int numVariables = 500;
-        int numLatents = 20;
+        int numVariables = 50;
+        int numLatents = 5;
         int numEdges = 75;
         int sampleSize = 200;
         int numSubsamples = 10;
-        int numRuns = 5;
+        int numRuns = 11;
         int index = 0;
         int numCategories = 4;
         double gamma = 0.05;
         boolean saveData = true;
         boolean reuseData = true;
         boolean rerunAlgorithms = false;
-        boolean onlyPrior = false;
+        boolean includeBCCD = true;
         String directory = ".";
         double [] alphas = {0.001,0.01,0.03,0.05};
-       // String [] algs = {"MGM-FCI-MAX","FCI","CFCI","MGM-CFCI","MGM-FCI","FCI-MAX"};
+        String [] p_loc = {".25",".5",".75"};
+        String [] p_edge = {".25",".5",".75"};
+        String [] algs = {"MGM-FCI-MAX","FCI","CFCI","MGM-CFCI","MGM-FCI","FCI-MAX"};
 
-         String [] algs = {"MGM-FCI-MAX","FCI","MGM-FCI"};
+      //   String [] algs = {"MGM-FCI-MAX","FCI","MGM-FCI"};
 
         while(index < args.length)
         {
@@ -137,6 +139,7 @@ public class mfmTest {
 
         //Type: ["CC","CD","DD","All"] * Adjacency Precision, Adj Recall, Orientation Prec, Orientation Rec, SHD
         double [][][][] results = new double[numRuns][algs.length][alphas.length][20];
+        double [][][][] bccdResults = new double[numRuns][p_loc.length][p_edge.length][20];
 
         File rFile = new File("Results");
         if(!rFile.isDirectory())
@@ -340,7 +343,22 @@ public class mfmTest {
                    //         done = true;
                         }
                     }
+                    if(includeBCCD)
+                    {
+                        for(int j = 0; j < p_loc.length;j++)
+                        {
+                            for(int k = 0;k < p_edge.length;k++)
+                            {
 
+                                File tFile = new File("Estimated/BCCD_" + i + "_" + p_loc[j] + "_" + p_edge[k] + "_" + numVariables + "_" + sampleSize + "_" + numLatents + ".txt");
+                                tFile.renameTo(new File("Estimated/BCCD_" +  "_" + p_loc[j] + "_" + p_edge[k] + "_" + i + "_" + numVariables + "_" + sampleSize + "_" + numLatents + ".txt"));
+                                tFile = new File("Estimated/BCCD_" + "_" + p_loc[j] + "_" + p_edge[k] + "_" + i + "_" + numVariables + "_" + sampleSize + "_" + numLatents + ".txt");
+
+                                Graph est = bccdToPAG(tFile,c.getDataSet(0));
+                                bccdResults[i][j][k] = getAllResults(est,currPAG,c.getTrueGraph(),c.getDataSet(0));
+                            }
+                        }
+                    }
 
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -384,8 +402,18 @@ public class mfmTest {
                 printData(pri[i][j], results, i,j);
             }
         }
+        if(includeBCCD)
+        {
+            for(int i = 0; i < p_loc.length;i++)
+            {
+                for(int j = 0; j < p_edge.length;j++)
+                {
+                    PrintStream bccdPrints = new PrintStream("Results/BCCD_" + p_loc[i] + "_" + p_edge[j] + "_" + numVariables + "_" + sampleSize + "_" + numSubsamples + "_" + numLatents + ".txt");
+                    printData(bccdPrints,bccdResults,i,j);
+                }
+            }
+        }
     }
-
     //Need a printstream for each alpha as well
     public static void printData(PrintStream p, double [][][][] result,int algInd,int alpInd)
     {
@@ -411,6 +439,58 @@ public class mfmTest {
         }
         p.flush();
         p.close();
+    }
+    public static Graph bccdToPAG(File f, DataSet d)
+    {
+        try{
+            BufferedReader b = new BufferedReader(new FileReader(f));
+            int [][] adj = new int[d.getNumColumns()][d.getNumColumns()];
+            int row = 0;
+            while(b.ready())
+            {
+                String [] line = b.readLine().split("\t");
+                for(int col = 0; col < line.length;col++)
+                {
+                    adj[row][col] = Integer.parseInt(line[col]);
+                }
+                row++;
+            }
+            return adjToPAG(adj,d);
+        }
+        catch(Exception e)
+        {
+            System.err.println("Couldn't load graph for bccd");
+            e.printStackTrace();
+            System.exit(-1);
+        }
+        return null;
+    }
+    public static Graph adjToPAG(int [][] adj, DataSet d)
+    {
+        Graph g = new EdgeListGraphSingleConnections(d.getVariables());
+        for(int i = 0; i < adj.length;i++)
+        {
+            for(int j = i+1; j < adj[i].length;j++)
+            {
+                if(adj[i][j]!=0)
+                {
+                    //TODO Make sure this isn't reversed
+                    g.addEdge(new Edge(g.getNode(d.getVariable(i).getName()),g.getNode(d.getVariable(j).getName()),toEndpoint(adj[i][j]),toEndpoint(adj[j][i])));
+                }
+            }
+        }
+        return g;
+    }
+    private static Endpoint toEndpoint(int i)
+    {
+        if(i==1)
+            return Endpoint.TAIL;
+        else if(i==2)
+            return Endpoint.ARROW;
+        else if(i==3)
+            return Endpoint.CIRCLE;
+        else
+            return null;
     }
     public static String compareGraphs(Graph truth, Graph est)
     {
