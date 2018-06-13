@@ -1088,6 +1088,82 @@ public class MixedUtils {
 
 
 
+
+    public static double [] structuralHamming(Graph pT, Graph pE, DataSet data)
+    {
+        HashMap<String,String> nd = new HashMap<String,String>();
+        for(Node n: pE.getNodes())
+        {
+            if(data.getVariable(n.getName()) instanceof DiscreteVariable)
+            {
+                nd.put(n.getName(),"Disc");
+            }
+            else
+            {
+                nd.put(n.getName(),"Norm");
+            }
+        }
+        double[] stats = new double[4];
+        for (int i = 0; i < stats.length; i++) {
+                stats[i] = 0;
+        }
+
+        //LOOP THROUGH TRUE EDGES
+        for(Edge e: pT.getEdges())
+        {
+            int edgeType = -1;
+            if (nd.get(e.getNode1().getName()).equals("Norm") && nd.get(e.getNode2().getName()).equals("Norm")) {
+                edgeType = 0;
+            } else if (nd.get(e.getNode1().getName()).equals("Disc") && nd.get(e.getNode2().getName()).equals("Disc")) {
+                edgeType = 2;
+            } else {
+                edgeType = 1;
+            }
+            Edge temp = pE.getEdge(pE.getNode(e.getNode1().getName()),pE.getNode(e.getNode2().getName()));
+            if(temp==null) //False Negative Undirected
+            {
+                stats[edgeType]+=2;
+                stats[3]+=2;
+            }
+            else {
+                Endpoint[] trueEndpoints = new Endpoint[]{e.getProximalEndpoint(e.getNode1()), e.getDistalEndpoint(e.getNode1())};
+                Endpoint[] estEndpoints = new Endpoint[]{temp.getProximalEndpoint(pE.getNode(e.getNode1().getName())), temp.getDistalEndpoint(pE.getNode(e.getNode1().getName()))};
+                if(trueEndpoints[0]!=estEndpoints[0])
+                {
+                    stats[edgeType]++;
+                    stats[3]++;
+                }
+                if(trueEndpoints[1]!=estEndpoints[1])
+                {
+                    stats[edgeType]++;
+                    stats[3]++;
+                }
+
+            }
+
+        }
+        for(Edge e:pE.getEdges())
+        {
+            int edgeType = -1;
+            if (nd.get(e.getNode1().getName()).equals("Norm") && nd.get(e.getNode2().getName()).equals("Norm")) {
+                edgeType = 0;
+            } else if (nd.get(e.getNode1().getName()).equals("Disc") && nd.get(e.getNode2().getName()).equals("Disc")) {
+                edgeType = 2;
+            } else {
+                edgeType = 1;
+            }
+            Edge temp = pT.getEdge(pT.getNode(e.getNode1().getName()),pT.getNode(e.getNode2().getName()));
+            if(temp==null) //False Positive Undirected
+            {
+                stats[edgeType]+=2;
+                stats[3]+=2;
+            }
+        }
+
+        return stats;
+    }
+
+
     //THIS IS THE CURRENT PAIRWISE TEST FOR THE MGM-FCI-MAX EXPERIMENT
     //INCLUDES STRUCTURAL HAMMING DISTANCE TODO ADD THESE SCORES
     public static double [][] newLatentScores(Graph pT, Graph pE, Graph trueDAG,DataSet data, boolean verbose)

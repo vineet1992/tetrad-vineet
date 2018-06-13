@@ -26,6 +26,7 @@ import cern.colt.matrix.DoubleMatrix2D;
 import cern.colt.matrix.linalg.Algebra;
 import cern.jet.math.Functions;
 import edu.cmu.tetrad.data.DataSet;
+import edu.cmu.tetrad.graph.Edge;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.GraphUtils;
 import edu.cmu.tetrad.graph.Node;
@@ -205,6 +206,122 @@ public class StabilityUtils {
         pool.invoke(new StabilityAction(chunk, 0, data.getNumRows()));
 
         thetaMat.assign(Functions.mult(1.0 / data.getNumRows()));
+
+        //do this elsewhere
+        //thetaMat.assign(thetaMat.copy().assign(Functions.minus(1.0)), Functions.mult).assign(Functions.mult(-2.0));
+        return thetaMat;
+    }
+
+
+
+    //Five possibilities: -->, <--, ---, <-> (No edge is implicit)
+    public static double [][][] OrientationSearchPar(final DataSet data, final DataGraphSearch gs, int N, int b)
+    {
+        if(b<0)
+        {
+            b = (int)Math.floor( 10*Math.sqrt(data.getNumRows()));
+            if (b > data.getNumRows())
+                b = data.getNumRows()/2;
+        }
+        final int numVars = data.getNumColumns();
+        final double [][][] thetaMat = new double[4][numVars][numVars];
+
+        final int[][] samps = subSampleNoReplacement(data.getNumRows(), b, N);
+
+        final ForkJoinPool pool = ForkJoinPoolInstance.getInstance().getPool();
+
+        class StabilityAction extends RecursiveAction{
+            private int chunk;
+            private int from;
+            private int to;
+
+            public StabilityAction(int chunk, int from, int to){
+                this.chunk = chunk;
+                this.from = from;
+                this.to = to;
+            }
+
+            //could avoid using synchronized if we keep track of array of mats and add at end, but that needs lots of
+            //memory
+            private synchronized void addToMats(double [][][] theta, Graph g, DataSet sub){
+                HashMap<Node, Integer> map = new HashMap<Node, Integer>();
+                for (Node node : g.getNodes()) {
+                    map.put(node, sub.getColumn(sub.getVariable(node.getName())));
+                }
+
+                // mark edges
+                for (Edge edge : g.getEdges()) {
+                    // if directed find which is parent/child
+                    Node node1 = edge.getNode1();
+                    Node node2 = edge.getNode2();
+
+                    if(map.get(node1) > map.get(node2))
+                    {
+                        Node temp = node2;
+                        node2 = node1;
+                        node1 = temp;
+                    }
+                    if(g.isParentOf(node1,node2))
+                    {
+                        theta[0][map.get(node1)][map.get(node2)]++;
+                    }
+                    else if(g.isChildOf(node1,node2))
+                    {
+                        theta[1][map.get(node1)][map.get(node2)]++;
+                    }
+                    else if(g.isUndirectedFromTo(node1,node2))
+                    {
+                        theta[2][map.get(node1)][map.get(node2)]++;
+                    }
+                    else
+                    {
+                        theta[3][map.get(node1)][map.get(node2)]++;
+                    }
+
+                }
+            }
+
+            @Override
+            protected void compute(){
+                if (to - from <= chunk) {
+                    for (int s = from; s < to; s++) {
+                        DataSet dataSubSamp = data.subsetRows(samps[s]).copy();
+                        DataGraphSearch curGs = gs.copy();
+                        Graph g = curGs.search(dataSubSamp);
+                        addToMats(thetaMat,g, dataSubSamp);
+                    }
+
+                    return;
+                } else {
+                    List<StabilityAction> tasks = new ArrayList<>();
+
+                    final int mid = (to + from) / 2;
+
+                    tasks.add(new StabilityAction(chunk, from, mid));
+                    tasks.add(new StabilityAction(chunk, mid, to));
+
+                    invokeAll(tasks);
+
+                    return;
+                }
+            }
+
+        }
+
+        final int chunk = 2;
+
+        pool.invoke(new StabilityAction(chunk, 0, N));
+
+        for(int i = 0; i < thetaMat.length;i++)
+        {
+            for(int j = 0; j < thetaMat[i].length;j++)
+            {
+                for(int k = 0; k < thetaMat[i][j].length;k++)
+                {
+                    thetaMat[i][j][k] = (thetaMat[i][j][k]/(double)N);
+                }
+            }
+        }
 
         //do this elsewhere
         //thetaMat.assign(thetaMat.copy().assign(Functions.minus(1.0)), Functions.mult).assign(Functions.mult(-2.0));

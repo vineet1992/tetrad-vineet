@@ -28,7 +28,7 @@ public static void main(String [] args) throws Exception
         int numSubsamples = 10;
         double [] priors = {0.1,0.3,0.6};
      //   int [] sampleSize = {500,1000,2000,3000};
-        int [] sampleSize = {500};
+        int [] sampleSize = {200};
         //double [] priors = {0.6};
         int numVars = 100;
         //int [] numExperts = {1,2,3,4,5};

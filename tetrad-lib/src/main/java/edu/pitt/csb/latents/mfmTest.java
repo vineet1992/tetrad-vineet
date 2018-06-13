@@ -34,16 +34,16 @@ public class mfmTest {
         int numVariables = 50;
         int numLatents = 5;
         int numEdges = 75;
-        int sampleSize = 200;
-        int numSubsamples = 10;
-        int numRuns = 11;
+        int sampleSize = 1000;
+        int numSubsamples = 20;
+        int numRuns = 12;
         int index = 0;
         int numCategories = 4;
         double gamma = 0.05;
         boolean saveData = true;
         boolean reuseData = true;
         boolean rerunAlgorithms = false;
-        boolean includeBCCD = true;
+        boolean includeBCCD = false;
         String directory = ".";
         double [] alphas = {0.001,0.01,0.03,0.05};
         String [] p_loc = {".25",".5",".75"};
@@ -350,7 +350,7 @@ public class mfmTest {
                             for(int k = 0;k < p_edge.length;k++)
                             {
 
-                                File tFile = new File("Estimated/BCCD_" + i + "_" + p_loc[j] + "_" + p_edge[k] + "_" + numVariables + "_" + sampleSize + "_" + numLatents + ".txt");
+                                File tFile = new File("Estimated/BCCD_" + "_" + p_loc[j] + "_" + p_edge[k] + "_" + i + "_" + numVariables + "_" + sampleSize + "_" + numSubsamples + "_" + numLatents + ".txt");
                                 tFile.renameTo(new File("Estimated/BCCD_" +  "_" + p_loc[j] + "_" + p_edge[k] + "_" + i + "_" + numVariables + "_" + sampleSize + "_" + numLatents + ".txt"));
                                 tFile = new File("Estimated/BCCD_" + "_" + p_loc[j] + "_" + p_edge[k] + "_" + i + "_" + numVariables + "_" + sampleSize + "_" + numLatents + ".txt");
 
@@ -362,10 +362,9 @@ public class mfmTest {
 
                 } catch (Exception e) {
                     e.printStackTrace();
-                    System.exit(-1);
-                    if(!reuseData) {
                         c.simulate(p);
-                    }
+                    //System.exit(-1);
+
                 }
 
             if(saveData) {

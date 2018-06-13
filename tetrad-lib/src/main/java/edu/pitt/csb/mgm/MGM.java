@@ -497,6 +497,7 @@ public class MGM extends ConvexProximal implements GraphSearch{
     public double smooth(DoubleMatrix1D parIn, DoubleMatrix1D gradOutVec){
         //work with copy
         MGMParams par = new MGMParams(parIn, p, lsum);
+
         MGMParams gradOut = new MGMParams();
 
         for(int i = 0; i < par.betad.size(); i++){

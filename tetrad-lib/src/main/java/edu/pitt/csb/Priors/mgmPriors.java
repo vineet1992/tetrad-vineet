@@ -13,6 +13,7 @@ import edu.pitt.csb.Pref_Div.ArrayIndexComparator;
 import edu.pitt.csb.mgm.MGM;
 import edu.pitt.csb.mgm.MGM_Priors;
 import edu.pitt.csb.mgm.MixedUtils;
+import edu.pitt.csb.stability.StabilityUtils;
 import org.apache.commons.math3.distribution.BinomialDistribution;
 import org.apache.commons.math3.distribution.NormalDistribution;
 import org.apache.commons.math3.stat.StatUtils;
@@ -86,6 +87,8 @@ public class mgmPriors {
         }
     public mgmPriors(int numSubsamples, double[] initLambdas, DataSet data, TetradMatrix[] priors) {
         this.numSubsamples = numSubsamples;
+        this.subsamples=new DataSet[numSubsamples];
+        //TODO Add Generation of subsamples here
         this.pValues = new double[priors.length];
         this.lambdas = constructLambdasPar(initLambdas, data);
         this.data = data;
@@ -100,6 +103,8 @@ public class mgmPriors {
     public mgmPriors(int numSubsamples, double [] initLambdas, TetradMatrix edgeCounts, TetradMatrix[] priors) {
         this.pValues = new double[priors.length];
         this.numSubsamples = numSubsamples;
+        //TODO Add Generation of subsamples here
+        subsamples = new DataSet[numSubsamples];
         this.stability = edgeCounts;
         if(logging) {
             try {
@@ -1304,6 +1309,7 @@ public class mgmPriors {
                 if (to - from <= chunk) {
                     for (int s = from; s < to; s++) {
                         double[] lambda = {init[s], init[s], init[s]};
+                        System.out.println("Running MGM " + s + " out of " + numLambdas);
                         MGM m = new MGM(data, lambda);
                         m.learnEdges(iterLimit);
                         Graph curr = m.graphFromMGM();

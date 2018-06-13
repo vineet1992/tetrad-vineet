@@ -30,18 +30,23 @@ public class lung_analysis {
         int N = 10;
         double alpha = 0.05;
         double g = 0.05;
-        String subDir = "Subsamples_Log";
+        String subDir = "Subsamples";
 
-        DataSet d = MixedUtils.loadDataSet2("MGM_Full_Data_Log.txt", DelimiterType.TAB);
+        DataSet d = MixedUtils.loadDataSet2("MGM_Full_Data.txt", DelimiterType.TAB);
 
        // d.removeColumn(d.getVariable("Score"));
+
+      //  d.removeColumn(d.getVariable("Pack_Years"));
+
+      //  d.removeColumn(d.getVariable("Years_quit"));
+
+        /*Removed in the current analysis
+        d.removeColumn(d.getVariable("Nodule.size.group"));
+        d.removeColumn(d.getVariable("Cigs_Per_Day"));
+        d.removeColumn(d.getVariable("Smoke_Duration"));
         d.removeColumn(d.getVariable("GOLD4"));
         d.removeColumn(d.getVariable("Smk_Status"));
-      //  d.removeColumn(d.getVariable("Pack_Years"));
-        d.removeColumn(d.getVariable("Cigs_Per_Day"));
-       d.removeColumn(d.getVariable("Smoke_Duration"));
-      //  d.removeColumn(d.getVariable("Years_quit"));
-        d.removeColumn(d.getVariable("Nodule.size.group"));
+        */
        // System.out.println(d);
         System.out.println(MixedUtils.getContinousData(d));
         System.out.println(MixedUtils.getDiscreteData(d));
@@ -102,9 +107,9 @@ public class lung_analysis {
 
         }
         f.setKnowledge(k2);
-     PrintStream out = new PrintStream("FCI_MAX_Log.txt");
+     PrintStream out = new PrintStream("FCI_MAX_Graph.txt");
         out.println(f.search());
-        out = new PrintStream("MGM_Stabilities_Log.txt");
+        out = new PrintStream("MGM_Stabilities.txt");
         for(int j = 0; j < d.getNumColumns();j++)
         {
             out.print(d.getVariable(j).getName());
@@ -127,7 +132,7 @@ public class lung_analysis {
         }
         out.flush();
         out.close();
-        out = new PrintStream("MAX_Stabilities_Log.txt");
+        out = new PrintStream("MAX_Stabilities.txt");
         for(int j = 0; j < d.getNumColumns();j++)
         {
             out.print(d.getVariable(j).getName());

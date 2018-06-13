@@ -71,6 +71,16 @@ public class STARS {
         alg = a;
 
     }
+    public STARS(DataSet dat,double [] alp,double g,int numSub, Algorithm a, int b)
+    {
+        N = numSub;
+        gamma = g;
+        alpha = alp;
+        d = dat;
+        this.b = b;
+        alg = a;
+
+    }
     public STARS(DataSet dat,double [] alp,double g,DataSet [] subs, Algorithm a)
     {
         subsamples = subs;
@@ -123,6 +133,79 @@ public class STARS {
         public void setMGMLambda(double [] lambda)
         {
             mgmLambda = lambda;
+        }
+
+        public double getAlpha(boolean FGS)
+        {
+            double [][] result = new double[alpha.length][4];
+
+            Arrays.sort(alpha);
+            if(FGS)
+            {
+                reverse(alpha);
+            }
+            if(!d.isMixed())
+            {
+                double [] stab = new double[alpha.length];
+
+                for(int i = alpha.length-1; i >= 0;i--) {
+                    DoubleMatrix2D insta = StabilityUtils.StabilitySearchPar(d, new SearchWrappers.FgsWrapper(alpha[i]),N,b);
+                    double sum = 0;
+                    for(int j = 0; j < insta.rows();j++)
+                    {
+                        for(int k = j+1; k < insta.columns();k++)
+                        {
+                            sum+= 2*insta.get(j,k)*(1-insta.get(j,k));
+                        }
+                    }
+                    stab[i] = sum / ((d.getNumColumns()*(d.getNumColumns()-1))/2);
+                }
+
+
+                //params is in ascending order [0.001, 0.01, 0.03, 0.05,0.08,0.1]
+                double max = Double.MIN_VALUE;
+                int maxIndex = -1;
+                for(int i = 0; i < stab.length;i++)
+                {
+                    if(stab[i] > max)
+                    {
+                        maxIndex = i;
+                        max = stab[i];
+                    }
+                }
+
+                System.out.println("Stabilities for each parameter: " + Arrays.toString(stab));
+                System.out.println("Parameters tested: " + Arrays.toString(alpha));
+
+                double min = Double.MAX_VALUE;
+                int minIndex = -1;
+                //System.out.println(Arrays.toString(stab));
+                for(int i = maxIndex; i >= 0;i--)
+                {
+                    if(stab[i] < gamma)
+                    {
+                        DoubleMatrix2D insta = StabilityUtils.StabilitySearchPar(d, new SearchWrappers.FgsWrapper(alpha[i]),N,b);
+                        stabilities = insta.toArray();
+                        return alpha[i];
+                    }
+                    if(stab[i] < min)
+                    {
+                        minIndex = i;
+                        min = stab[i];
+                    }
+                }
+                DoubleMatrix2D insta = StabilityUtils.StabilitySearchPar(d, new SearchWrappers.FgsWrapper(alpha[minIndex]),N,b);
+
+                stabilities = insta.toArray();
+                return alpha[minIndex];
+
+            }
+            else {
+                DoubleMatrix2D insta = StabilityUtils.StabilitySearchPar(d, new SearchWrappers.FgsWrapper(alpha[0]),N,b);
+                stabilities = insta.toArray();
+                return alpha[0];
+            }
+
         }
         public double [][] runSTARS()
         {
@@ -385,4 +468,13 @@ public class STARS {
             }
             return deStable/numStable;
         }
+
+    private static void reverse(double[] data) {
+        for (int left = 0, right = data.length - 1; left < right; left++, right--) {
+            // swap the values at the left and right indices
+            double temp = data[left];
+            data[left]  = data[right];
+            data[right] = temp;
+        }
+    }
     }

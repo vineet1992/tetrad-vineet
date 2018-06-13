@@ -16,6 +16,7 @@ public final class Algorithm implements TetradSerializable {
     public static final Algorithm PCS = new Algorithm("PC-Stable");
     public static final Algorithm CPC = new Algorithm("CPC");
     public static final Algorithm PCMAX = new Algorithm("PC-Max");
+    public static final Algorithm FGS = new Algorithm("FGES");
     public static final Algorithm NONE = new Algorithm("No type");
 
     /**

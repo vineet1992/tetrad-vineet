@@ -5,6 +5,7 @@ import edu.cmu.tetrad.data.DiscreteVariable;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.util.TetradMatrix;
 import edu.pitt.csb.mgm.MixedUtils;
+import edu.pitt.csb.stability.StabilityUtils;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -27,6 +28,7 @@ import java.util.Random;
 //TODO Change the loadPriors function here and in realDataPriorTest to treat missing value as null instead of 0
 public class runPriors {
 
+    private static boolean verbose = false;
     public static void main(String [] args) {
 
         String priorDirectory = "pathway_lists";
@@ -41,6 +43,7 @@ public class runPriors {
         double high = 0.95;
         boolean loocv = false;
         int index = 0;
+        List<String> toRemove = new ArrayList<String>();
         try {
             while (index < args.length) {
                 if (args[index].equals("-ns")) {
@@ -65,11 +68,26 @@ public class runPriors {
                 } else if (args[index].equals("-ex")) {
                     excludeUnreliable = true;
                     index++;
+                }
+                else if(args[index].equals("-rm"))
+                {
+                    int count = index + 1;
+                     while(count < args.length && !args[count].startsWith("-"))
+                     {
+                         toRemove.add(args[count]);
+                         count++;
+                     }
+                     index = count;
                 } else if (args[index].equals("-t")) {
                     unreliableThreshold = Double.parseDouble(args[index + 1]);
                     index += 2;
                 } else if (args[index].equals("-loocv")) {
                     loocv = true;
+                    index++;
+                }
+                else if(args[index].equals("-v"))
+                {
+                    verbose = true;
                     index++;
                 }
                 else
@@ -109,6 +127,15 @@ public class runPriors {
             e.printStackTrace();
             System.exit(-1);
         }
+
+        if(verbose)
+        {
+            System.out.println("Removing Variables... " + toRemove);
+        }
+        for(String s:toRemove)
+        {
+            d.removeColumn(d.getVariable(s));
+        }
         boolean addedDummy = false;
         if(d.isContinuous())
         {
@@ -123,6 +150,11 @@ public class runPriors {
             }
             System.out.println("Done");
             addedDummy = true;
+        }
+        if(verbose)
+        {
+            System.out.println("Full Dataset: " + d);
+            System.out.println("Is DataSet Mixed? " + d.isMixed());
         }
         try{
             File x = new File(runName);
@@ -161,7 +193,7 @@ public class runPriors {
                     createPrior(f.listFiles()[i],out,d.getVariableNames());
                     currFile = "temp.txt";
                 }
-                else if(addedDummy)
+                if(addedDummy)
                 {
                     addLines(new File(currFile));
                     priors[i] = new TetradMatrix(realDataPriorTest.loadPrior(new File("temp_2.txt"),d.getNumColumns()));
@@ -171,15 +203,46 @@ public class runPriors {
                     priors[i] = new TetradMatrix(realDataPriorTest.loadPrior(new File(currFile),d.getNumColumns()));
                 }
             }
+           /* if(verbose)
+            {
+                for(int i = 0; i < numPriors;i++)
+                {
+                    System.out.println(f.listFiles()[i].getName() + " Prior");
+                    for(int j = 0; j < d.getNumColumns();j++)
+                    {
+                        System.out.print(d.getVariableNames().get(j) + " ");
+                    }
+
+                    System.out.println(priors[i]);
+                }
+            }*/
+
+
             File t = new File("temp.txt");
             t.deleteOnExit();
             t = new File("temp_2.txt");
             if(t.exists())
                 t.deleteOnExit();
 
+            int b = (int) Math.floor(10 * Math.sqrt(d.getNumRows()));
+            if (b >= d.getNumRows())
+                b = d.getNumRows() / 2;
+            int [][] samps;
+            if(loocv)
+                samps = StabilityUtils.generateSubsamples(d.getNumRows());
+            else
+                samps = StabilityUtils.subSampleNoReplacement(d.getNumRows(), b, ns);
+            DataSet [] subsamples = new DataSet[ns];
+            for (int j = 0; j < ns; j++)
+                subsamples[j] = d.subsetRows(samps[j]);
+
+
+            System.out.print("Generating Lambda Params...");
+            mgmPriors m = new mgmPriors(ns,initLambdas,d,priors,subsamples);
+            System.out.println("Done");
             System.out.print("Running piMGM...");
-            mgmPriors m = new mgmPriors(ns,initLambdas,d,priors);
             Graph g = m.runPriors();
+            System.out.println("Done");
             System.out.println("Done");
             System.out.print("Printing Results...");
             printAllResults(g,m,runName,fileMap);
@@ -250,6 +313,7 @@ public class runPriors {
     {
         //loop through pathway file, and add elements to a double [][], then print it all out to the file
         double [][] prior = fileToPrior(pathway, vars);
+        out.println(pathway.getName());
         for(int i = 0; i < prior.length;i++)
         {
             for(int j = 0; j < prior[i].length;j++)
@@ -268,6 +332,11 @@ public class runPriors {
     {
         double [][] prior = new double[vars.size()][vars.size()];
         BufferedReader b = new BufferedReader(new FileReader(pathway.getAbsolutePath()));
+        if(verbose)
+        {
+            System.out.println("Parsing prior for " + pathway.getName());
+            System.out.println("Variables: " + vars);
+        }
         b.readLine();//eat the title
         while(b.ready())
         {
@@ -279,6 +348,10 @@ public class runPriors {
                 score = Double.parseDouble(line[2]);
             if(i==-1||j==-1)
                 continue;
+            if(verbose)
+            {
+                System.out.println("Adding probability: " + score + " for edge " + line[0] + ":" + i + ", " + line[1] + ":" + j);
+            }
             prior[i][j] = score;
             prior[j][i] = score;
         }

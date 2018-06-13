@@ -51,6 +51,7 @@ public class simulatePrefDivMGM {
             double accuracy = 0.5;
             int topK = 50;
 
+
             int index = 0;
             while (index < args.length) {
                 if (args[index].equals("-runs")) {

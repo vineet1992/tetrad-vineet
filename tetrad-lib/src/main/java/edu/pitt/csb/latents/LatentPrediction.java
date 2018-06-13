@@ -24,7 +24,8 @@ import java.util.concurrent.RecursiveAction;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Created by vinee_000 on 10/9/2017. Runs modifications of FCI-flavor approaches to determine the variables likely to be confounded by latents
+ * Created by vinee_000 on 10/9/2017.
+ * Runs modifications of FCI-flavor approaches to determine the variables likely to be confounded by latents
  */
 public class LatentPrediction {
 

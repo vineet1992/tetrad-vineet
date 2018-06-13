@@ -24,8 +24,8 @@ public class runSteps {
         String stabilityFile = "";
         String graphFile = "";
         int ns = 20;
-        double g = 0.05;
-        int numLambdas = 20;
+        double g = 0.03;
+        int numLambdas = 40;
         double lambdaLow = 0.05;
         double lambdaHigh = 0.95;
         boolean LOO = true;
@@ -58,7 +58,7 @@ public class runSteps {
             }
             else if(args[index].equals("-graphOut"))
             {
-                graphFile = args[index]+1;
+                graphFile = args[index+1];
                 index+=2;
             }
             else if(args[index].equals("-ns"))
@@ -123,6 +123,11 @@ public class runSteps {
         p.setInitialGraph(g2);
         System.out.println(p.search());
         out = new PrintStream(directory + "/" + stabilityFile);
+        printStability(out,d,stab);
+    }
+
+    public static void printStability(PrintStream out, DataSet d, double [][] stab)
+    {
         for(int i = 0; i < d.getNumColumns();i++)
         {
             out.print(d.getVariable(i).getName());

@@ -52,6 +52,14 @@ public class STEPS {
 
 
     }
+    public STEPS(DataSet dat,double [] lam,double g,int numSub, int b)
+    {
+        N = numSub;
+        gamma = g;
+        lambda = lam;
+        d = dat;
+        this.b = b;
+    }
     public STEPS(DataSet dat,double [] lam,double g,DataSet[] subsamples)
     {
         gamma = g;
