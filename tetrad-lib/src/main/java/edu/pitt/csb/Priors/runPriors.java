@@ -52,6 +52,12 @@ public class runPriors {
                 } else if (args[index].equals("-nl")) {
                     numLambdas = Integer.parseInt(args[index + 1]);
                     index += 2;
+                } else if(args[index].equals("-llow")){
+                    low = Double.parseDouble(args[index+1]);
+                    index+=2;
+                }else if (args[index].equals("-lhigh")){
+                    high = Double.parseDouble(args[index+1]);
+                    index+=2;
                 } else if(args[index].equals("-run")) {
                     runName = args[index+1];
                     index+=2;
@@ -115,7 +121,7 @@ public class runPriors {
         double [] initLambdas = new double[numLambdas];
         for(int i = 0; i < numLambdas;i++)
         {
-            initLambdas[i] = i*(high-low)/numLambdas;
+            initLambdas[i] = low + i*(high-low)/numLambdas;
         }
         DataSet d = null;
         try {

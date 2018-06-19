@@ -1309,9 +1309,10 @@ public class mgmPriors {
                 if (to - from <= chunk) {
                     for (int s = from; s < to; s++) {
                         double[] lambda = {init[s], init[s], init[s]};
-                        System.out.println("Running MGM " + s + " out of " + numLambdas);
+                        System.out.println("Running MGM " + s + " out of " + numLambdas + ", for lambda " + init[s]);
                         MGM m = new MGM(data, lambda);
                         m.learnEdges(iterLimit);
+                        System.out.println("Completed MGM for Lambda: " + init[s]);
                         Graph curr = m.graphFromMGM();
 
                         addToMat(curr, numEdges, s);
