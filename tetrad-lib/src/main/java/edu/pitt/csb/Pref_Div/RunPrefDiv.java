@@ -134,6 +134,7 @@ public class RunPrefDiv {
         //If result is below threshold, then keep it
         //Otherwise increment by alphaStep and continue searching
 
+
         System.out.print("Generating Subsamples...");
         if(subs==null) {
             if (loocv)
@@ -148,9 +149,18 @@ public class RunPrefDiv {
             alphas[i] = i*alphaLimit/(double)numAlphas;
         }
 
+
+
         ArrayList<Gene> finalSet = null;
+
+
         for(int i = alphas.length-1; i >=0;i--)
         {
+            if(useStabilitySelection)
+            {
+
+            }
+
             System.out.print("Running Pref-Div for Alpha value: " + alphas[i] + " ...");
             double stab = stabilityPD(alphas[i]);
             if(stabPS!=null) {
