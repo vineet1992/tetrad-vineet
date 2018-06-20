@@ -37,19 +37,18 @@ public class RunPrefDiv {
     private int topK = 50;
     private double accuracy = 0; //TODO what's the right value for this to get good clusters? 0?
     private double radius = 0.5; //TODO decide if we should use the radius or the max cluster size
-    private int numAlphas = 20;
-    private double alphaLimit = 1;
-    private int maxIntDiscrete = 5;
-    private double lambdaLow = 0.05;
-    private double lambdaHigh = 0.95;
+    private int numAlphas = 20; //How many alpha values should we test? (Data-Theory tradeoff alpha)
+    private double alphaLimit = 1; //The largest value of alpha we test
+    private double lambdaLow = 0.05; //Lambda low limit
+    private double lambdaHigh = 0.95; //Lambda high limit for MGM StEPS
     private double g = 0.05; //Stability threshold
     private ArrayList<Gene> lastGeneSet;
     private HashMap<Gene,List<Gene>> lastClusters;
-    private String target;
-    private boolean approxCorrelations = false;
+    private String target; //Target variable
+    private boolean approxCorrelations = false; //Compute some correlations and do the rest on the fly?
     private boolean useClusterStability = false; //cluster stability, or gene wise stability
     private boolean partialCorr = false; //Use partial correlations instead of correlation for continuous variables
-    private double [][] lastStepsStabilities;
+    private double [][] lastStepsStabilities; //Last set of gene stabilities given by StEPS
 
     private ArrayList<String> stabPS;//PrintStream to output file where we have run\talpha\tstability
     private boolean includeAccuracy = false; //When writing the stability output to file, should we include an accuracy score for each stability data point
@@ -60,6 +59,7 @@ public class RunPrefDiv {
     private boolean getCausalAccuracy = false;
     private Graph trueGraph;
 
+    private boolean useStabilitySelection = false;
 
     public RunPrefDiv(float [] dissimilarity, ArrayList<Gene> genes, DataSet data,String target,boolean leaveOneOut)
     {
@@ -94,10 +94,6 @@ public class RunPrefDiv {
     {
         useClusterStability = x;
     }
-    public void setMaxInt(int m)
-    {
-        this.maxIntDiscrete = m;
-    }
     public void setAlphaLimit(double lim)
     {
         alphaLimit = lim;
@@ -129,6 +125,7 @@ public class RunPrefDiv {
     public void setRun(int r){run = r;}
     public ArrayList<Gene> getLastGeneSet(){return lastGeneSet;}
     public void usePartialCorrelation(boolean pc){partialCorr = pc;}
+    public void useStabilitySelection(){useStabilitySelection = true;}
 
     public ArrayList<Gene> runPD()
     {

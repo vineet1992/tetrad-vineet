@@ -147,7 +147,7 @@ public class runPriors {
         {
             System.out.print("Data is only continuous, adding a discrete variable...");
             Random rand = new Random();
-            DiscreteVariable temp= new DiscreteVariable("Dummy",3);
+            DiscreteVariable temp= new DiscreteVariable("Dummy",2);
             d.addVariable(temp);
             int column = d.getColumn(d.getVariable(temp.getName()));
             for(int i = 0; i < d.getNumRows();i++)
@@ -248,7 +248,6 @@ public class runPriors {
             System.out.println("Done");
             System.out.print("Running piMGM...");
             Graph g = m.runPriors();
-            System.out.println("Done");
             System.out.println("Done");
             System.out.print("Printing Results...");
             printAllResults(g,m,runName,fileMap);

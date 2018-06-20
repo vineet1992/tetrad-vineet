@@ -70,6 +70,8 @@ public class runAlgorithms {
     private static String stabPath = "";
     private static boolean outputOrients = false;
     private static String orientPath = "";
+    private static double paramLow = -1;
+    private static double paramHigh = -1;
     public static void main(String[] args) throws Exception{
         try {
 
@@ -99,6 +101,16 @@ public class runAlgorithms {
                         count+=2;
                     }
 
+                }
+                else if(args[count].equals("-low"))
+                {
+                    paramLow = Double.parseDouble(args[count+1]);
+                    count+=2;
+                }
+                else if(args[count].equals("-high"))
+                {
+                    paramHigh = Double.parseDouble(args[count+1]);
+                    count+=2;
                 }
                 else if(args[count].equals("-b"))
                 {
@@ -194,6 +206,10 @@ public class runAlgorithms {
                 System.out.print("Running StEPS...");
                 double low = .05;
                 double high = .9;
+                if(paramLow!=-1)
+                    low = paramLow;
+                if(paramHigh!=-1)
+                    high = paramHigh;
                 double[] initLambdas = new double[40];
                 for (int i = 0; i < 40; i++) {
                     initLambdas[i] = i * (high - low) / 40 + low;
@@ -283,6 +299,10 @@ public class runAlgorithms {
                         double pLow = 0.01;
                         double pHigh = 15;
 
+                        if(paramLow!=-1)
+                            pLow = paramLow;
+                        if(paramHigh!=-1)
+                            pHigh = paramHigh;
                         double [] penalties = new double[numParams];
                         for(int j = 0; j < penalties.length;j++)
                         {

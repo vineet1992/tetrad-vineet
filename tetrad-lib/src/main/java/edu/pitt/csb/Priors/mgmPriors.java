@@ -1017,12 +1017,14 @@ public class mgmPriors {
                         int j = s/lambdas[0].length;
                         int i = s%lambdas[0].length;
                         double [] lambda = {lambdas[0][i],lambdas[1][i],lambdas[2][i]};
+                        System.out.println("Computing Edge Probability for run " + s + " out of " + numSubsamples*lambdas[0].length + ", Lambdas:" + Arrays.toString(lambda) + ", Subsample: " + j );
 
                         //temp is an int array with the samples for the current subsampling
                         DataSet current = subsamples[j];
                         MGM m = new MGM(current,lambda);
                         m.learnEdges(iterLimit);
                         Graph g = m.graphFromMGM();
+                        System.out.println("Completed Edge Probability for run " + s + " out of " + numSubsamples*lambdas[0].length + ", Lambdas:" + Arrays.toString(lambda) + ", Subsample: " + j );
 
 
                         updateEdgeCounts(edgeCounts[i][j],g);
