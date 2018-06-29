@@ -27,11 +27,11 @@ public class priorTest {
         boolean excludeUnreliable = false; //Should piMGM exclude priors below p-value threshold
         double reliabilityThreshold = 0.05; //piMGM will exclude priors with adjusted p-value < 0.05
         double amountPrior = .1;
-        boolean reliable = false; //Are all priors reliable?
+        boolean reliable = true; //Are all priors reliable?
         boolean diffNumPrior = true; //Does each prior provide with the same number of edges?
         boolean correctEdges = true; //Determines whether or not we will use correct edges only for unreliable priors as well or not
         boolean pureRandom = false; //Only for different number of edges given by each prior, this sets the priors to be purely random with reliability computed after the fact
-        boolean onlyPrior = false;
+        boolean onlyPrior = true;
         int reliableExperts = 5; //How many priors are reliable?
         int numExperts = 5;
         int numLambdas = 40;
@@ -39,7 +39,7 @@ public class priorTest {
         int numEdges = 75;
         int sampleSize = 400;
         int numSubsamples = 10;
-        int numRuns = 5;
+        int numRuns = 1;
         int index = 0;
         int numCategories = 4;
         double gamma = 0.05;
@@ -325,6 +325,7 @@ public class priorTest {
                         steps = s.runStepsPar();
                     if(foundIt) {
                         m = new mgmPriors(numSubsamples, initLambdas, c.getDataSet(0), priors, c.getTrueGraph(),false,subsamples);
+                       m.setLog(true);
                         if(excludeUnreliable)
                             m.excludeUnreliablePriors(reliabilityThreshold);
                         mgmprior = m.runPriors();
