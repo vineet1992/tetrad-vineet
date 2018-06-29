@@ -1,5 +1,6 @@
 package edu.pitt.csb.Priors;
 
+import cern.colt.matrix.impl.SparseDoubleMatrix2D;
 import edu.cmu.tetrad.algcomparison.simulation.MixedLeeHastieSimulation;
 import edu.cmu.tetrad.algcomparison.simulation.Parameters;
 import edu.cmu.tetrad.data.DataSet;
@@ -27,19 +28,19 @@ public class priorTest {
         boolean excludeUnreliable = false; //Should piMGM exclude priors below p-value threshold
         double reliabilityThreshold = 0.05; //piMGM will exclude priors with adjusted p-value < 0.05
         double amountPrior = .1;
-        boolean reliable = false; //Are all priors reliable?
+        boolean reliable = true; //Are all priors reliable?
         boolean diffNumPrior = true; //Does each prior provide with the same number of edges?
         boolean correctEdges = true; //Determines whether or not we will use correct edges only for unreliable priors as well or not
         boolean pureRandom = false; //Only for different number of edges given by each prior, this sets the priors to be purely random with reliability computed after the fact
-        boolean onlyPrior = false;
+        boolean onlyPrior = true;
         int reliableExperts = 5; //How many priors are reliable?
         int numExperts = 5;
         int numLambdas = 40;
-        int numVariables = 100;
+        int numVariables = 20;
         int numEdges = 75;
-        int sampleSize = 200;
+        int sampleSize = 400;
         int numSubsamples = 10;
-        int numRuns = 15;
+        int numRuns = 1;
         int index = 0;
         int numCategories = 4;
         double gamma = 0.05;
@@ -192,8 +193,10 @@ public class priorTest {
                 pri[i] = new PrintStream("Results/" + algs[i] + "_" + amountPrior + "_" + numExperts + "_" + numVariables + "_" + sampleSize + "_" + numSubsamples + ".txt");
         }
         A:for(int i = 0; i < numRuns; i++) {
+            boolean foundPrior = false;
             MixedLeeHastieSimulation c = new MixedLeeHastieSimulation();
             System.out.println(i);
+            System.out.println("Chossing the number of edges");
             if(numEdgesRandom)
             {
                 numEdges = (int)n.sample();
@@ -206,10 +209,11 @@ public class priorTest {
             p.setValue("sampleSize", sampleSize);
             p.setValue("numCategories",numCategories);
             c.simulate(p);
-            TetradMatrix[] priors = new TetradMatrix[numExperts];
-            DataSet [] subsamples = new DataSet[numSubsamples];
+            SparseDoubleMatrix2D[] priors = new SparseDoubleMatrix2D[numExperts];
+            int[][] subsamples = new int[numSubsamples][];
             if(reuseData)
             {
+                System.out.println("Loading in old data");
                 boolean foundFile = false;
                 boolean foundData = false;
                 File f = new File("Graphs/Graph_" + i + "_" + numVariables + ".txt");
@@ -232,15 +236,24 @@ public class priorTest {
                         else
                             f = new File("Priors/Priors_" + i + "_" + numVariables + "_" + amountPrior + "_" + reliableExperts + "_" + j + ".txt");
                         if (f.exists()) {
-                            priors[j] = new TetradMatrix(loadPrior(f, numVariables));
+                            foundPrior = true;
+                            priors[j] = new SparseDoubleMatrix2D(loadPrior(f, numVariables));
                         }
                     }
                 }
                 if(foundData) {
+                    f = new File("Subsamples/Subsample_" + i + "_" + numVariables + "_" + sampleSize + ".txt");
+                    if(f.exists()) {
+                        BufferedReader b2 =new BufferedReader(new FileReader(f));
+
                     for (int j = 0; j < numSubsamples; j++) {
-                        f = new File("Subsamples/Subsample_" + i + "_" + numVariables + "_" + sampleSize + "_" + j + ".txt");
-                        if(f.exists())
-                            subsamples[j] = MixedUtils.loadDataSet2(f.getAbsolutePath());
+                        String [] line = b2.readLine().split("\t");
+                            subsamples[j] = new int[line.length];
+                            for(int k = 0; k < line.length;k++)
+                            {
+                                subsamples[j][k] = Integer.parseInt(line[k]);
+                            }
+                        }
                     }
                 }
 
@@ -267,24 +280,28 @@ public class priorTest {
             int [] edges = new int[numExperts];
             double [] reli = new double[numExperts];
            // System.out.println(c.getDataSet(0));
-            c.setTrueGraph(moralize(c.getTrueGraph()));
-           //  priors = simulatePrior(c.getTrueGraph(), amountPrior, numExperts,priors,c.getDataSet(0));
-            if(reliable)
-                priors = simulatePriorDim(c.getTrueGraph(), amountPrior, numExperts,priors,c.getDataSet(0));
-            else if(!reliable && diffNumPrior) {
-
-                priors = simulatePriorUnreli(c.getTrueGraph(), numExperts, c.getDataSet(0),edges,reli,pureRandom);
-            }
-          //  else if(reliable&&diffNumPrior)
-            //    priors = simulatePriorDim(c.getTrueGraph(),numExperts,priors,c.getDataSet(0)); TODO
-            else
-                priors = simulatePriorUnreli(c.getTrueGraph(),amountPrior,numExperts,c.getDataSet(0),reliableExperts,correctEdges);
             boolean done = false;
-            if (!diffNumPrior && correctEdges)
-                 checkPriors(c.getTrueGraph(),c.getDataSet(0),priors,i,true);
-            else
-                checkPriors(c.getTrueGraph(),c.getDataSet(0),priors,i,false);
 
+            if(!foundPrior) {
+                System.out.println("Simulating priors");
+                c.setTrueGraph(moralize(c.getTrueGraph()));
+                //  priors = simulatePrior(c.getTrueGraph(), amountPrior, numExperts,priors,c.getDataSet(0));
+                if (reliable)
+                    priors = simulatePriorDim(c.getTrueGraph(), amountPrior, numExperts, priors, c.getDataSet(0));
+                else if (!reliable && diffNumPrior) {
+
+                    priors = simulatePriorUnreli(c.getTrueGraph(), numExperts, c.getDataSet(0), edges, reli, pureRandom);
+                }
+                //  else if(reliable&&diffNumPrior)
+                //    priors = simulatePriorDim(c.getTrueGraph(),numExperts,priors,c.getDataSet(0)); TODO
+                else
+                    priors = simulatePriorUnreli(c.getTrueGraph(), amountPrior, numExperts, c.getDataSet(0), reliableExperts, correctEdges);
+                System.out.println("Checking correctness of priors");
+                if (!diffNumPrior && correctEdges)
+                    checkPriors(c.getTrueGraph(), c.getDataSet(0), priors, i, true);
+                else
+                    checkPriors(c.getTrueGraph(), c.getDataSet(0), priors, i, false);
+            }
             while(!done)
             {
                 System.out.println(i);
@@ -314,10 +331,8 @@ public class priorTest {
                         int b = (int) Math.floor(10 * Math.sqrt(c.getDataSet(0).getNumRows()));
                         if (b > c.getDataSet(0).getNumRows())
                             b = c.getDataSet(0).getNumRows() / 2;
-                        int[][] samps = StabilityUtils.subSampleNoReplacement(c.getDataSet(0).getNumRows(), b, numSubsamples);
-                        for (int j = 0; j < subsamples.length; j++) {
-                            subsamples[j] = c.getDataSet(0).subsetRows(samps[j]);
-                        }
+                       subsamples = StabilityUtils.subSampleNoReplacement(c.getDataSet(0).getNumRows(), b, numSubsamples);
+
                     }
                     STEPS s = new STEPS(c.getDataSet(0), initLambdas, gamma, subsamples);
                     Graph steps = null;
@@ -325,6 +340,7 @@ public class priorTest {
                         steps = s.runStepsPar();
                     if(foundIt) {
                         m = new mgmPriors(numSubsamples, initLambdas, c.getDataSet(0), priors, c.getTrueGraph(),false,subsamples);
+                        m.setLog(true);
                         if(excludeUnreliable)
                             m.excludeUnreliablePriors(reliabilityThreshold);
                         mgmprior = m.runPriors();
@@ -475,14 +491,21 @@ public class priorTest {
                     p2.close();
 
                 }
+                p2 = new PrintStream("Subsamples/Subsample_" + i + "_" + numVariables + "_" + sampleSize +".txt");
+
                 for(int j = 0; j < subsamples.length;j++)
                 {
-                    p2 = new PrintStream("Subsamples/Subsample_" + i + "_" + numVariables + "_" + sampleSize + "_" + j + ".txt");
-                    p2.println(subsamples[j]);
-                    p2.flush();
-                    p2.close();
-                }
+                    for(int k = 0; k < subsamples[j].length;k++)
+                    {
+                        if(k==subsamples[j].length-1)
+                            p2.println(subsamples[j][k]);
+                        else
+                            p2.print(subsamples[j][k] + "\t");
+                    }
 
+                }
+                p2.flush();
+                p2.close();
 
                 }
 
@@ -533,10 +556,10 @@ public class priorTest {
 
         return x;
     }
-    public static TetradMatrix [] simulatePrior(Graph g, double ap, int numExperts,TetradMatrix [] currPrior,DataSet d)
+    public static SparseDoubleMatrix2D [] simulatePrior(Graph g, double ap, int numExperts,SparseDoubleMatrix2D [] currPrior,DataSet d)
     {
         Random rand = new Random();
-       TetradMatrix [] temp = new TetradMatrix[numExperts];
+       SparseDoubleMatrix2D [] temp = new SparseDoubleMatrix2D[numExperts];
         List<Node> list = g.getNodes();
 
        A: for(int i = 0; i < numExperts; i ++)
@@ -546,7 +569,7 @@ public class priorTest {
                 temp[i] = currPrior[i];
                 continue A;
             }
-            TetradMatrix curr = new TetradMatrix(g.getNumNodes(),g.getNumNodes());
+            SparseDoubleMatrix2D curr = new SparseDoubleMatrix2D(g.getNumNodes(),g.getNumNodes());
             for(Edge e:g.getEdges())
             {
                 if(rand.nextDouble() < ap)
@@ -566,12 +589,12 @@ public class priorTest {
 
 
     //Generates unreliable priors, with differing amount of prior information from each expert HARD PRIOR (0-1) only
-    public static TetradMatrix [] simulatePriorUnreli(Graph g, int numExperts, DataSet d, int [] edges, double [] reliability,boolean pureRandom)
+    public static SparseDoubleMatrix2D [] simulatePriorUnreli(Graph g, int numExperts, DataSet d, int [] edges, double [] reliability,boolean pureRandom)
     {
-        TetradMatrix [] temp = new TetradMatrix [numExperts];
+        SparseDoubleMatrix2D [] temp = new SparseDoubleMatrix2D [numExperts];
         for(int i = 0; i < numExperts;i++)
         {
-            TetradMatrix curr = new TetradMatrix(g.getNumNodes(),g.getNumNodes());
+            SparseDoubleMatrix2D curr = new SparseDoubleMatrix2D(g.getNumNodes(),g.getNumNodes());
             temp[i] = curr;
         }
         Random rand = new Random();
@@ -653,12 +676,12 @@ public class priorTest {
         return temp;
     }
     //Generates unreliable priors, currently generates the entire set of priors from scratch, can't deal with potentially generated priors TODO
-    public static TetradMatrix [] simulatePriorUnreli(Graph g, double ap, int numExperts, DataSet d, int numReliable, boolean correctEdges) {
+    public static SparseDoubleMatrix2D [] simulatePriorUnreli(Graph g, double ap, int numExperts, DataSet d, int numReliable, boolean correctEdges) {
         Random rand = new Random();
-        TetradMatrix[] temp = new TetradMatrix[numExperts];
+        SparseDoubleMatrix2D[] temp = new SparseDoubleMatrix2D[numExperts];
         for (int i = 0; i < numExperts; i++)
         {
-            TetradMatrix curr = new TetradMatrix(g.getNumNodes(), g.getNumNodes());
+            SparseDoubleMatrix2D curr = new SparseDoubleMatrix2D(g.getNumNodes(), g.getNumNodes());
             temp[i] = curr;
         }
 
@@ -727,16 +750,16 @@ public class priorTest {
         }
         return temp;
     }
-    public static TetradMatrix [] simulatePriorDim(Graph g, double ap, int numExperts,TetradMatrix [] currPrior,DataSet d)
+    public static SparseDoubleMatrix2D [] simulatePriorDim(Graph g, double ap, int numExperts,SparseDoubleMatrix2D [] currPrior,DataSet d)
     {
         Random rand = new Random();
-        TetradMatrix [] temp = new TetradMatrix[numExperts];
+        SparseDoubleMatrix2D [] temp = new SparseDoubleMatrix2D[numExperts];
         List<Node> list = g.getNodes();
         boolean addNew = true;
         for(int i = 0; i < numExperts;i++)
         {
             if(currPrior[i]==null) {
-                TetradMatrix curr = new TetradMatrix(g.getNumNodes(), g.getNumNodes());
+                SparseDoubleMatrix2D curr = new SparseDoubleMatrix2D(g.getNumNodes(), g.getNumNodes());
                 temp[i] = curr;
             }
             else {
@@ -833,7 +856,7 @@ public class priorTest {
             }
         }
     }
-    public static void checkPriors(Graph g, DataSet d, TetradMatrix [] priors,int index,boolean exit)
+    public static void checkPriors(Graph g, DataSet d, SparseDoubleMatrix2D [] priors,int index,boolean exit)
     {
         for(int i = 0; i < priors.length;i++)
         {
