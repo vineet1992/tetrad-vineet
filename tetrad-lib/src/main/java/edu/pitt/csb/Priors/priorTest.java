@@ -194,6 +194,8 @@ public class priorTest {
         }
         A:for(int i = 0; i < numRuns; i++) {
             boolean foundPrior = false;
+            boolean foundData = false;
+
             MixedLeeHastieSimulation c = new MixedLeeHastieSimulation();
             System.out.println(i);
             System.out.println("Chossing the number of edges");
@@ -215,7 +217,6 @@ public class priorTest {
             {
                 System.out.println("Loading in old data");
                 boolean foundFile = false;
-                boolean foundData = false;
                 File f = new File("Graphs/Graph_" + i + "_" + numVariables + ".txt");
                 if(f.exists()) {
                     foundFile = true;
@@ -319,15 +320,8 @@ public class priorTest {
                             foundSteps = true;
                     }
 
-                    boolean nullSub = false;
-                    for(int j = 0; j < subsamples.length;j++)
-                    {
-                        if(subsamples[j]==null)
-                        {
-                            nullSub = true;
-                        }
-                    }
-                    if(nullSub) {
+
+                    if(!foundData) {
                         int b = (int) Math.floor(10 * Math.sqrt(c.getDataSet(0).getNumRows()));
                         if (b > c.getDataSet(0).getNumRows())
                             b = c.getDataSet(0).getNumRows() / 2;
