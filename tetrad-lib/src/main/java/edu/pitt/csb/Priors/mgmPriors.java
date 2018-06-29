@@ -234,6 +234,7 @@ public class mgmPriors {
     public Graph runPriors() {
         if(logging) {
             try {
+                log = new PrintStream("log_file.txt");
                 log.println("True Graph: " + trueGraph);
                 log.flush();
             } catch (Exception e) {
@@ -247,6 +248,12 @@ public class mgmPriors {
 
         TetradMatrix counts = getFullCounts(edgeCounts); // # of times each edge appeared
         this.fullCounts = counts;
+        if(logging)
+        {
+            log.println("Lambdas:" + Arrays.toString(lambdas[0]) + "\n" + Arrays.toString(lambdas[1]) + "\n" + Arrays.toString(lambdas[2]));
+            log.println("Edge Counts: " + counts);
+            log.flush();
+        }
         //Across all lambda*subsamples graphs
         TetradMatrix variances = getVariances(counts); // variance of appearences of each edge
         //  System.out.println("Variances: " + variances);
