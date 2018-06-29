@@ -192,7 +192,7 @@ public class mfmTest {
             Graph currPAG = addLatents(c,numLatents);
 
 
-            DataSet [] subsamples = new DataSet[numSubsamples];
+            int[][] subsamples = new int[numSubsamples][];
             if(reuseData)
             {
                 boolean foundFile = false;
@@ -224,15 +224,24 @@ public class mfmTest {
                     currPAG = addLatents(c,numLatents);
                 }
                 if(foundData) {
-                    for (int j = 0; j < numSubsamples; j++) {
-                        f = new File("Subsamples/Subsample_" + i + "_" + numVariables + "_" + sampleSize + "_" + numLatents + "_" +  j + ".txt");
-                        if(f.exists())
-                            subsamples[j] = MixedUtils.loadDataSet2(f.getAbsolutePath());
+                    f = new File("Subsamples/Subsample_" + i + "_" + numVariables + "_" + sampleSize + "_" + numLatents + ".txt");
+                    if(f.exists()) {
+                        BufferedReader b2 =new BufferedReader(new FileReader(f));
+                        for (int j = 0; j < numSubsamples; j++) {
+                            String [] line = b2.readLine().split("\t");
+                            subsamples[j] = new int[line.length];
+                            for(int k = 0; k < subsamples.length;k++)
+                            {
+                                subsamples[j][k] = Integer.parseInt(line[k]);
+                            }
+
+                        }
                     }
                 }
 
             }
 
+            //TODO Fix Subsample issue here
 
 
 
@@ -275,10 +284,8 @@ public class mfmTest {
                         int b = (int) Math.floor(10 * Math.sqrt(c.getDataSet(0).getNumRows()));
                         if (b > c.getDataSet(0).getNumRows())
                             b = c.getDataSet(0).getNumRows() / 2;
-                        int[][] samps = StabilityUtils.subSampleNoReplacement(c.getDataSet(0).getNumRows(), b, numSubsamples);
-                        for (int j = 0; j < subsamples.length; j++) {
-                            subsamples[j] = c.getDataSet(0).subsetRows(samps[j]);
-                        }
+                        subsamples = StabilityUtils.subSampleNoReplacement(c.getDataSet(0).getNumRows(), b, numSubsamples);
+
                     }
                     STEPS s = new STEPS(c.getDataSet(0), initLambdas, gamma, subsamples);
                     Graph steps = null;
@@ -385,14 +392,22 @@ public class mfmTest {
                         p2.close();
                     }
                 }
+                p2 = new PrintStream("Subsamples/Subsample_" + i + "_" + numVariables + "_" + sampleSize + "_" + numLatents + ".txt");
 
                 for(int j = 0; j < subsamples.length;j++)
                 {
-                    p2 = new PrintStream("Subsamples/Subsample_" + i + "_" + numVariables + "_" + sampleSize + "_" + numLatents + "_" + j + ".txt");
-                    p2.println(subsamples[j]);
-                    p2.flush();
-                    p2.close();
+                    for(int k = 0;k < subsamples[j].length;k++)
+                    {
+                        if(k==subsamples[j].length-1)
+                            p2.println(subsamples[j][k]);
+                        else
+                            p2.print(subsamples[j][k] + "\t");
+
+                    }
+
                 }
+                p2.flush();
+                p2.close();
             }
         }
         for(int i = 0; i < pri.length;i++)

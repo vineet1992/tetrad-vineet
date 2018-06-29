@@ -26,6 +26,7 @@ import java.util.Map;
 /**
  * Created by vinee_000 on 10/9/2017.
  */
+
 public class testLatentRecovery {
     public static void main(String [] args)throws Exception
     {
@@ -199,7 +200,7 @@ public class testLatentRecovery {
             {
                 c.simulate(p);
             }
-            DataSet[] subsamples = new DataSet[numSubsamples];
+            int[][] subsamples = new int[numSubsamples][];
             if(reuseData)
             {
                 boolean foundFile = false;
@@ -236,10 +237,20 @@ public class testLatentRecovery {
                     }
                 }
                 if(foundData) {
-                    for (int j = 0; j < numSubsamples; j++) {
-                        f = new File("Subsamples/Subsample_" + i + "_" + numVariables + "_" + sampleSize + "_" + numLatents + "_" + j + ".txt");
-                        if(f.exists())
-                            subsamples[j] = MixedUtils.loadDataSet2(f.getAbsolutePath());
+
+                        f = new File("Subsamples/Subsample_" + i + "_" + numVariables + "_" + sampleSize + "_" + numLatents + ".txt");
+
+                        if (f.exists()) {
+                            BufferedReader b2 = new BufferedReader(new FileReader(f.getAbsolutePath()));
+                            for (int j = 0; j < numSubsamples; j++) {
+                            String [] line = b2.readLine().split("\t");
+                            subsamples[j] = new int[line.length];
+                            for(int k = 0; k < line.length;k++)
+                            {
+                                subsamples[j][k] = Integer.parseInt(line[k]);
+                            }
+
+                        }
                     }
                 }
 
@@ -320,10 +331,8 @@ public class testLatentRecovery {
                         int b = (int) Math.floor(10 * Math.sqrt(c.getDataSet(0).getNumRows()));
                         if (b > c.getDataSet(0).getNumRows())
                             b = c.getDataSet(0).getNumRows() / 2;
-                        int[][] samps = StabilityUtils.subSampleNoReplacement(c.getDataSet(0).getNumRows(), b, numSubsamples);
-                        for (int j = 0; j < subsamples.length; j++) {
-                            subsamples[j] = c.getDataSet(0).subsetRows(samps[j]);
-                        }
+                        subsamples = StabilityUtils.subSampleNoReplacement(c.getDataSet(0).getNumRows(), b, numSubsamples);
+
                     }
 
 
@@ -369,13 +378,12 @@ public class testLatentRecovery {
                                 orientations.set(j,lp.orientations);
                             }
                         }
-                        //TODO Add in the code to get stabilities to the non subsampled versions too
-                        //TODO change this back to all types
 
                         System.out.println("Doing DAG to PAG conversion");
                         DagToPag pg = new DagToPag(c.getTrueGraph());
                         pg.setCompleteRuleSetUsed(false);
                         Graph truePag = pg.convert();
+                        //TODO change this back to all types
                         for(int k = 3; k < types.length;k++)
                         {
                             if(!algs[j].contains("Latent")) {
@@ -446,14 +454,17 @@ public class testLatentRecovery {
                     p2.flush();
                     p2.close();
                 }
+                p2 = new PrintStream("Subsamples/Subsample_" + i + "_" + numVariables + "_" + sampleSize + "_" + numLatents + ".txt");
                 for(int j = 0; j < subsamples.length;j++)
                 {
-                    p2 = new PrintStream("Subsamples/Subsample_" + i + "_" + numVariables + "_" + sampleSize + "_" + numLatents + "_" + j + ".txt");
-                    p2.println(subsamples[j]);
-                    p2.flush();
-                    p2.close();
+                    for(int k = 0; k < subsamples[j].length;k++)
+                    {
+                        p2.print(subsamples[j][k] + "\t");
+                    }
+                   p2.println();
                 }
-
+                p2.flush();
+                p2.close();
 
             }
         }

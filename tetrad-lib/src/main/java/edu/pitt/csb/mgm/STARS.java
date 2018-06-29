@@ -39,7 +39,7 @@ public class STARS {
         private boolean leaveOneOut = false;
         private Algorithm alg;
         public double [][] stabilities = null;
-        private DataSet [] subsamples;
+        private int [][] subs;
         private Graph trueGraph;
 
 
@@ -81,9 +81,9 @@ public class STARS {
         alg = a;
 
     }
-    public STARS(DataSet dat,double [] alp,double g,DataSet [] subs, Algorithm a)
+    public STARS(DataSet dat,double [] alp,double g,int[][] subs, Algorithm a)
     {
-        subsamples = subs;
+        this.subs = subs;
         gamma = g;
         alpha = alp;
         d = dat;
@@ -274,7 +274,7 @@ public class STARS {
                         adjMat = StabilityUtils.StabilitySearchPar(d,new SearchWrappers.MFMWrapper(paramsCurr));
                     }
                 }
-                else if(subsamples==null) {
+                else if(subs==null) {
                     if(alg ==Algorithm.FCI) {
                         double [] fciParam = {alpha[currIndex]};
                         adjMat = StabilityUtils.StabilitySearchPar(d, new SearchWrappers.FCIWrapper(fciParam),N,b);
@@ -292,17 +292,15 @@ public class STARS {
                 {
                     if(alg ==Algorithm.FCI) {
                         double [] fciParam = {alpha[currIndex]};
-                        adjMat = StabilityUtils.StabilitySearchPar(d, new SearchWrappers.FCIWrapper(fciParam),subsamples);
+                        adjMat = StabilityUtils.StabilitySearchPar(d, new SearchWrappers.FCIWrapper(fciParam),subs);
                     }
                     else if(alg==Algorithm.MGMFCI)
                     {
-                        adjMat = StabilityUtils.StabilitySearchPar(d,new SearchWrappers.MGMFCIWrapper(paramsCurr),subsamples);
+                        adjMat = StabilityUtils.StabilitySearchPar(d,new SearchWrappers.MGMFCIWrapper(paramsCurr),subs);
                     }
                     else if(alg==Algorithm.MGMFCIMAX)
                     {
-                        adjMat = StabilityUtils.StabilitySearchPar(d, new SearchWrappers.MFMWrapper(paramsCurr), subsamples);
-                        adjMat2 = StabilityUtils.StabilitySearchParLatent(d,new SearchWrappers.MFMWrapper(paramsCurr),subsamples);
-                        //TODO CHANGE BACK TO NORMAL
+                        adjMat = StabilityUtils.StabilitySearchPar(d, new SearchWrappers.MFMWrapper(paramsCurr), subs);
                     }
                 }
 
@@ -393,31 +391,6 @@ public class STARS {
                     break A;
                 currIndex--;
 
-                //TODO DELETE THIS PART WHEN DONE EXPLORING
-                try {
-                    out.print(alpha[currIndex + 1] + "\t");
-                    int numLatents = 0;
-                    ArrayList<LatentPrediction.Pair> estLatents = new ArrayList<LatentPrediction.Pair>();
-                    for(int i = 0; i < adjMat2.rows();i++)
-                    {
-                        for(int j = i+1; j < adjMat2.columns();j++)
-                        {
-                            if(adjMat2.get(i,j)>0.5) {
-                                estLatents.add(new LatentPrediction.Pair(d.getVariable(i),d.getVariable(j)));
-                                numLatents++;
-                            }
-                            out2.println(alpha[currIndex+1] + "\t" + adjMat2.get(i,j) + "\t" + isLatent(trueGraph,d,i,j));
-                        }
-                    }
-                    out.println(numLatents+"\t"+ allDestable + "\t" + latentStability(adjMat2) + "\t" + LatentPrediction.getPrecision(estLatents,trueGraph,d,"All") + "\t" + LatentPrediction.getRecall(estLatents,trueGraph,d,"All"));
-                    out.flush();
-                    out2.flush();
-                    //out.close();
-                }
-                catch(Exception e)
-                {
-
-                }
                 /////////////////////////////////////////////////////
             }
             if(CC==-1)

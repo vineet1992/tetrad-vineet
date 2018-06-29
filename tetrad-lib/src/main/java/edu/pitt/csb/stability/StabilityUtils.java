@@ -69,7 +69,7 @@ public class StabilityUtils {
         return thetaMat;
     }
 
-    public static DoubleMatrix2D StabilitySearchPar(final DataSet data, final DataGraphSearch gs, final DataSet[] subsamples)
+    public static DoubleMatrix2D StabilitySearchPar(final DataSet data, final DataGraphSearch gs, final int[][] subs)
     {
         final int numVars = data.getNumColumns();
         final DoubleMatrix2D thetaMat = DoubleFactory2D.dense.make(numVars, numVars, 0.0).copy();
@@ -99,7 +99,7 @@ public class StabilityUtils {
                 if (to - from <= chunk) {
                     for (int s = from; s < to; s++) {
                         //System.out.println(s);
-                        DataSet dataSubSamp = subsamples[s];
+                        DataSet dataSubSamp = data.subsetRows(subs[s]);
                         DataGraphSearch curGs = gs.copy();
                         Graph g = curGs.search(dataSubSamp);
                         DoubleMatrix2D curAdj = MixedUtils.skeletonToMatrix(g,dataSubSamp); //set weights so that undirected stability works
@@ -125,9 +125,9 @@ public class StabilityUtils {
 
         final int chunk = 2;
 
-        pool.invoke(new StabilityAction(chunk, 0, subsamples.length));
+        pool.invoke(new StabilityAction(chunk, 0, subs.length));
 
-        thetaMat.assign(Functions.mult(1.0 / subsamples.length));
+        thetaMat.assign(Functions.mult(1.0 / subs.length));
 
         //do this elsewhere
         //thetaMat.assign(thetaMat.copy().assign(Functions.minus(1.0)), Functions.mult).assign(Functions.mult(-2.0));
@@ -628,7 +628,7 @@ public class StabilityUtils {
         return thetaMat;
     }
 
-    public static DoubleMatrix2D StabilitySearchParLatent(final DataSet data, final DataGraphSearch gs,final DataSet [] subsamples,final Map<String,String> orients){
+    public static DoubleMatrix2D StabilitySearchParLatent(final DataSet data, final DataGraphSearch gs,final int [][] subs,final Map<String,String> orients){
 
         final int numVars = data.getNumColumns();
         final DoubleMatrix2D thetaMat = DoubleFactory2D.dense.make(numVars, numVars, 0.0);
@@ -668,7 +668,7 @@ public class StabilityUtils {
             protected void compute(){
                 if (to - from <= chunk) {
                     for (int s = from; s < to; s++) {
-                        DataSet dataSubSamp = subsamples[s];
+                        DataSet dataSubSamp = data.subsetRows(subs[s]);
                         DataGraphSearch curGs = gs.copy();
                         Graph g = curGs.search(dataSubSamp);
                         addToOrient(curGs.orientations,s);
@@ -695,9 +695,9 @@ public class StabilityUtils {
 
         final int chunk = 2;
 
-        pool.invoke(new StabilityAction(chunk, 0, subsamples.length));
+        pool.invoke(new StabilityAction(chunk, 0, subs.length));
 
-        thetaMat.assign(Functions.mult(1.0 / subsamples.length));
+        thetaMat.assign(Functions.mult(1.0 / subs.length));
 
         //do this elsewhere
         //thetaMat.assign(thetaMat.copy().assign(Functions.minus(1.0)), Functions.mult).assign(Functions.mult(-2.0));
@@ -819,7 +819,8 @@ public class StabilityUtils {
         }
         return result;
     }
-    //Automatically generate N approximately equal size subsamples for data set of size sampleSize
+    //Automatically generate N approximately equal size subsamples for data set of size sampleSiz
+    //THE NAME OF THIS METHOD IS A MISNOMER, THIS GENERATES FOLDS (PARTITIONS) OF THE DATA
 public static int [][] generateSubsamples(int N, int sampleSize)
 {
     int [][] result = new int[N][];
