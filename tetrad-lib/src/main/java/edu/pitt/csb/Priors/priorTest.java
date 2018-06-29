@@ -39,7 +39,7 @@ public class priorTest {
         int numEdges = 75;
         int sampleSize = 400;
         int numSubsamples = 10;
-        int numRuns = 1;
+        int numRuns = 5;
         int index = 0;
         int numCategories = 4;
         double gamma = 0.05;
@@ -240,9 +240,9 @@ public class priorTest {
                 }
                 if(foundData) {
                     f = new File("Subsamples/Subsample_" + i + "_" + numVariables + "_" + sampleSize + ".txt");
+                    BufferedReader b2 =new BufferedReader(new FileReader(f));
                     if(f.exists()) {
                         for (int j = 0; j < numSubsamples; j++) {
-                            BufferedReader b2 =new BufferedReader(new FileReader(f));
                             String [] line = b2.readLine().split("\t");
                             subsamples[j] =new int[line.length];
                             for(int k=0; k < line.length;k++)
@@ -250,6 +250,7 @@ public class priorTest {
                                 subsamples[j][k] = Integer.parseInt(line[k]);
                             }
                         }
+                        b2.close();
                     }
                 }
 
