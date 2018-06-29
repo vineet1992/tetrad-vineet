@@ -1,6 +1,7 @@
 package edu.pitt.csb.Priors;
 
 import cern.colt.matrix.DoubleMatrix2D;
+import cern.colt.matrix.impl.SparseDoubleMatrix2D;
 import edu.cmu.tetrad.data.*;
 import edu.cmu.tetrad.graph.Edge;
 import edu.cmu.tetrad.graph.Graph;
@@ -29,7 +30,7 @@ import java.util.concurrent.RecursiveAction;
 public class mgmPriors {
 
     //TODO NEED TO DEBUG EXCLUDING PRIORS
-
+    //TODO Add in sparse doublematrix2d instead of tetradmatrix for priors to save a ton of memory
     Random rand = new Random();
     private final double normalEpsilon = 0.5;
     private double gEpsilon;
@@ -64,13 +65,14 @@ public class mgmPriors {
     private boolean excludeUnreliablePriors = false;
     private double unreliableThreshold = 0.05;
     private int normalizationSamples = 20000;
+    private boolean constructScores = false; //This makes piMGM run a stability analysis after selecting lambdas to get stability of each edge
     public double [][] edgeScores;
 
     public void setLog(boolean b)
     {
         logging = b;
     }
-
+    public void makeEdgeScores(){constructScores=true;}
 
     //If this is set to true, the method will normalize by computing a null distribution for each size of prior
     public void setNormalize(boolean b)
