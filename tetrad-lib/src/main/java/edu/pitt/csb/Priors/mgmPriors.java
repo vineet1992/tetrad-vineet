@@ -49,7 +49,7 @@ public class mgmPriors {
     public double oracleDD;
     public double oracleAll;
     public boolean splitLambdas = false;
-    private DataSet [] subsamples;
+    private int[][] subsamples;
     public Graph trueGraph;
     private PrintStream log;
     public TetradMatrix fullCounts;
@@ -87,7 +87,7 @@ public class mgmPriors {
         }
     public mgmPriors(int numSubsamples, double[] initLambdas, DataSet data, TetradMatrix[] priors) {
         this.numSubsamples = numSubsamples;
-        this.subsamples=new DataSet[numSubsamples];
+        this.subsamples=new int[numSubsamples][];
         //TODO Add Generation of subsamples here
         this.pValues = new double[priors.length];
         this.lambdas = constructLambdasPar(initLambdas, data);
@@ -104,7 +104,7 @@ public class mgmPriors {
         this.pValues = new double[priors.length];
         this.numSubsamples = numSubsamples;
         //TODO Add Generation of subsamples here
-        subsamples = new DataSet[numSubsamples];
+        subsamples = new int[numSubsamples][];
         this.stability = edgeCounts;
         if(logging) {
             try {
@@ -124,7 +124,7 @@ public class mgmPriors {
         gEpsilon = 1 / (double) numSubsamples;
     }
 
-    public mgmPriors(int numSubsamples, double[] initLambdas, DataSet data, TetradMatrix[] priors,DataSet [] subsamples) {
+    public mgmPriors(int numSubsamples, double[] initLambdas, DataSet data, TetradMatrix[] priors,int[][] subsamples) {
         this.subsamples = subsamples;
         this.pValues = new double[priors.length];
         this.numSubsamples = numSubsamples;
@@ -145,7 +145,7 @@ public class mgmPriors {
     }
 
 
-    public mgmPriors(int numSubsamples, double[] initLambdas, DataSet data, TetradMatrix[] priors, Graph truth,boolean splitLambdas,DataSet [] subsamples) {
+    public mgmPriors(int numSubsamples, double[] initLambdas, DataSet data, TetradMatrix[] priors, Graph truth,boolean splitLambdas,int[][] subsamples) {
         this.subsamples = subsamples;
         this.pValues = new double[priors.length];
         this.splitLambdas = splitLambdas;
@@ -485,7 +485,7 @@ public class mgmPriors {
                 if (to - from <= chunk) {
                     for (int s = from; s < to; s++) {
                         //temp is an int array with the samples for the current subsampling
-                        DataSet current = subsamples[s];
+                        DataSet current = data.subsetRows(subsamples[s]);
                         MGM_Priors m = new MGM_Priors(current,npLambdas,wpLambdas,havePriors);
                         m.learnEdges(iterLimit);
                         Graph g = m.graphFromMGM();
@@ -1019,7 +1019,7 @@ public class mgmPriors {
                         double [] lambda = {lambdas[0][i],lambdas[1][i],lambdas[2][i]};
 
                         //temp is an int array with the samples for the current subsampling
-                        DataSet current = subsamples[j];
+                        DataSet current = data.subsetRows(subsamples[j]);
                         MGM m = new MGM(current,lambda);
                         m.learnEdges(iterLimit);
                         Graph g = m.graphFromMGM();

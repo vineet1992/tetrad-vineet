@@ -238,13 +238,11 @@ public class runPriors {
                 samps = StabilityUtils.generateSubsamples(d.getNumRows());
             else
                 samps = StabilityUtils.subSampleNoReplacement(d.getNumRows(), b, ns);
-            DataSet [] subsamples = new DataSet[ns];
-            for (int j = 0; j < ns; j++)
-                subsamples[j] = d.subsetRows(samps[j]);
+
 
 
             System.out.print("Generating Lambda Params...");
-            mgmPriors m = new mgmPriors(ns,initLambdas,d,priors,subsamples);
+            mgmPriors m = new mgmPriors(ns,initLambdas,d,priors,samps);
             System.out.println("Done");
             System.out.print("Running piMGM...");
             Graph g = m.runPriors();

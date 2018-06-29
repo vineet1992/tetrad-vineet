@@ -72,6 +72,22 @@ public class STEPS {
 
 
     }
+    public STEPS(DataSet dat,double [] lam,double g,int[][] subs)
+    {
+        gamma = g;
+        lambda = lam;
+        d = dat;
+        b = (int)Math.floor( 10*Math.sqrt(dat.getNumRows()));
+        if (b > d.getNumRows())
+            b = d.getNumRows()/2;
+        this.subsamples = new DataSet[subs.length];
+        for(int i = 0; i < subs.length;i++)
+        {
+            this.subsamples[i] = d.subsetRows(subs[i]);
+        }
+
+
+    }
     public STEPS(DataSet dat,double [] lam,double g,int numSub,boolean loo)
     {
         leaveOneOut = loo;

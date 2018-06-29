@@ -147,7 +147,7 @@ public class realDataPriorTest {
         DataSet data = null;
 
 
-        System.out.print("Reading Subsamples...");
+        System.out.print("Reading samps...");
         data = MixedUtils.loadDataSet2("genes_with_clinical.txt");
         if(erPositive)
             data = MixedUtils.loadDataSet2("ER_Positive.txt");
@@ -162,15 +162,15 @@ public class realDataPriorTest {
         data = MixedUtils.completeCases(data);
 
         //System.out.println(data);
-        File f = new File("Subsamples");
+        File f = new File("samps");
         if(erPositive)
-            f = new File("ER_Positive_Subsamples");
+            f = new File("ER_Positive_samps");
         else if(erNegative)
-            f = new File("ER_Negative_Subsamples");
+            f = new File("ER_Negative_samps");
         else if(!tumors)
-            f = new File("Normal_Subsamples");
+            f = new File("Normal_samps");
         else if(type!=-1)
-            f = new File(types[type] + "_Subsamples");
+            f = new File(types[type] + "_samps");
         if(!f.exists())
             f.mkdir();
         int numSub = 20;
@@ -179,19 +179,18 @@ public class realDataPriorTest {
         if (b > data.getNumRows())
             b = data.getNumRows() / 2;
         int[][] samps = StabilityUtils.subSampleNoReplacement(data.getNumRows(), b, numSub);
-        DataSet [] subsamples = new DataSet[numSub];
         for(int i = 0; i< numSub;i++)
         {
-            //File temp = new File("Subsamples/Subsample_" + i + ".txt");
-            File temp = new File("Subsamples/Subsample_" + i + ".txt");
+            //File temp = new File("samps/Subsample_" + i + ".txt");
+            File temp = new File("samps/Subsample_" + i + ".txt");
             if(erPositive)
-                temp = new File("ER_Positive_Subsamples/ER_Positive_Subsample_" + i + ".txt");
+                temp = new File("ER_Positive_samps/ER_Positive_Subsample_" + i + ".txt");
             else if(erNegative)
-                temp = new File("ER_Negative_Subsamples/ER_Negative_Subsample_" + i + ".txt");
+                temp = new File("ER_Negative_samps/ER_Negative_Subsample_" + i + ".txt");
             else if(!tumors)
-                temp = new File("Normal_Subsamples/Normal_Subsample_" + i + ".txt");
+                temp = new File("Normal_samps/Normal_Subsample_" + i + ".txt");
             else if(type!=-1)
-                temp = new File(types[type] + "_Subsamples/" + types[type] + "_Subsample_" + i + ".txt");
+                temp = new File(types[type] + "_samps/" + types[type] + "_Subsample_" + i + ".txt");
             if(!temp.exists())
             {
                 DataSet tData = data.subsetRows(samps[i]);
@@ -199,23 +198,23 @@ public class realDataPriorTest {
                 out2.println(tData);
                 out2.flush();
                 out2.close();
-                subsamples[i] = tData;
+               // samps[i] = tData;
             }
             else
             {
-                subsamples[i] = MixedUtils.loadDataSet2(temp.getAbsolutePath());
+              //  samps[i] = MixedUtils.loadDataSet2(temp.getAbsolutePath());
             }
         }
 
         System.out.println("Done");
         //Test no Prior situation
         if(runNoPrior) {
-            STEPS s = new STEPS(data, lambda, g, subsamples);
+            STEPS s = new STEPS(data, lambda, g, samps);
             Graph graph = s.runStepsPar();
             double[][] stab = s.stabilities;
             //TODO Should parallelize this, but want to be safe because of the time crunch for the paper deadline
             System.out.println("Cross Validating");
-            CrossValidationSets cv = new CrossValidationSets(data,s.lastLambda,"Subsamples",".","Subtype",k,"No_Prior");
+            CrossValidationSets cv = new CrossValidationSets(data,s.lastLambda,"samps",".","Subtype",k,"No_Prior");
             cv.crossValidate();
             ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -263,7 +262,7 @@ public class realDataPriorTest {
                 System.out.println(priors[i].rows() + "," + priors[i].columns());
             }
             System.out.println("Constructing lambdas...");
-            mgmPriors m = new mgmPriors(subsamples.length,lambda,data,priors,subsamples);
+            mgmPriors m = new mgmPriors(samps.length,lambda,data,priors,samps);
             PrintStream lb = new PrintStream("Irrelevant_Lambdas.txt");
             for(int i = 0; i < m.getLambdas().length;i++)
             {
@@ -276,7 +275,7 @@ public class realDataPriorTest {
 
             //TODO SAME AS ABOVE SHOULD BE PARALLELIZED BUT TIME CRUNCH
             System.out.println("Cross Validating");
-            CrossValidationSets cv = new CrossValidationSets(data,m.lastNPLambda,m.lastWPLambda,"Subsamples",".","Subtype",m.lastHavePrior,k,"Irrelevant_Prior");
+            CrossValidationSets cv = new CrossValidationSets(data,m.lastNPLambda,m.lastWPLambda,"samps",".","Subtype",m.lastHavePrior,k,"Irrelevant_Prior");
             cv.crossValidate();
             //////////////////////////////////////////////////////////////
 
@@ -336,7 +335,7 @@ public class realDataPriorTest {
             TetradMatrix [] priors = new TetradMatrix[1];
             priors[0] = new TetradMatrix(loadPAM50(new File("prior_sources/Prior_PAM50.txt"),data.getNumColumns()));
 
-            mgmPriors m = new mgmPriors(subsamples.length,lambda,data,priors,subsamples);
+            mgmPriors m = new mgmPriors(samps.length,lambda,data,priors,samps);
             PrintStream lb;
             if(tumors)
                 lb = new PrintStream("Only_Relevant_Lambdas.txt");
@@ -354,7 +353,7 @@ public class realDataPriorTest {
 
             //TODO SAME AS ABOVE SHOULD BE PARALLELIZED BUT TIME CRUNCH
             System.out.println("Cross Validating...");
-            CrossValidationSets cv = new CrossValidationSets(data,m.lastNPLambda,m.lastWPLambda,"Subsamples",".","Subtype",m.lastHavePrior,k,"Only_Relevant_Prior");
+            CrossValidationSets cv = new CrossValidationSets(data,m.lastNPLambda,m.lastWPLambda,"samps",".","Subtype",m.lastHavePrior,k,"Only_Relevant_Prior");
             cv.crossValidate();
             System.out.println("Done");
             //////////////////////////////////////////////////////////////
@@ -423,7 +422,7 @@ public class realDataPriorTest {
             }
             priors[priors.length-1] = new TetradMatrix(loadPAM50(new File("prior_sources/Prior_PAM50.txt"),data.getNumColumns()));
 
-            mgmPriors m = new mgmPriors(subsamples.length,lambda,data,priors,subsamples);
+            mgmPriors m = new mgmPriors(samps.length,lambda,data,priors,samps);
             PrintStream lb;
             if(tumors)
                 lb = new PrintStream("Relevant_Lambdas.txt");
@@ -444,7 +443,7 @@ public class realDataPriorTest {
             String runName = "Relevant_Priors";
             if(doNumPriors)
                 runName ="Relevant_Prior_" + numPriors;
-            CrossValidationSets cv = new CrossValidationSets(data,m.lastNPLambda,m.lastWPLambda,"Subsamples",".","Subtype",m.lastHavePrior,k,runName);
+            CrossValidationSets cv = new CrossValidationSets(data,m.lastNPLambda,m.lastWPLambda,"samps",".","Subtype",m.lastHavePrior,k,runName);
             cv.crossValidate();
             System.out.println("Done");
             //////////////////////////////////////////////////////////////
@@ -552,7 +551,7 @@ public class realDataPriorTest {
             else {
 
                 System.out.print("Computing Lambda Range...");
-                mgmPriors m = new mgmPriors(subsamples.length, lambda, data, priors, subsamples);
+                mgmPriors m = new mgmPriors(samps.length, lambda, data, priors, samps);
                 System.out.println("Done");
                 PrintStream lb = new PrintStream("Pathway_Lambdas.txt");
                 if(erPositive)
