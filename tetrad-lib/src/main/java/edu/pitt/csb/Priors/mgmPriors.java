@@ -30,7 +30,6 @@ import java.util.concurrent.RecursiveAction;
 public class mgmPriors {
 
     //TODO NEED TO DEBUG EXCLUDING PRIORS
-    //TODO Add in sparse doublematrix2d instead of tetradmatrix for priors to save a ton of memory
     Random rand = new Random();
     private final double normalEpsilon = 0.5;
     private double gEpsilon;
@@ -41,7 +40,7 @@ public class mgmPriors {
     public double [] lastWPLambda;
     public boolean [][] lastHavePrior;
     private DataSet data;
-    private TetradMatrix[] priors;
+    private SparseDoubleMatrix2D[] priors;
     private boolean[][] havePriors; //did any source provide priors about edge i,j?
     private boolean[][][] sourcePrior; //did source k provide prior about edge i,j?
     private final int iterLimit = 100;
@@ -50,7 +49,7 @@ public class mgmPriors {
     public double oracleDD;
     public double oracleAll;
     public boolean splitLambdas = false;
-    private DataSet [] subsamples;
+    private int [][] subsamples;
     public Graph trueGraph;
     private PrintStream log;
     public TetradMatrix fullCounts;
@@ -67,7 +66,10 @@ public class mgmPriors {
     private int normalizationSamples = 20000;
     private boolean constructScores = false; //This makes piMGM run a stability analysis after selecting lambdas to get stability of each edge
     public double [][] edgeScores;
+    private boolean verbose= false;
 
+
+    public void setVerbose(){verbose = true;}
     public void setLog(boolean b)
     {
         logging = b;
@@ -87,9 +89,9 @@ public class mgmPriors {
             excludeUnreliablePriors = true;
             unreliableThreshold = threshold;
         }
-    public mgmPriors(int numSubsamples, double[] initLambdas, DataSet data, TetradMatrix[] priors) {
+    public mgmPriors(int numSubsamples, double[] initLambdas, DataSet data, SparseDoubleMatrix2D[] priors) {
         this.numSubsamples = numSubsamples;
-        this.subsamples=new DataSet[numSubsamples];
+        this.subsamples=new int[numSubsamples][];
         //TODO Add Generation of subsamples here
         this.pValues = new double[priors.length];
         this.lambdas = constructLambdasPar(initLambdas, data);
@@ -102,11 +104,11 @@ public class mgmPriors {
 
 
     //Used to reuse computes stabilities to just run pathway evaluation, no need to compute theta or anything
-    public mgmPriors(int numSubsamples, double [] initLambdas, TetradMatrix edgeCounts, TetradMatrix[] priors) {
+    public mgmPriors(int numSubsamples, double [] initLambdas, TetradMatrix edgeCounts, SparseDoubleMatrix2D[] priors) {
         this.pValues = new double[priors.length];
         this.numSubsamples = numSubsamples;
         //TODO Add Generation of subsamples here
-        subsamples = new DataSet[numSubsamples];
+        subsamples = new int[numSubsamples][];
         this.stability = edgeCounts;
         if(logging) {
             try {
@@ -126,8 +128,8 @@ public class mgmPriors {
         gEpsilon = 1 / (double) numSubsamples;
     }
 
-    public mgmPriors(int numSubsamples, double[] initLambdas, DataSet data, TetradMatrix[] priors,DataSet [] subsamples) {
-        this.subsamples = subsamples;
+    public mgmPriors(int numSubsamples, double[] initLambdas, DataSet data, SparseDoubleMatrix2D[] priors,int [][] subsamples) {
+        this.subsamples = new int[numSubsamples][];
         this.pValues = new double[priors.length];
         this.numSubsamples = numSubsamples;
         if(logging) {
@@ -147,7 +149,7 @@ public class mgmPriors {
     }
 
 
-    public mgmPriors(int numSubsamples, double[] initLambdas, DataSet data, TetradMatrix[] priors, Graph truth,boolean splitLambdas,DataSet [] subsamples) {
+    public mgmPriors(int numSubsamples, double[] initLambdas, DataSet data, SparseDoubleMatrix2D[] priors, Graph truth,boolean splitLambdas,int [][] subsamples) {
         this.subsamples = subsamples;
         this.pValues = new double[priors.length];
         this.splitLambdas = splitLambdas;
@@ -169,7 +171,7 @@ public class mgmPriors {
         gEpsilon = 1 / (double) numSubsamples;
     }
 
-    public mgmPriors(int numSubsamples, double[] initLambdas, DataSet data, TetradMatrix[] priors, Graph truth,boolean splitLambdas) {
+    public mgmPriors(int numSubsamples, double[] initLambdas, DataSet data, SparseDoubleMatrix2D[] priors, Graph truth,boolean splitLambdas) {
         this.splitLambdas = splitLambdas;
         this.numSubsamples = numSubsamples;
         this.pValues = new double[priors.length];
@@ -194,7 +196,7 @@ public class mgmPriors {
 
     public void evaluatePriors()
     {
-         TetradMatrix[] phi = new TetradMatrix[priors.length];
+         SparseDoubleMatrix2D[] phi = new SparseDoubleMatrix2D[priors.length];
         // TetradMatrix[] tao = new TetradMatrix[priors.length];
         double[] tao = new double[priors.length];
         double [] normalTao = new double[priors.length];
@@ -202,7 +204,7 @@ public class mgmPriors {
         double[] weights = new double[priors.length];
         for (int tr = 0; tr < priors.length; tr++) //for each source of prior information
         {
-            TetradMatrix currPrior = priors[tr];
+            SparseDoubleMatrix2D currPrior = priors[tr];
             phi[tr] = getPhi(currPrior);
             //How many times do we expect an edge to appear based on the prior, for a given lambda?
             //phi = prior value * numSubSamples
@@ -248,7 +250,7 @@ public class mgmPriors {
         //Across all lambda*subsamples graphs
         TetradMatrix variances = getVariances(counts); // variance of appearences of each edge
         //  System.out.println("Variances: " + variances);
-        TetradMatrix[] phi = new TetradMatrix[priors.length];
+        SparseDoubleMatrix2D[] phi = new SparseDoubleMatrix2D[priors.length];
         // TetradMatrix[] tao = new TetradMatrix[priors.length];
         double[] tao = new double[priors.length];
         double [] normalTao = new double[priors.length];
@@ -258,7 +260,7 @@ public class mgmPriors {
         int priorCount = 0;
         for (int tr = 0; tr < priors.length; tr++) //for each source of prior information
         {
-            TetradMatrix currPrior = priors[tr];
+            SparseDoubleMatrix2D currPrior = priors[tr];
             phi[tr] = getPhi(currPrior);
             //How many times do we expect an edge to appear based on the prior, for a given lambda?
             //phi = prior value * numSubSamples
@@ -289,7 +291,7 @@ public class mgmPriors {
                 priorCount++;
             }
         }
-        TetradMatrix [] priorsToKeep = new TetradMatrix[priorCount];
+        SparseDoubleMatrix2D [] priorsToKeep = new SparseDoubleMatrix2D[priorCount];
         if(!excludeUnreliablePriors && priorCount!=priors.length)
         {
             System.err.println("Mistake in establishing unreliable priors...Exiting");
@@ -487,7 +489,7 @@ public class mgmPriors {
                 if (to - from <= chunk) {
                     for (int s = from; s < to; s++) {
                         //temp is an int array with the samples for the current subsampling
-                        DataSet current = subsamples[s];
+                        DataSet current = data.subsetRows(subsamples[s]);
                         MGM_Priors m = new MGM_Priors(current,npLambdas,wpLambdas,havePriors);
                         m.learnEdges(iterLimit);
                         Graph g = m.graphFromMGM();
@@ -532,7 +534,7 @@ public class mgmPriors {
     }
 
 
-    private double getTao(TetradMatrix phi, TetradMatrix counts, int tr) {
+    private double getTao(SparseDoubleMatrix2D phi, TetradMatrix counts, int tr) {
         double tao = 0;
         int numPriors = 0;
         for (int i = 0; i < counts.rows(); i++) {
@@ -553,7 +555,7 @@ public class mgmPriors {
         double [] hist = new double[normalizationSamples];
        for(int i = 0; i < normalizationSamples;i++)
         {
-            TetradMatrix rand = generateRandomPrior(tr);
+            SparseDoubleMatrix2D rand = generateRandomPrior(tr);
             rand = getPhi(rand);
             double currTao = 0;
             int numEdges = 0;
@@ -634,7 +636,7 @@ public class mgmPriors {
         return result;
     }
     //Generates a random hard prior with the same number of entries as sourcePrior[][][k] (The kth expert)
-    private TetradMatrix generateRandomPrior(int k)
+    private SparseDoubleMatrix2D generateRandomPrior(int k)
     {
         ArrayList<Double>priorValues = new ArrayList<Double>();
         int count = 0;
@@ -649,7 +651,8 @@ public class mgmPriors {
             }
         }
 
-        TetradMatrix t = new TetradMatrix(priors[0].rows(),priors[0].rows());
+
+        SparseDoubleMatrix2D t = new SparseDoubleMatrix2D(priors[0].rows(),priors[0].rows());
         while(count >0)
         {
             int x = rand.nextInt(priors[0].rows());
@@ -845,7 +848,7 @@ public class mgmPriors {
         return temp;
     }
 
-    private TetradMatrix getVarMixture(double[] weights, double[] tao, TetradMatrix u_mixture, TetradMatrix[] phi) {
+    private TetradMatrix getVarMixture(double[] weights, double[] tao, TetradMatrix u_mixture, SparseDoubleMatrix2D[] phi) {
 
         TetradMatrix temp = new TetradMatrix(phi[0].rows(), phi[0].columns());
         for (int i = 0; i < temp.rows(); i++) {
@@ -862,7 +865,7 @@ public class mgmPriors {
         return temp;
     }
 
-    private TetradMatrix getMeanMixture(TetradMatrix[] phi, double[] weights) {
+    private TetradMatrix getMeanMixture(SparseDoubleMatrix2D[] phi, double[] weights) {
 
         TetradMatrix temp = new TetradMatrix(phi[0].rows(), phi[0].columns());
         for (int i = 0; i < temp.rows(); i++) {
@@ -895,10 +898,12 @@ public class mgmPriors {
 
 
 
-    private TetradMatrix getPhi(TetradMatrix priors) {
-        TetradMatrix temp = new TetradMatrix(priors.rows(), priors.columns());
+    private SparseDoubleMatrix2D getPhi(SparseDoubleMatrix2D priors) {
+        SparseDoubleMatrix2D temp = new SparseDoubleMatrix2D(priors.rows(), priors.columns());
         for (int i = 0; i < priors.rows(); i++) {
             for (int j = i + 1; j < priors.rows(); j++) {
+                if(priors.get(i,j)==0)
+                    continue;
                 temp.set(i, j, priors.get(i, j) * numSubsamples);
             }
         }
@@ -1019,13 +1024,15 @@ public class mgmPriors {
                         int j = s/lambdas[0].length;
                         int i = s%lambdas[0].length;
                         double [] lambda = {lambdas[0][i],lambdas[1][i],lambdas[2][i]};
+                        if(verbose)
                         System.out.println("Computing Edge Probability for run " + s + " out of " + numSubsamples*lambdas[0].length + ", Lambdas:" + Arrays.toString(lambda) + ", Subsample: " + j );
 
                         //temp is an int array with the samples for the current subsampling
-                        DataSet current = subsamples[j];
+                        DataSet current = data.subsetRows(subsamples[j]);
                         MGM m = new MGM(current,lambda);
                         m.learnEdges(iterLimit);
                         Graph g = m.graphFromMGM();
+                        if(verbose)
                         System.out.println("Completed Edge Probability for run " + s + " out of " + numSubsamples*lambdas[0].length + ", Lambdas:" + Arrays.toString(lambda) + ", Subsample: " + j );
 
 
@@ -1313,9 +1320,11 @@ public class mgmPriors {
                 if (to - from <= chunk) {
                     for (int s = from; s < to; s++) {
                         double[] lambda = {init[s], init[s], init[s]};
+                        if(verbose)
                         System.out.println("Running MGM " + s + " out of " + numLambdas + ", for lambda " + init[s]);
                         MGM m = new MGM(data, lambda);
                         m.learnEdges(iterLimit);
+                        if(verbose)
                         System.out.println("Completed MGM for Lambda: " + init[s]);
                         Graph curr = m.graphFromMGM();
 
@@ -1712,13 +1721,13 @@ catch(org.apache.commons.math3.linear.SingularMatrixException e)
         }
         return count;
     }
-    private boolean[][] findPrior(TetradMatrix [] pInf)
+    private boolean[][] findPrior(SparseDoubleMatrix2D [] pInf)
     {
         boolean [][] temp = new boolean[pInf[0].rows()][pInf[0].columns()];
         for(int i = 0; i < pInf.length;i++)
         {
 
-         TetradMatrix curr = pInf[i];
+         SparseDoubleMatrix2D curr = pInf[i];
 
             for(int j = 0; j < curr.rows();j++)
             {
