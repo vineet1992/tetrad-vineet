@@ -271,9 +271,10 @@ public class runPriors {
                 }
             }
 
+            subsamples = null;
             System.out.println("Done");
             System.out.print("Generating Lambda Params...");
-            mgmPriors m = new mgmPriors(ns,initLambdas,d,priors,samps);
+            mgmPriors m = new mgmPriors(ns,initLambdas,d,priors,samps,verbose);
             System.out.println("Done");
             if(makeScores) {
                 m.makeEdgeScores();
