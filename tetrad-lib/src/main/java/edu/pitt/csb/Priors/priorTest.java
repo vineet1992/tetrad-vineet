@@ -40,7 +40,7 @@ public class priorTest {
         int numEdges = 75;
         int sampleSize = 400;
         int numSubsamples = 10;
-        int numRuns = 1;
+        int numRuns = 5;
         int index = 0;
         int numCategories = 4;
         double gamma = 0.05;
@@ -282,10 +282,10 @@ public class priorTest {
             double [] reli = new double[numExperts];
            // System.out.println(c.getDataSet(0));
             boolean done = false;
-
+            c.setTrueGraph(moralize(c.getTrueGraph()));
             if(!foundPrior) {
                 System.out.println("Simulating priors");
-                c.setTrueGraph(moralize(c.getTrueGraph()));
+
                 //  priors = simulatePrior(c.getTrueGraph(), amountPrior, numExperts,priors,c.getDataSet(0));
                 if (reliable)
                     priors = simulatePriorDim(c.getTrueGraph(), amountPrior, numExperts, priors, c.getDataSet(0));
