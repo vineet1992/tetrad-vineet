@@ -1,5 +1,6 @@
 package edu.pitt.csb.Priors;
 
+import cern.colt.matrix.impl.SparseDoubleMatrix2D;
 import edu.cmu.tetrad.data.ContinuousVariable;
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.data.DiscreteVariable;
@@ -42,6 +43,7 @@ public class runPriors {
         double low = 0.05;
         double high = 0.95;
         boolean loocv = false;
+        boolean makeScores = false;
         int index = 0;
         List<String> toRemove = new ArrayList<String>();
         try {
@@ -91,6 +93,11 @@ public class runPriors {
                     loocv = true;
                     index++;
                 }
+                else if(args[index].equals("-makeScores"))
+                {
+                    makeScores = true;
+                    index++;
+                }
                 else if(args[index].equals("-v"))
                 {
                     verbose = true;
@@ -138,6 +145,7 @@ public class runPriors {
         {
             System.out.println("Removing Variables... " + toRemove);
         }
+        //System.out.println(toRemove);
         for(String s:toRemove)
         {
             d.removeColumn(d.getVariable(s));
@@ -188,7 +196,7 @@ public class runPriors {
             }
             HashMap<Integer,String> fileMap = new HashMap<Integer,String>();
             int numPriors = f.listFiles().length;
-            TetradMatrix [] priors = new TetradMatrix[numPriors];
+            SparseDoubleMatrix2D[] priors = new SparseDoubleMatrix2D[numPriors];
             for(int i = 0;i < f.listFiles().length;i++)
             {
                 fileMap.put(i,f.listFiles()[i].getName());
@@ -202,11 +210,11 @@ public class runPriors {
                 if(addedDummy)
                 {
                     addLines(new File(currFile));
-                    priors[i] = new TetradMatrix(realDataPriorTest.loadPrior(new File("temp_2.txt"),d.getNumColumns()));
+                    priors[i] = new SparseDoubleMatrix2D(realDataPriorTest.loadPrior(new File("temp_2.txt"),d.getNumColumns()));
                 }
                 else
                 {
-                    priors[i] = new TetradMatrix(realDataPriorTest.loadPrior(new File(currFile),d.getNumColumns()));
+                    priors[i] = new SparseDoubleMatrix2D(realDataPriorTest.loadPrior(new File(currFile),d.getNumColumns()));
                 }
             }
            /* if(verbose)
@@ -233,7 +241,7 @@ public class runPriors {
             int b = (int) Math.floor(10 * Math.sqrt(d.getNumRows()));
             if (b >= d.getNumRows())
                 b = d.getNumRows() / 2;
-            int [][] samps;
+            int [][] samps = new int[ns][];
             boolean done = false;
             int attempts = 10000;
             DataSet[] subsamples = new DataSet[ns];
@@ -265,13 +273,21 @@ public class runPriors {
 
             System.out.println("Done");
             System.out.print("Generating Lambda Params...");
-            mgmPriors m = new mgmPriors(ns,initLambdas,d,priors,subsamples);
+            mgmPriors m = new mgmPriors(ns,initLambdas,d,priors,samps);
             System.out.println("Done");
+            if(makeScores) {
+                m.makeEdgeScores();
+            }
             System.out.print("Running piMGM...");
             Graph g = m.runPriors();
             System.out.println("Done");
             System.out.print("Printing Results...");
             printAllResults(g,m,runName,fileMap);
+            if(makeScores)
+            {
+                double [][] scores = m.edgeScores;
+                printScores(scores,d,runName);
+            }
             System.out.println("Done");
         }
         catch(Exception e)
@@ -314,6 +330,26 @@ public class runPriors {
             }
         }
         return -1;
+    }
+
+    public static void printScores(double [][] scores, DataSet d, String runName) throws Exception
+    {
+        PrintStream out = new PrintStream(runName + "/Edge_Scores.txt");
+        for(int i = 0; i < d.getNumColumns();i++)
+        {
+            out.print(d.getVariable(i) + "\t");
+        }
+        for(int i = 0; i < scores.length;i++)
+        {
+            out.print(d.getVariable(i) + "\t");
+            for(int j = 0; j < scores[i].length;j++)
+            {
+                out.print(scores[i][j] + "\t");
+            }
+            out.println();
+        }
+        out.flush();
+        out.close();
     }
 
     public static void printAllResults(Graph g, mgmPriors m, String runName, HashMap<Integer,String> map) throws Exception
