@@ -39,7 +39,7 @@ public class priorTest {
         int numEdges = 75;
         int sampleSize = 400;
         int numSubsamples = 10;
-        int numRuns = 5;
+        int numRuns = 10;
         int index = 0;
         int numCategories = 4;
         double gamma = 0.05;
@@ -240,8 +240,9 @@ public class priorTest {
                 }
                 if(foundData) {
                     f = new File("Subsamples/Subsample_" + i + "_" + numVariables + "_" + sampleSize + ".txt");
-                    BufferedReader b2 =new BufferedReader(new FileReader(f));
+
                     if(f.exists()) {
+                        BufferedReader b2 =new BufferedReader(new FileReader(f));
                         for (int j = 0; j < numSubsamples; j++) {
                             String [] line = b2.readLine().split("\t");
                             subsamples[j] =new int[line.length];
@@ -432,11 +433,7 @@ public class priorTest {
                     done = true;
                 } catch (Exception e) {
                     e.printStackTrace();
-                    if(!reuseData) {
-                        removeMoral(c.getTrueGraph());
-                        c.simulate(p);
-                        moralize(c.getTrueGraph());
-                    }
+                   System.exit(-1);
                 }
             }
 
