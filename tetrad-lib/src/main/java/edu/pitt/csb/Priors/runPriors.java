@@ -1,9 +1,13 @@
 package edu.pitt.csb.Priors;
 
+import cern.colt.matrix.impl.SparseDoubleMatrix2D;
+import edu.cmu.tetrad.data.ContinuousVariable;
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.data.DiscreteVariable;
 import edu.cmu.tetrad.graph.Graph;
+import edu.cmu.tetrad.util.StatUtils;
 import edu.cmu.tetrad.util.TetradMatrix;
+import edu.pitt.csb.mgm.MGM;
 import edu.pitt.csb.mgm.MixedUtils;
 import edu.pitt.csb.stability.StabilityUtils;
 
@@ -11,10 +15,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.PrintStream;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 
 /**
  * This is a packaged .jar file to run MGM Priors. The jar is expecting an expression dataset
@@ -42,6 +43,7 @@ public class runPriors {
         double low = 0.05;
         double high = 0.95;
         boolean loocv = false;
+        boolean makeScores = false;
         int index = 0;
         List<String> toRemove = new ArrayList<String>();
         try {
@@ -91,6 +93,11 @@ public class runPriors {
                     loocv = true;
                     index++;
                 }
+                else if(args[index].equals("-makeScores"))
+                {
+                    makeScores = true;
+                    index++;
+                }
                 else if(args[index].equals("-v"))
                 {
                     verbose = true;
@@ -138,6 +145,7 @@ public class runPriors {
         {
             System.out.println("Removing Variables... " + toRemove);
         }
+        //System.out.println(toRemove);
         for(String s:toRemove)
         {
             d.removeColumn(d.getVariable(s));
@@ -147,7 +155,7 @@ public class runPriors {
         {
             System.out.print("Data is only continuous, adding a discrete variable...");
             Random rand = new Random();
-            DiscreteVariable temp= new DiscreteVariable("Dummy",3);
+            DiscreteVariable temp= new DiscreteVariable("Dummy",2);
             d.addVariable(temp);
             int column = d.getColumn(d.getVariable(temp.getName()));
             for(int i = 0; i < d.getNumRows();i++)
@@ -188,7 +196,7 @@ public class runPriors {
             }
             HashMap<Integer,String> fileMap = new HashMap<Integer,String>();
             int numPriors = f.listFiles().length;
-            TetradMatrix [] priors = new TetradMatrix[numPriors];
+            SparseDoubleMatrix2D[] priors = new SparseDoubleMatrix2D[numPriors];
             for(int i = 0;i < f.listFiles().length;i++)
             {
                 fileMap.put(i,f.listFiles()[i].getName());
@@ -202,11 +210,11 @@ public class runPriors {
                 if(addedDummy)
                 {
                     addLines(new File(currFile));
-                    priors[i] = new TetradMatrix(realDataPriorTest.loadPrior(new File("temp_2.txt"),d.getNumColumns()));
+                    priors[i] = new SparseDoubleMatrix2D(realDataPriorTest.loadPrior(new File("temp_2.txt"),d.getNumColumns()));
                 }
                 else
                 {
-                    priors[i] = new TetradMatrix(realDataPriorTest.loadPrior(new File(currFile),d.getNumColumns()));
+                    priors[i] = new SparseDoubleMatrix2D(realDataPriorTest.loadPrior(new File(currFile),d.getNumColumns()));
                 }
             }
            /* if(verbose)
@@ -233,23 +241,54 @@ public class runPriors {
             int b = (int) Math.floor(10 * Math.sqrt(d.getNumRows()));
             if (b >= d.getNumRows())
                 b = d.getNumRows() / 2;
-            int [][] samps;
-            if(loocv)
-                samps = StabilityUtils.generateSubsamples(d.getNumRows());
-            else
-                samps = StabilityUtils.subSampleNoReplacement(d.getNumRows(), b, ns);
+            int [][] samps = new int[ns][];
+            boolean done = false;
+            int attempts = 10000;
+            DataSet[] subsamples = new DataSet[ns];
+            System.out.print("Generating subsamples and ensuring variance...");
+            while(!done && attempts > 0) {
+                done = true;
+                if (loocv)
+                    samps = StabilityUtils.generateSubsamples(d.getNumRows());
+                else
+                    samps = StabilityUtils.subSampleNoReplacement(d.getNumRows(), b, ns);
 
+                for (int j = 0; j < ns; j++) {
+                    subsamples[j] = d.subsetRows(samps[j]);
+                    int col = checkForVariance(subsamples[j],d);
+                    if(col!=-1)
+                    {
+                        if(loocv)
+                        {
+                            System.out.println("Can't perform Leave-one-out Cross Validation...leaving out sample " + j + " makes " + d.getVariable(col) + " have no variance");
+                            System.exit(-1);
+                        }
+                        else {
+                            attempts--;
+                            done = false;
+                        }
+                    }
+                }
+            }
 
-
-            System.out.print("Generating Lambda Params...");
-            mgmPriors m = new mgmPriors(ns,initLambdas,d,priors,samps);
+            subsamples = null;
             System.out.println("Done");
+            System.out.print("Generating Lambda Params...");
+            mgmPriors m = new mgmPriors(ns,initLambdas,d,priors,samps,verbose);
+            System.out.println("Done");
+            if(makeScores) {
+                m.makeEdgeScores();
+            }
             System.out.print("Running piMGM...");
             Graph g = m.runPriors();
             System.out.println("Done");
-            System.out.println("Done");
             System.out.print("Printing Results...");
             printAllResults(g,m,runName,fileMap);
+            if(makeScores)
+            {
+                double [][] scores = m.edgeScores;
+                printScores(scores,d,runName);
+            }
             System.out.println("Done");
         }
         catch(Exception e)
@@ -261,6 +300,58 @@ public class runPriors {
 
     }
 
+
+    public static int checkForVariance(DataSet d, DataSet full)
+    {
+        TetradMatrix t = d.getDoubleData();
+        for(int i = 0; i < d.getNumColumns();i++)
+        {
+            if(d.getVariable(i)instanceof ContinuousVariable)
+            {
+                double [] curr = t.getColumn(i).toArray();
+                curr = StatUtils.standardizeData(curr);
+                double var = StatUtils.variance(curr);
+                if(var <= 0.000001)
+                    return i;
+
+            }
+            else
+            {
+                HashSet<Integer> cats = new HashSet<Integer>();
+                for(int j = 0; j < full.getNumRows();j++)
+                {
+                    cats.add(full.getInt(j,i));
+                }
+                for(int j = 0; j < d.getNumRows();j++)
+                {
+                    cats.remove(d.getInt(j,i));
+                }
+                if(!cats.isEmpty())
+                    return i;
+            }
+        }
+        return -1;
+    }
+
+    public static void printScores(double [][] scores, DataSet d, String runName) throws Exception
+    {
+        PrintStream out = new PrintStream(runName + "/Edge_Scores.txt");
+        for(int i = 0; i < d.getNumColumns();i++)
+        {
+            out.print(d.getVariable(i) + "\t");
+        }
+        for(int i = 0; i < scores.length;i++)
+        {
+            out.print(d.getVariable(i) + "\t");
+            for(int j = 0; j < scores[i].length;j++)
+            {
+                out.print(scores[i][j] + "\t");
+            }
+            out.println();
+        }
+        out.flush();
+        out.close();
+    }
 
     public static void printAllResults(Graph g, mgmPriors m, String runName, HashMap<Integer,String> map) throws Exception
     {
