@@ -92,7 +92,10 @@ public class mgmPriors {
     public mgmPriors(int numSubsamples, double[] initLambdas, DataSet data, SparseDoubleMatrix2D[] priors) {
         this.numSubsamples = numSubsamples;
         this.subsamples=new int[numSubsamples][];
-        //TODO Add Generation of subsamples here
+        int b = (int) Math.floor(10 * Math.sqrt(data.getNumRows()));
+        if (b >= data.getNumRows())
+            b = data.getNumRows() / 2;
+        subsamples = StabilityUtils.subSampleNoReplacement(data.getNumRows(),b,numSubsamples);
         this.pValues = new double[priors.length];
         this.lambdas = constructLambdasPar(initLambdas, data);
         this.data = data;
@@ -107,7 +110,6 @@ public class mgmPriors {
     public mgmPriors(int numSubsamples, double [] initLambdas, TetradMatrix edgeCounts, SparseDoubleMatrix2D[] priors) {
         this.pValues = new double[priors.length];
         this.numSubsamples = numSubsamples;
-        //TODO Add Generation of subsamples here
         subsamples = new int[numSubsamples][];
         this.stability = edgeCounts;
         if(logging) {
@@ -128,8 +130,30 @@ public class mgmPriors {
         gEpsilon = 1 / (double) numSubsamples;
     }
 
+
     public mgmPriors(int numSubsamples, double[] initLambdas, DataSet data, SparseDoubleMatrix2D[] priors,int [][] subsamples) {
-        this.subsamples = new int[numSubsamples][];
+        this.subsamples = subsamples;
+        this.verbose = verbose;
+        this.pValues = new double[priors.length];
+        this.numSubsamples = numSubsamples;
+        if(logging) {
+            try {
+                this.log = new PrintStream("log_file.txt");
+            } catch (Exception e) {
+            }
+        }
+        this.lambdas = constructLambdasPar(initLambdas, data);
+
+        this.data = data;
+        this.priors = priors;
+        this.sourcePrior = new boolean[data.getNumColumns()][data.getNumColumns()][priors.length];
+        havePriors = findPrior(priors);
+
+        gEpsilon = 1 / (double) numSubsamples;
+    }
+    public mgmPriors(int numSubsamples, double[] initLambdas, DataSet data, SparseDoubleMatrix2D[] priors,int [][] subsamples,boolean verbose) {
+        this.subsamples = subsamples;
+        this.verbose = verbose;
         this.pValues = new double[priors.length];
         this.numSubsamples = numSubsamples;
         if(logging) {
