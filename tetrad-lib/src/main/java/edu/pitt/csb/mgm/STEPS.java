@@ -39,7 +39,7 @@ public class STEPS {
     public double[] lastLambda;
     private boolean leaveOneOut = false;
     public double [][] stabilities = null;
-    private DataSet[] subsamples;
+    private int [][] subs;
     public STEPS(DataSet dat,double [] lam,double g,int numSub)
     {
         N = numSub;
@@ -60,7 +60,7 @@ public class STEPS {
         d = dat;
         this.b = b;
     }
-    public STEPS(DataSet dat,double [] lam,double g,DataSet[] subsamples)
+    public STEPS(DataSet dat,double [] lam,double g,int [][] subsamples)
     {
         gamma = g;
         lambda = lam;
@@ -68,7 +68,7 @@ public class STEPS {
         b = (int)Math.floor( 10*Math.sqrt(dat.getNumRows()));
         if (b > d.getNumRows())
             b = d.getNumRows()/2;
-        this.subsamples = subsamples;
+        this.subs = subsamples;
 
 
     }
@@ -119,10 +119,12 @@ public class STEPS {
         //  System.out.println("b:" + b);
         A:while(true) //go until we break by having instability better than threshold
         {
-              System.out.println("Lambda: " + lambda[currIndex]);
+            //System.out.println("Lambda: " + lambda[currIndex]);
             double [] lambdaCurr = {lambda[currIndex],lambda[currIndex],lambda[currIndex]};
             DoubleMatrix2D adjMat;
-            if(leaveOneOut)
+            if(subs!=null)
+                adjMat = StabilityUtils.StabilitySearchPar(d,new SearchWrappers.MGMWrapper(lambdaCurr),subs);
+            else if(leaveOneOut)
                 adjMat = StabilityUtils.StabilitySearchPar(d,new SearchWrappers.MGMWrapper(lambdaCurr));
             else
                 adjMat = StabilityUtils.StabilitySearchPar(d,new SearchWrappers.MGMWrapper(lambdaCurr),N,b);
@@ -165,6 +167,7 @@ public class STEPS {
                     }
                 }
             }
+            //System.out.println(adjMat);
             double allDestable = ccDestable + cdDestable + ddDestable;
             allDestable = allDestable/(numCC+numCD+numDD);
             if(allDestable <= gamma && oneLamb==-1)
@@ -904,8 +907,8 @@ System.out.println("Lambdas: " + Arrays.toString(lambda));
                System.out.println("Lambda: " + lambda[currIndex]);
                 double [] lambdaCurr = {lambda[currIndex],lambda[currIndex],lambda[currIndex]};
                 DoubleMatrix2D adjMat;
-                if(subsamples!=null)
-                    adjMat = StabilityUtils.StabilitySearchPar(d,new SearchWrappers.MGMWrapper(lambdaCurr),subsamples);
+                if(subs!=null)
+                    adjMat = StabilityUtils.StabilitySearchPar(d,new SearchWrappers.MGMWrapper(lambdaCurr),subs);
                 else if(leaveOneOut)
                     adjMat = StabilityUtils.StabilitySearchPar(d,new SearchWrappers.MGMWrapper(lambdaCurr));
                 else
@@ -927,9 +930,9 @@ System.out.println("Lambdas: " + Arrays.toString(lambda));
                 {
                     Node one;
                     Node two;
-                    if(subsamples!=null) {
-                        one = d.getVariable(subsamples[0].getVariable(j).getName());
-                        two = d.getVariable(subsamples[0].getVariable(k).getName());
+                    if(subs!=null) {
+                        one = d.getVariable(j);
+                        two = d.getVariable(k);
                     }
                     else
                     {
@@ -1023,8 +1026,8 @@ System.out.println("Lambdas: " + Arrays.toString(lambda));
         MGM m = new MGM(d,lambda);
         m.learnEdges(iterLimit);
         DoubleMatrix2D stabs;
-        if(subsamples!=null)
-            stabs = StabilityUtils.StabilitySearchPar(d,new SearchWrappers.MGMWrapper(lambda),subsamples);
+        if(subs!=null)
+            stabs = StabilityUtils.StabilitySearchPar(d,new SearchWrappers.MGMWrapper(lambda),subs);
         else if(leaveOneOut)
              stabs = StabilityUtils.StabilitySearchPar(d,new SearchWrappers.MGMWrapper(lambda));
         else

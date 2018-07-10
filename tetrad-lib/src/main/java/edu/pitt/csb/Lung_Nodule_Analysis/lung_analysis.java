@@ -85,13 +85,13 @@ public class lung_analysis {
             lambda[i] = .1+(.7/numLambdas)*i;
         }
         IndependenceTest ind  = new IndTestMultinomialAJ(d,alpha);
-        STEPS s = new STEPS(d,lambda,g,subsamples);
+        STEPS s = new STEPS(d,lambda,g,subs);
         Graph g2 = s.runStepsPar();
         double [][] stab = s.stabilities;
 
         double []params = {s.lastLambda[0],s.lastLambda[1],s.lastLambda[2],0.2};
         DataGraphSearch gs = new SearchWrappers.MFMWrapper(params);
-        DoubleMatrix2D db = StabilityUtils.StabilitySearchPar(d,gs,subsamples);
+        DoubleMatrix2D db = StabilityUtils.StabilitySearchPar(d,gs,subs);
         FciMaxP f = new FciMaxP(ind);
         f.setInitialGraph(g2);
         IKnowledge k2 = new Knowledge2();//Nothing will cause sex, education, age, and Lung Cancer won't cause anything else

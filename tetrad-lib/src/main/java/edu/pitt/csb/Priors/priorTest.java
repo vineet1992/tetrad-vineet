@@ -27,19 +27,19 @@ public class priorTest {
         boolean excludeUnreliable = false; //Should piMGM exclude priors below p-value threshold
         double reliabilityThreshold = 0.05; //piMGM will exclude priors with adjusted p-value < 0.05
         double amountPrior = .1;
-        boolean reliable = false; //Are all priors reliable?
+        boolean reliable = true; //Are all priors reliable?
         boolean diffNumPrior = true; //Does each prior provide with the same number of edges?
         boolean correctEdges = true; //Determines whether or not we will use correct edges only for unreliable priors as well or not
         boolean pureRandom = false; //Only for different number of edges given by each prior, this sets the priors to be purely random with reliability computed after the fact
-        boolean onlyPrior = false;
+        boolean onlyPrior = true;
         int reliableExperts = 5; //How many priors are reliable?
         int numExperts = 5;
         int numLambdas = 40;
-        int numVariables = 100;
+        int numVariables = 20;
         int numEdges = 75;
-        int sampleSize = 200;
+        int sampleSize = 400;
         int numSubsamples = 10;
-        int numRuns = 15;
+        int numRuns = 10;
         int index = 0;
         int numCategories = 4;
         double gamma = 0.05;
@@ -192,6 +192,8 @@ public class priorTest {
                 pri[i] = new PrintStream("Results/" + algs[i] + "_" + amountPrior + "_" + numExperts + "_" + numVariables + "_" + sampleSize + "_" + numSubsamples + ".txt");
         }
         A:for(int i = 0; i < numRuns; i++) {
+            boolean foundData = false;
+            boolean foundPriors = false;
             MixedLeeHastieSimulation c = new MixedLeeHastieSimulation();
             System.out.println(i);
             if(numEdgesRandom)
@@ -207,11 +209,10 @@ public class priorTest {
             p.setValue("numCategories",numCategories);
             c.simulate(p);
             TetradMatrix[] priors = new TetradMatrix[numExperts];
-            DataSet [] subsamples = new DataSet[numSubsamples];
+            int[][] subsamples = new int[numSubsamples][];
             if(reuseData)
             {
                 boolean foundFile = false;
-                boolean foundData = false;
                 File f = new File("Graphs/Graph_" + i + "_" + numVariables + ".txt");
                 if(f.exists()) {
                     foundFile = true;
@@ -232,15 +233,25 @@ public class priorTest {
                         else
                             f = new File("Priors/Priors_" + i + "_" + numVariables + "_" + amountPrior + "_" + reliableExperts + "_" + j + ".txt");
                         if (f.exists()) {
+                            foundPriors = true;
                             priors[j] = new TetradMatrix(loadPrior(f, numVariables));
                         }
                     }
                 }
                 if(foundData) {
-                    for (int j = 0; j < numSubsamples; j++) {
-                        f = new File("Subsamples/Subsample_" + i + "_" + numVariables + "_" + sampleSize + "_" + j + ".txt");
-                        if(f.exists())
-                            subsamples[j] = MixedUtils.loadDataSet2(f.getAbsolutePath());
+                    f = new File("Subsamples/Subsample_" + i + "_" + numVariables + "_" + sampleSize + ".txt");
+
+                    if(f.exists()) {
+                        BufferedReader b2 =new BufferedReader(new FileReader(f));
+                        for (int j = 0; j < numSubsamples; j++) {
+                            String [] line = b2.readLine().split("\t");
+                            subsamples[j] =new int[line.length];
+                            for(int k=0; k < line.length;k++)
+                            {
+                                subsamples[j][k] = Integer.parseInt(line[k]);
+                            }
+                        }
+                        b2.close();
                     }
                 }
 
@@ -269,22 +280,24 @@ public class priorTest {
            // System.out.println(c.getDataSet(0));
             c.setTrueGraph(moralize(c.getTrueGraph()));
            //  priors = simulatePrior(c.getTrueGraph(), amountPrior, numExperts,priors,c.getDataSet(0));
-            if(reliable)
-                priors = simulatePriorDim(c.getTrueGraph(), amountPrior, numExperts,priors,c.getDataSet(0));
-            else if(!reliable && diffNumPrior) {
-
-                priors = simulatePriorUnreli(c.getTrueGraph(), numExperts, c.getDataSet(0),edges,reli,pureRandom);
-            }
-          //  else if(reliable&&diffNumPrior)
-            //    priors = simulatePriorDim(c.getTrueGraph(),numExperts,priors,c.getDataSet(0)); TODO
-            else
-                priors = simulatePriorUnreli(c.getTrueGraph(),amountPrior,numExperts,c.getDataSet(0),reliableExperts,correctEdges);
             boolean done = false;
-            if (!diffNumPrior && correctEdges)
-                 checkPriors(c.getTrueGraph(),c.getDataSet(0),priors,i,true);
-            else
-                checkPriors(c.getTrueGraph(),c.getDataSet(0),priors,i,false);
+            if(!foundPriors) {
+                if (reliable)
+                    priors = simulatePriorDim(c.getTrueGraph(), amountPrior, numExperts, priors, c.getDataSet(0));
+                else if (!reliable && diffNumPrior) {
 
+                    priors = simulatePriorUnreli(c.getTrueGraph(), numExperts, c.getDataSet(0), edges, reli, pureRandom);
+                }
+                //  else if(reliable&&diffNumPrior)
+                //    priors = simulatePriorDim(c.getTrueGraph(),numExperts,priors,c.getDataSet(0)); TODO
+                else
+                    priors = simulatePriorUnreli(c.getTrueGraph(), amountPrior, numExperts, c.getDataSet(0), reliableExperts, correctEdges);
+
+                if (!diffNumPrior && correctEdges)
+                    checkPriors(c.getTrueGraph(), c.getDataSet(0), priors, i, true);
+                else
+                    checkPriors(c.getTrueGraph(), c.getDataSet(0), priors, i, false);
+            }
             while(!done)
             {
                 System.out.println(i);
@@ -302,22 +315,11 @@ public class priorTest {
                             foundSteps = true;
                     }
 
-                    boolean nullSub = false;
-                    for(int j = 0; j < subsamples.length;j++)
-                    {
-                        if(subsamples[j]==null)
-                        {
-                            nullSub = true;
-                        }
-                    }
-                    if(nullSub) {
+                    if(!foundData) {
                         int b = (int) Math.floor(10 * Math.sqrt(c.getDataSet(0).getNumRows()));
                         if (b > c.getDataSet(0).getNumRows())
                             b = c.getDataSet(0).getNumRows() / 2;
-                        int[][] samps = StabilityUtils.subSampleNoReplacement(c.getDataSet(0).getNumRows(), b, numSubsamples);
-                        for (int j = 0; j < subsamples.length; j++) {
-                            subsamples[j] = c.getDataSet(0).subsetRows(samps[j]);
-                        }
+                        subsamples= StabilityUtils.subSampleNoReplacement(c.getDataSet(0).getNumRows(), b, numSubsamples);
                     }
                     STEPS s = new STEPS(c.getDataSet(0), initLambdas, gamma, subsamples);
                     Graph steps = null;
@@ -325,6 +327,7 @@ public class priorTest {
                         steps = s.runStepsPar();
                     if(foundIt) {
                         m = new mgmPriors(numSubsamples, initLambdas, c.getDataSet(0), priors, c.getTrueGraph(),false,subsamples);
+                       m.setLog(true);
                         if(excludeUnreliable)
                             m.excludeUnreliablePriors(reliabilityThreshold);
                         mgmprior = m.runPriors();
@@ -430,11 +433,7 @@ public class priorTest {
                     done = true;
                 } catch (Exception e) {
                     e.printStackTrace();
-                    if(!reuseData) {
-                        removeMoral(c.getTrueGraph());
-                        c.simulate(p);
-                        moralize(c.getTrueGraph());
-                    }
+                   System.exit(-1);
                 }
             }
 
@@ -475,14 +474,21 @@ public class priorTest {
                     p2.close();
 
                 }
+                p2 = new PrintStream("Subsamples/Subsample_" + i + "_" + numVariables + "_" + sampleSize + ".txt");
                 for(int j = 0; j < subsamples.length;j++)
                 {
-                    p2 = new PrintStream("Subsamples/Subsample_" + i + "_" + numVariables + "_" + sampleSize + "_" + j + ".txt");
-                    p2.println(subsamples[j]);
-                    p2.flush();
-                    p2.close();
-                }
+                    for(int k = 0; k < subsamples[j].length;k++)
+                    {
+                        if(k==subsamples[j].length-1)
+                            p2.println(subsamples[j][k]);
+                        else
+                            p2.print(subsamples[j][k] + "\t");
 
+                    }
+
+                }
+                p2.flush();
+                p2.close();
 
                 }
 

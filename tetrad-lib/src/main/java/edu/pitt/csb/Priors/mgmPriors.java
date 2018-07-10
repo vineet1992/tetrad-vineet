@@ -1,7 +1,6 @@
 package edu.pitt.csb.Priors;
 
 import cern.colt.matrix.DoubleMatrix2D;
-import cern.colt.matrix.impl.SparseDoubleMatrix2D;
 import edu.cmu.tetrad.data.*;
 import edu.cmu.tetrad.graph.Edge;
 import edu.cmu.tetrad.graph.Graph;
@@ -30,7 +29,7 @@ import java.util.concurrent.RecursiveAction;
 public class mgmPriors {
 
     //TODO NEED TO DEBUG EXCLUDING PRIORS
-    //TODO Add in sparse doublematrix2d instead of tetradmatrix for priors to save a ton of memory
+
     Random rand = new Random();
     private final double normalEpsilon = 0.5;
     private double gEpsilon;
@@ -50,7 +49,7 @@ public class mgmPriors {
     public double oracleDD;
     public double oracleAll;
     public boolean splitLambdas = false;
-    private DataSet [] subsamples;
+    private int[][] subsamples;
     public Graph trueGraph;
     private PrintStream log;
     public TetradMatrix fullCounts;
@@ -65,14 +64,13 @@ public class mgmPriors {
     private boolean excludeUnreliablePriors = false;
     private double unreliableThreshold = 0.05;
     private int normalizationSamples = 20000;
-    private boolean constructScores = false; //This makes piMGM run a stability analysis after selecting lambdas to get stability of each edge
     public double [][] edgeScores;
 
     public void setLog(boolean b)
     {
         logging = b;
     }
-    public void makeEdgeScores(){constructScores=true;}
+
 
     //If this is set to true, the method will normalize by computing a null distribution for each size of prior
     public void setNormalize(boolean b)
@@ -89,7 +87,7 @@ public class mgmPriors {
         }
     public mgmPriors(int numSubsamples, double[] initLambdas, DataSet data, TetradMatrix[] priors) {
         this.numSubsamples = numSubsamples;
-        this.subsamples=new DataSet[numSubsamples];
+        this.subsamples=new int[numSubsamples][];
         //TODO Add Generation of subsamples here
         this.pValues = new double[priors.length];
         this.lambdas = constructLambdasPar(initLambdas, data);
@@ -106,7 +104,7 @@ public class mgmPriors {
         this.pValues = new double[priors.length];
         this.numSubsamples = numSubsamples;
         //TODO Add Generation of subsamples here
-        subsamples = new DataSet[numSubsamples];
+        subsamples = new int[numSubsamples][];
         this.stability = edgeCounts;
         if(logging) {
             try {
@@ -126,7 +124,7 @@ public class mgmPriors {
         gEpsilon = 1 / (double) numSubsamples;
     }
 
-    public mgmPriors(int numSubsamples, double[] initLambdas, DataSet data, TetradMatrix[] priors,DataSet [] subsamples) {
+    public mgmPriors(int numSubsamples, double[] initLambdas, DataSet data, TetradMatrix[] priors,int[][] subsamples) {
         this.subsamples = subsamples;
         this.pValues = new double[priors.length];
         this.numSubsamples = numSubsamples;
@@ -147,7 +145,7 @@ public class mgmPriors {
     }
 
 
-    public mgmPriors(int numSubsamples, double[] initLambdas, DataSet data, TetradMatrix[] priors, Graph truth,boolean splitLambdas,DataSet [] subsamples) {
+    public mgmPriors(int numSubsamples, double[] initLambdas, DataSet data, TetradMatrix[] priors, Graph truth,boolean splitLambdas,int[][] subsamples) {
         this.subsamples = subsamples;
         this.pValues = new double[priors.length];
         this.splitLambdas = splitLambdas;
@@ -232,6 +230,7 @@ public class mgmPriors {
     public Graph runPriors() {
         if(logging) {
             try {
+                log = new PrintStream("log_file.txt");
                 log.println("True Graph: " + trueGraph);
                 log.flush();
             } catch (Exception e) {
@@ -245,6 +244,12 @@ public class mgmPriors {
 
         TetradMatrix counts = getFullCounts(edgeCounts); // # of times each edge appeared
         this.fullCounts = counts;
+        if(logging)
+        {
+            log.println("Lambdas:" + Arrays.toString(lambdas[0]) + "\n" + Arrays.toString(lambdas[1]) + "\n" + Arrays.toString(lambdas[2]));
+            log.println("Edge Counts: " + counts);
+            log.flush();
+        }
         //Across all lambda*subsamples graphs
         TetradMatrix variances = getVariances(counts); // variance of appearences of each edge
         //  System.out.println("Variances: " + variances);
@@ -487,7 +492,7 @@ public class mgmPriors {
                 if (to - from <= chunk) {
                     for (int s = from; s < to; s++) {
                         //temp is an int array with the samples for the current subsampling
-                        DataSet current = subsamples[s];
+                        DataSet current = data.subsetRows(subsamples[s]);
                         MGM_Priors m = new MGM_Priors(current,npLambdas,wpLambdas,havePriors);
                         m.learnEdges(iterLimit);
                         Graph g = m.graphFromMGM();
@@ -1019,14 +1024,12 @@ public class mgmPriors {
                         int j = s/lambdas[0].length;
                         int i = s%lambdas[0].length;
                         double [] lambda = {lambdas[0][i],lambdas[1][i],lambdas[2][i]};
-                        System.out.println("Computing Edge Probability for run " + s + " out of " + numSubsamples*lambdas[0].length + ", Lambdas:" + Arrays.toString(lambda) + ", Subsample: " + j );
 
                         //temp is an int array with the samples for the current subsampling
-                        DataSet current = subsamples[j];
+                        DataSet current = data.subsetRows(subsamples[j]);
                         MGM m = new MGM(current,lambda);
                         m.learnEdges(iterLimit);
                         Graph g = m.graphFromMGM();
-                        System.out.println("Completed Edge Probability for run " + s + " out of " + numSubsamples*lambdas[0].length + ", Lambdas:" + Arrays.toString(lambda) + ", Subsample: " + j );
 
 
                         updateEdgeCounts(edgeCounts[i][j],g);

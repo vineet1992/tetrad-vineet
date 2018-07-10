@@ -1,12 +1,9 @@
 package edu.pitt.csb.Priors;
 
-import edu.cmu.tetrad.data.ContinuousVariable;
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.data.DiscreteVariable;
 import edu.cmu.tetrad.graph.Graph;
-import edu.cmu.tetrad.util.StatUtils;
 import edu.cmu.tetrad.util.TetradMatrix;
-import edu.pitt.csb.mgm.MGM;
 import edu.pitt.csb.mgm.MixedUtils;
 import edu.pitt.csb.stability.StabilityUtils;
 
@@ -14,7 +11,10 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.PrintStream;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Random;
 
 /**
  * This is a packaged .jar file to run MGM Priors. The jar is expecting an expression dataset
@@ -147,7 +147,7 @@ public class runPriors {
         {
             System.out.print("Data is only continuous, adding a discrete variable...");
             Random rand = new Random();
-            DiscreteVariable temp= new DiscreteVariable("Dummy",2);
+            DiscreteVariable temp= new DiscreteVariable("Dummy",3);
             d.addVariable(temp);
             int column = d.getColumn(d.getVariable(temp.getName()));
             for(int i = 0; i < d.getNumRows();i++)
@@ -234,41 +234,19 @@ public class runPriors {
             if (b >= d.getNumRows())
                 b = d.getNumRows() / 2;
             int [][] samps;
-            boolean done = false;
-            int attempts = 10000;
-            DataSet[] subsamples = new DataSet[ns];
-            System.out.print("Generating subsamples and ensuring variance...");
-            while(!done && attempts > 0) {
-                done = true;
-                if (loocv)
-                    samps = StabilityUtils.generateSubsamples(d.getNumRows());
-                else
-                    samps = StabilityUtils.subSampleNoReplacement(d.getNumRows(), b, ns);
+            if(loocv)
+                samps = StabilityUtils.generateSubsamples(d.getNumRows());
+            else
+                samps = StabilityUtils.subSampleNoReplacement(d.getNumRows(), b, ns);
 
-                for (int j = 0; j < ns; j++) {
-                    subsamples[j] = d.subsetRows(samps[j]);
-                    int col = checkForVariance(subsamples[j],d);
-                    if(col!=-1)
-                    {
-                        if(loocv)
-                        {
-                            System.out.println("Can't perform Leave-one-out Cross Validation...leaving out sample " + j + " makes " + d.getVariable(col) + " have no variance");
-                            System.exit(-1);
-                        }
-                        else {
-                            attempts--;
-                            done = false;
-                        }
-                    }
-                }
-            }
 
-            System.out.println("Done");
+
             System.out.print("Generating Lambda Params...");
-            mgmPriors m = new mgmPriors(ns,initLambdas,d,priors,subsamples);
+            mgmPriors m = new mgmPriors(ns,initLambdas,d,priors,samps);
             System.out.println("Done");
             System.out.print("Running piMGM...");
             Graph g = m.runPriors();
+            System.out.println("Done");
             System.out.println("Done");
             System.out.print("Printing Results...");
             printAllResults(g,m,runName,fileMap);
@@ -283,38 +261,6 @@ public class runPriors {
 
     }
 
-
-    public static int checkForVariance(DataSet d, DataSet full)
-    {
-        TetradMatrix t = d.getDoubleData();
-        for(int i = 0; i < d.getNumColumns();i++)
-        {
-            if(d.getVariable(i)instanceof ContinuousVariable)
-            {
-                double [] curr = t.getColumn(i).toArray();
-                curr = StatUtils.standardizeData(curr);
-                double var = StatUtils.variance(curr);
-                if(var <= 0.000001)
-                    return i;
-
-            }
-            else
-            {
-                HashSet<Integer> cats = new HashSet<Integer>();
-                for(int j = 0; j < full.getNumRows();j++)
-                {
-                    cats.add(full.getInt(j,i));
-                }
-                for(int j = 0; j < d.getNumRows();j++)
-                {
-                    cats.remove(d.getInt(j,i));
-                }
-                if(!cats.isEmpty())
-                    return i;
-            }
-        }
-        return -1;
-    }
 
     public static void printAllResults(Graph g, mgmPriors m, String runName, HashMap<Integer,String> map) throws Exception
     {
