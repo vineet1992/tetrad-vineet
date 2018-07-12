@@ -1,6 +1,7 @@
 package edu.pitt.csb.Priors;
 
 import cern.colt.matrix.DoubleMatrix2D;
+import cern.colt.matrix.impl.SparseDoubleMatrix2D;
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.GraphUtils;
@@ -147,7 +148,7 @@ public class realDataPriorTest {
         DataSet data = null;
 
 
-        System.out.print("Reading samps...");
+        System.out.print("Reading Subsamples...");
         data = MixedUtils.loadDataSet2("genes_with_clinical.txt");
         if(erPositive)
             data = MixedUtils.loadDataSet2("ER_Positive.txt");
@@ -162,15 +163,15 @@ public class realDataPriorTest {
         data = MixedUtils.completeCases(data);
 
         //System.out.println(data);
-        File f = new File("samps");
+        File f = new File("Subsamples");
         if(erPositive)
-            f = new File("ER_Positive_samps");
+            f = new File("ER_Positive_Subsamples");
         else if(erNegative)
-            f = new File("ER_Negative_samps");
+            f = new File("ER_Negative_Subsamples");
         else if(!tumors)
-            f = new File("Normal_samps");
+            f = new File("Normal_Subsamples");
         else if(type!=-1)
-            f = new File(types[type] + "_samps");
+            f = new File(types[type] + "_Subsamples");
         if(!f.exists())
             f.mkdir();
         int numSub = 20;
@@ -179,32 +180,41 @@ public class realDataPriorTest {
         if (b > data.getNumRows())
             b = data.getNumRows() / 2;
         int[][] samps = StabilityUtils.subSampleNoReplacement(data.getNumRows(), b, numSub);
-        for(int i = 0; i< numSub;i++)
-        {
-            //File temp = new File("samps/Subsample_" + i + ".txt");
-            File temp = new File("samps/Subsample_" + i + ".txt");
+            File temp = new File("Subsamples/Subsamples.txt");
             if(erPositive)
-                temp = new File("ER_Positive_samps/ER_Positive_Subsample_" + i + ".txt");
+                temp = new File("ER_Positive_Subsamples/ER_Positive_Subsamples.txt");
             else if(erNegative)
-                temp = new File("ER_Negative_samps/ER_Negative_Subsample_" + i + ".txt");
+                temp = new File("ER_Negative_Subsamples/ER_Negative_Subsamples.txt");
             else if(!tumors)
-                temp = new File("Normal_samps/Normal_Subsample_" + i + ".txt");
+                temp = new File("Normal_Subsamples/Normal_Subsamples.txt");
             else if(type!=-1)
-                temp = new File(types[type] + "_samps/" + types[type] + "_Subsample_" + i + ".txt");
+                temp = new File(types[type] + "_Subsamples/" + types[type] + "_Subsamples.txt");
             if(!temp.exists())
             {
-                DataSet tData = data.subsetRows(samps[i]);
                 PrintStream out2 = new PrintStream(temp.getAbsolutePath());
-                out2.println(tData);
+                for(int i = 0; i < samps.length;i++) {
+
+                    for (int j = 0; j < samps[i].length; j++) {
+                        if(j==samps[i].length-1)
+                            out2.println(samps[i][j]);
+                        else
+                            out2.print(samps[i][j] + "\t");
+                    }
+                }
                 out2.flush();
                 out2.close();
-               // samps[i] = tData;
             }
             else
             {
-              //  samps[i] = MixedUtils.loadDataSet2(temp.getAbsolutePath());
+                BufferedReader b2 = new BufferedReader(new FileReader(temp));
+                for(int j = 0; j < numSub;j++)
+                {
+                    String [] line = b2.readLine().split("\t");
+                    samps[j] = new int[line.length];
+                    for(int l = 0; l< line.length;l++)
+                        samps[j][l] = Integer.parseInt(line[l]);
+                }
             }
-        }
 
         System.out.println("Done");
         //Test no Prior situation
@@ -214,7 +224,7 @@ public class realDataPriorTest {
             double[][] stab = s.stabilities;
             //TODO Should parallelize this, but want to be safe because of the time crunch for the paper deadline
             System.out.println("Cross Validating");
-            CrossValidationSets cv = new CrossValidationSets(data,s.lastLambda,"samps",".","Subtype",k,"No_Prior");
+            CrossValidationSets cv = new CrossValidationSets(data,s.lastLambda,"Subsamples",".","Subtype",k,"No_Prior");
             cv.crossValidate();
             ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -255,10 +265,10 @@ public class realDataPriorTest {
         {
 
             numPriors = 5;
-            TetradMatrix [] priors = new TetradMatrix[numPriors];
+            SparseDoubleMatrix2D[] priors = new SparseDoubleMatrix2D[numPriors];
             for(int i = 0; i < numPriors;i++) {
                 //priors[i] = new TetradMatrix(loadPrior(new File("prior_sources/Irr_Prior_" + i + ".txt"),data.getNumColumns()));
-                priors[i] = new TetradMatrix(loadPAM50(new File("prior_sources/Irr_PAM50_" + i + ".txt"),data.getNumColumns()));
+                priors[i] = new SparseDoubleMatrix2D(loadPAM50(new File("prior_sources/Irr_PAM50_" + i + ".txt"),data.getNumColumns()));
                 System.out.println(priors[i].rows() + "," + priors[i].columns());
             }
             System.out.println("Constructing lambdas...");
@@ -275,7 +285,7 @@ public class realDataPriorTest {
 
             //TODO SAME AS ABOVE SHOULD BE PARALLELIZED BUT TIME CRUNCH
             System.out.println("Cross Validating");
-            CrossValidationSets cv = new CrossValidationSets(data,m.lastNPLambda,m.lastWPLambda,"samps",".","Subtype",m.lastHavePrior,k,"Irrelevant_Prior");
+            CrossValidationSets cv = new CrossValidationSets(data,m.lastNPLambda,m.lastWPLambda,"Subsamples",".","Subtype",m.lastHavePrior,k,"Irrelevant_Prior");
             cv.crossValidate();
             //////////////////////////////////////////////////////////////
 
@@ -332,8 +342,8 @@ public class realDataPriorTest {
 
         if(runOnlyRelevant)
         {
-            TetradMatrix [] priors = new TetradMatrix[1];
-            priors[0] = new TetradMatrix(loadPAM50(new File("prior_sources/Prior_PAM50.txt"),data.getNumColumns()));
+            SparseDoubleMatrix2D[] priors = new SparseDoubleMatrix2D[1];
+            priors[0] = new SparseDoubleMatrix2D(loadPAM50(new File("prior_sources/Prior_PAM50.txt"),data.getNumColumns()));
 
             mgmPriors m = new mgmPriors(samps.length,lambda,data,priors,samps);
             PrintStream lb;
@@ -353,7 +363,7 @@ public class realDataPriorTest {
 
             //TODO SAME AS ABOVE SHOULD BE PARALLELIZED BUT TIME CRUNCH
             System.out.println("Cross Validating...");
-            CrossValidationSets cv = new CrossValidationSets(data,m.lastNPLambda,m.lastWPLambda,"samps",".","Subtype",m.lastHavePrior,k,"Only_Relevant_Prior");
+            CrossValidationSets cv = new CrossValidationSets(data,m.lastNPLambda,m.lastWPLambda,"Subsamples",".","Subtype",m.lastHavePrior,k,"Only_Relevant_Prior");
             cv.crossValidate();
             System.out.println("Done");
             //////////////////////////////////////////////////////////////
@@ -415,12 +425,12 @@ public class realDataPriorTest {
 
             if(!doNumPriors)
                 numPriors = 5;
-            TetradMatrix [] priors = new TetradMatrix[numPriors+1];
+            SparseDoubleMatrix2D [] priors = new SparseDoubleMatrix2D[numPriors+1];
             for(int i = 0; i < numPriors;i++) {
-                priors[i] = new TetradMatrix(loadPAM50(new File("prior_sources/Irr_PAM50_" + i + ".txt"),data.getNumColumns()));
+                priors[i] = new SparseDoubleMatrix2D(loadPAM50(new File("prior_sources/Irr_PAM50_" + i + ".txt"),data.getNumColumns()));
 
             }
-            priors[priors.length-1] = new TetradMatrix(loadPAM50(new File("prior_sources/Prior_PAM50.txt"),data.getNumColumns()));
+            priors[priors.length-1] = new SparseDoubleMatrix2D(loadPAM50(new File("prior_sources/Prior_PAM50.txt"),data.getNumColumns()));
 
             mgmPriors m = new mgmPriors(samps.length,lambda,data,priors,samps);
             PrintStream lb;
@@ -443,7 +453,7 @@ public class realDataPriorTest {
             String runName = "Relevant_Priors";
             if(doNumPriors)
                 runName ="Relevant_Prior_" + numPriors;
-            CrossValidationSets cv = new CrossValidationSets(data,m.lastNPLambda,m.lastWPLambda,"samps",".","Subtype",m.lastHavePrior,k,runName);
+            CrossValidationSets cv = new CrossValidationSets(data,m.lastNPLambda,m.lastWPLambda,"Subsamples",".","Subtype",m.lastHavePrior,k,runName);
             cv.crossValidate();
             System.out.println("Done");
             //////////////////////////////////////////////////////////////
@@ -511,9 +521,9 @@ public class realDataPriorTest {
                 if(!stuff[i].getName().contains("PAM50"))
                     files.add(stuff[i]);
             }
-            TetradMatrix [] priors = new TetradMatrix[files.size()];
+           SparseDoubleMatrix2D [] priors = new SparseDoubleMatrix2D[files.size()];
             for(int i = 0; i < files.size();i++) {
-                priors[i] = new TetradMatrix(loadPrior(files.get(i),data.getNumColumns()));
+                priors[i] = new SparseDoubleMatrix2D(loadPrior(files.get(i),data.getNumColumns()));
             }
 
             System.out.println("Done");

@@ -301,7 +301,7 @@ public class runPriors {
     }
 
 
-    public static int checkForVariance(DataSet d, DataSet full)
+    public static synchronized int checkForVariance(DataSet d, DataSet full)
     {
         TetradMatrix t = d.getDoubleData();
         for(int i = 0; i < d.getNumColumns();i++)
