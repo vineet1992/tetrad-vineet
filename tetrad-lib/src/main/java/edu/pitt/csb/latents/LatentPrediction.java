@@ -1,6 +1,8 @@
 package edu.pitt.csb.latents;
 
 import cern.colt.matrix.DoubleMatrix2D;
+import cern.colt.matrix.impl.SparseDoubleMatrix2D;
+import edu.cmu.tetrad.data.ColtDataSet;
 import edu.cmu.tetrad.data.ContinuousVariable;
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.data.DiscreteVariable;
@@ -11,8 +13,10 @@ import edu.cmu.tetrad.search.IndependenceTest;
 import edu.cmu.tetrad.util.ForkJoinPoolInstance;
 import edu.pitt.csb.Pref_Div.Functions;
 import edu.pitt.csb.Pref_Div.Gene;
+import edu.pitt.csb.Priors.runPriors;
 import edu.pitt.csb.latents.mirnaPrediction;
 import edu.pitt.csb.mgm.*;
+import edu.pitt.csb.stability.CPSS;
 import edu.pitt.csb.stability.SearchWrappers;
 import edu.pitt.csb.stability.StabilityUtils;
 
@@ -53,7 +57,11 @@ public class LatentPrediction {
     private double useAlpha = -1;
     public Graph trueGraph;
     private int runNumber = 0;
-
+    private boolean runCPSS;
+    private double cpssAlpha = 0.05;
+    private double [] cpssLambda = {0.2,0.2,0.2};
+    private int B = 50;
+    private double bound;
     public LatentPrediction(DataSet d,int numSubSets, double tao, int numSubsamples)
     {
         data = d;
@@ -79,6 +87,8 @@ public class LatentPrediction {
 
     }
 
+
+    public void setCPSS(int B, double alpha, double [] lambda, double bound){runCPSS = true; this.bound = bound; this.B = B; this.cpssAlpha = alpha; this.cpssLambda = lambda; }
     public void setStarsGamma(double starsGamma)
     {
         starsG = starsGamma;
@@ -200,74 +210,77 @@ public class LatentPrediction {
         int b = (int)(10*Math.sqrt(d.getNumRows()));
         DoubleMatrix2D stabs;
         Graph gTotal = null;
+        if(runCPSS)
+        {
+            CPSS cp = new CPSS(data,cpssLambda,bound);
+            return cp.runCPSSLatent(algName,cpssAlpha);
+        }
+        else {
             if (algName.equals("FCI")) {
-                searchParams[0] = getStarsAlpha(d,Algorithm.FCI);
+                searchParams[0] = getStarsAlpha(d, Algorithm.FCI);
                 stabs = StabilityUtils.StabilitySearchParLatent(d, new SearchWrappers.FCIWrapper(searchParams), subs, orientations);
-                IndependenceTest i = new IndTestMultinomialAJ(d,searchParams[0]);
+                IndependenceTest i = new IndTestMultinomialAJ(d, searchParams[0]);
                 Fci f = new Fci(i);
                 gTotal = f.search();
-                ConcurrentHashMap<String,String>tempOr = f.whyOrient;
+                ConcurrentHashMap<String, String> tempOr = f.whyOrient;
                 addToOrient(tempOr);
 
-            }
-            else if (algName.equals("MGM-FCI")) {
-                double [] temp = getStepsLambda(d);
+            } else if (algName.equals("MGM-FCI")) {
+                double[] temp = getStepsLambda(d);
                 searchParams[0] = temp[0];
                 searchParams[1] = temp[1];
                 searchParams[2] = temp[2];
-                searchParams[3] = getStarsAlpha(d,Algorithm.MGMFCI,temp);
-                stabs = StabilityUtils.StabilitySearchParLatent(d, new SearchWrappers.MGMFCIWrapper(searchParams),subs,orientations);
-                MGM m = new MGM(data,temp);
+                searchParams[3] = getStarsAlpha(d, Algorithm.MGMFCI, temp);
+                stabs = StabilityUtils.StabilitySearchParLatent(d, new SearchWrappers.MGMFCIWrapper(searchParams), subs, orientations);
+                MGM m = new MGM(data, temp);
                 m.learnEdges(1000);
-                IndependenceTest i = new IndTestMultinomialAJ(data,searchParams[3]);
+                IndependenceTest i = new IndTestMultinomialAJ(data, searchParams[3]);
                 Fci f = new Fci(i);
                 f.setInitialGraph(m.graphFromMGM());
                 gTotal = f.search();
-                ConcurrentHashMap<String,String>tempOr = f.whyOrient;
+                ConcurrentHashMap<String, String> tempOr = f.whyOrient;
                 addToOrient(tempOr);
-            }
-            else if (algName.equals("MGM-FCI-MAX")) {
+            } else if (algName.equals("MGM-FCI-MAX")) {
                 System.out.println("Computing Optimal Lambda");
-                double [] temp = getStepsLambda(d);
+                double[] temp = getStepsLambda(d);
                 System.out.println("Lambda: " + Arrays.toString(temp));
 
                 searchParams[0] = temp[0];
                 searchParams[1] = temp[1];
                 searchParams[2] = temp[2];
                 System.out.println("Computing Optimal Alpha...");
-                searchParams[3] = getStarsAlpha(d,Algorithm.MGMFCIMAX,temp);
+                searchParams[3] = getStarsAlpha(d, Algorithm.MGMFCIMAX, temp);
                 System.out.println("Alpha: " + searchParams[3]);
                 System.out.println("Computing Stable Edges...");
-                stabs = StabilityUtils.StabilitySearchParLatent(d,new SearchWrappers.MFMWrapper(searchParams),subs,orientations);
-                MGM m = new MGM(d,temp);
+                stabs = StabilityUtils.StabilitySearchParLatent(d, new SearchWrappers.MFMWrapper(searchParams), subs, orientations);
+                MGM m = new MGM(d, temp);
                 m.learnEdges(1000);
-                IndependenceTest i = new IndTestMultinomialAJ(d,searchParams[3]);
+                IndependenceTest i = new IndTestMultinomialAJ(d, searchParams[3]);
                 FciMaxP f = new FciMaxP(i);
                 f.setInitialGraph(m.graphFromMGM());
                 gTotal = f.search();
-                ConcurrentHashMap<String,String>tempOr = (ConcurrentHashMap<String,String>)f.whyOrient;
+                ConcurrentHashMap<String, String> tempOr = (ConcurrentHashMap<String, String>) f.whyOrient;
                 addToOrient(tempOr);
 
             } else {
                 throw new Exception("Unrecognized Algorithm");
             }
-        System.out.println("Graph for latent algorithm: " + gTotal);
+            System.out.println("Graph for latent algorithm: " + gTotal);
             for (int i = 0; i < stabs.rows(); i++) {
                 for (int j = i + 1; j < stabs.columns(); j++) {
-                    if(d.getVariable(i) instanceof DiscreteVariable || d.getVariable(j) instanceof DiscreteVariable)
+                    if (d.getVariable(i) instanceof DiscreteVariable || d.getVariable(j) instanceof DiscreteVariable)
                         continue;
                     Edge e = gTotal.getEdge(gTotal.getNode(d.getVariable(i).getName()), gTotal.getNode(d.getVariable(j).getName()));
                     if (e != null && e.getEndpoint1() == Endpoint.ARROW && e.getEndpoint2() == Endpoint.ARROW) {
                         if (stabs.get(i, j) > tao) {
                             result.add(new Pair(d.getVariable(i), d.getVariable(j), stabs.get(i, j)));
                         }
-                    }
-                    else if(!requireFullEdge && stabs.get(i,j)>tao)
-                    {
-                        result.add(new Pair(d.getVariable(i),d.getVariable(j),stabs.get(i,j)));
+                    } else if (!requireFullEdge && stabs.get(i, j) > tao) {
+                        result.add(new Pair(d.getVariable(i), d.getVariable(j), stabs.get(i, j)));
                     }
                 }
             }
+        }
         System.out.println("List of latents for latent algorithm: " + result);
         return result;
     }
