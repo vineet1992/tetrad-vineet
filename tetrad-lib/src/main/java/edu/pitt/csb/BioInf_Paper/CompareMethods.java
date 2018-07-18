@@ -11,6 +11,7 @@ import edu.pitt.csb.mgm.MGM;
 import edu.pitt.csb.mgm.MixedUtils;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.PrintStream;
 
 /**
@@ -21,17 +22,22 @@ public class CompareMethods {
     {
         boolean justGenerate = false;
         //int numRuns = 50;
-        int numRuns = 2;
+        int numRuns = 50;
         int [] numVariables = {50,200};
         int [] numSamples = {500,100};
         int numCats = 3;
         int maxDegree = 10;
         int avgDegree = 2;
+        String [] algs = {"MGMPCS","MGMCPCS"};
         //String [] algs = {"CPCS","CPSS","PCS","CG","MGMPCS","MGMCPCS"};
-        String [] algs = {"CPSS"};
+        //String [] algs = {"CPCS","CPSS","PCS","CG","MGMPCS","MGMCPCS","Copula"};
+        //String [] algs = {"Copula"};
+        //String [] algs = {"CPSS"};
         String [] types = {"CC","CD","DD","All"};
         double [] alphas = {0.001,0.01,0.05,0.1};
-        double [] lambdas = {0.2,0.28,0.4,0.57,0.8};
+        //double [] lambdas = {0.2,0.28,0.4,0.57,0.8};
+        double [] lambdas = {0.05,0.071,0.1,0.14,0.2};
+        boolean reload = false;
         for(int i = 0; i < 1;i++)
         {
             int numMeasures = numVariables[i];
@@ -75,8 +81,12 @@ public class CompareMethods {
             PrintStream [] result = new PrintStream[algs.length];
             if(!justGenerate) {
                 for (int x = 0; x < algs.length; x++) {
-                    result[x] = new PrintStream(directory + "/Results/" + algs[x] + ".txt");
-                    result[x].println("Alpha\tLambda\tType\tRun\tAP\tAR\tAHP\tAHR\tSHD\tTime");
+                    if(reload)
+                        result[x] = new PrintStream(new FileOutputStream(directory + "/Results/"  + algs[x] + ".txt",true));
+                    else {
+                        result[x] = new PrintStream(directory + "/Results/" + algs[x] + ".txt");
+                        result[x].println("Alpha\tLambda\tType\tRun\tAP\tAR\tAHP\tAHR\tSHD\tTime");
+                    }
                     result[x].flush();
                 }
             }
@@ -101,7 +111,7 @@ public class CompareMethods {
                     PcStable pcs = new PcStable(itd);
                     System.out.println("Converting to pattern");
                     truePattern = pcs.search();
-                    //Graph truePattern = dtp.convert();
+                    //truePattern = dtp.convert();
                     data = m.getDataSet(0);
                     System.out.println("Done");
                     //Save everything
@@ -120,27 +130,31 @@ public class CompareMethods {
                 }
                 if(justGenerate)
                     continue RUN;
-
                 //Run each algorithm on the data and save the output to Estimated folder
                 for(int k = 0; k < algs.length;k++)
                 {
                     A:for(int a = 0; a < alphas.length;a++)
                     {
-                        IndependenceTest ind = new IndTestMultinomialAJ(data,alphas[a]);
+                        IndependenceTest ind = new IndTestMultinomialAJ(data,alphas[a],true);
                         for(int b = 0; b < lambdas.length;b++)
                         {
-                            System.out.print("Running " + algs[k] + " with alpha " + alphas[a] + " and lambda " + lambdas[b] + " ...");
+                            System.out.print("Running " + algs[k] + " with alpha " + alphas[a] + " and lambda " + lambdas[b] + " for run " + j + "...");
                             Graph est = null;
                             double [] lambda = {lambdas[b],lambdas[b],lambdas[b]};
                             long time = System.nanoTime();
-                            if(algs[k]=="CPCS")
+                            File tempGraph = new File(directory + "/Estimated_Graphs/" + algs[k] + "_" + alphas[a] + "_" + lambdas[b] + "_" + j + ".txt");
+                            if(tempGraph.exists() && reload)
+                            {
+                                est = GraphUtils.loadGraphTxt(tempGraph);
+                            }
+                            else if(algs[k].equals("CPCS"))
                             {
                                 if(b!=0)
                                     continue A;
                                 CpcStable cp = new CpcStable(ind);
                                 est = cp.search();
                             }
-                            if(algs[k]=="CPSS")
+                            else if(algs[k].equals("CPSS"))
                             {
                                 if(b!=0)
                                     continue A;
@@ -153,17 +167,25 @@ public class CompareMethods {
                                 Graph init = cp.runCPSSPar();
                                 IndependenceTest cpssTest = new IndTestMultinomialAJ(data,alp);
                                 CpcStable cpc = new CpcStable(cpssTest);
-                                cpc.setInitialGraph(init);
+                                if(init.getNumEdges()>0)
+                                    cpc.setInitialGraph(init);
                                 est = cpc.search();
                             }
-                            if(algs[k]=="PCS")
+                            else if(algs[k].equals("Copula"))
+                            {
+                                //REMEMBER COPULA CAN'T RUN WITH P > N
+                                if(b!=0)
+                                    continue A;
+                                est = GraphUtils.loadGraphTxt(new File(directory + "/Estimated_Graphs/" + algs[k] + "_" + alphas[a] + "_" + lambdas[b] + "_" + j + ".txt"));
+                            }
+                            else if(algs[k].equals("PCS"))
                             {
                                 if(b!=0)
                                     continue A;
                                 PcStable cp = new PcStable(ind);
                                 est = cp.search();
                             }
-                            if(algs[k]=="CG")
+                            else if(algs[k].equals("CG"))
                             {
                                 if(b!=0)
                                     continue A;
@@ -171,7 +193,7 @@ public class CompareMethods {
                                 PcStable cp = new PcStable(cg);
                                 est = cp.search();
                             }
-                            if(algs[k]=="MGMPCS")
+                            else if(algs[k].equals("MGMPCS"))
                             {
                                 MGM mgm = new MGM(data,lambda);
                                 mgm.learnEdges(1000);
@@ -180,7 +202,7 @@ public class CompareMethods {
                                 cp.setInitialGraph(temp);
                                 est = cp.search();
                             }
-                            if(algs[k]=="MGMCPCS")
+                            else if(algs[k].equals("MGMCPCS"))
                             {
                                 MGM mgm = new MGM(data,lambda);
                                 mgm.learnEdges(1000);
@@ -190,20 +212,24 @@ public class CompareMethods {
                                 est = cp.search();
                             }
                             time = System.nanoTime()-time;
-                            PrintStream temp = new PrintStream(directory + "/Estimated_Graphs/" + algs[k] + "_" + alphas[a] + "_" + lambdas[b] + "_" + j + ".txt");
-                            temp.println(est);
-                            temp.flush();
-                            temp.close();
-                            int [][] stats = MixedUtils.allEdgeStatsBioInf(truePattern,est);
+                            if(!(tempGraph.exists() && reload)) {
+                                PrintStream temp = new PrintStream(directory + "/Estimated_Graphs/" + algs[k] + "_" + alphas[a] + "_" + lambdas[b] + "_" + j + ".txt");
+                                temp.println(est);
+                                temp.flush();
+                                temp.close();
 
 
-                            //Compute ap, ar, ahp, ahr, shd for each edge type, and time
+                                int[][] stats = MixedUtils.allEdgeStatsBioInf(truePattern, est,data);
 
-                            //Print out to file each line (for each edge type)
-                            for(int t = 0; t < types.length;t++) {
-                                result[k].println(alphas[a] + "\t" + lambdas[b] + "\t" + types[t] + "\t" + j + "\t" + (stats[t][0]/(double)(stats[t][0]+stats[t][1])) + "\t" + (stats[t][0]/(double)(stats[t][0]+stats[t][2])) + "\t" + (stats[t][3]/(double)(stats[t][3]+stats[t][4])) + "\t" + (stats[t][3]/(double)(stats[t][3]+stats[t][5])) + "\t" + stats[t][6] + "\t" + time/Math.pow(10,9) );
+
+                                //Compute ap, ar, ahp, ahr, shd for each edge type, and time
+
+                                //Print out to file each line (for each edge type)
+                                for (int t = 0; t < types.length; t++) {
+                                    result[k].println(alphas[a] + "\t" + lambdas[b] + "\t" + types[t] + "\t" + j + "\t" + (stats[t][0] / (double) (stats[t][0] + stats[t][1])) + "\t" + (stats[t][0] / (double) (stats[t][0] + stats[t][2])) + "\t" + (stats[t][3] / (double) (stats[t][3] + stats[t][4])) + "\t" + (stats[t][3] / (double) (stats[t][3] + stats[t][5])) + "\t" + stats[t][6] + "\t" + time / Math.pow(10, 9));
+                                }
+                                result[k].flush();
                             }
-                            result[k].flush();
                             System.out.println("Done");
                         }
                     }

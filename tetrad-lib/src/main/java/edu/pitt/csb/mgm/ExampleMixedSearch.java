@@ -157,7 +157,6 @@ public class ExampleMixedSearch {
                         else
                             usePcs = true;
                     }
-
                 }
 
             }

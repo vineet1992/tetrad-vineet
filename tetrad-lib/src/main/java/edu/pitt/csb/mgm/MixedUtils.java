@@ -762,13 +762,13 @@ public class MixedUtils {
         return allEdgeStats(pT, pE, nd);
     }
 
-    public static int [][] allEdgeStatsBioInf(Graph pT, Graph pE)
+    public static int [][] allEdgeStatsBioInf(Graph pT, Graph pE,DataSet data)
     {
         HashMap<String, String> nd = new HashMap<String, String>();
 
         //Estimated graph more likely to have correct node types...
         for(Node n : pE.getNodes()){
-            if(n instanceof DiscreteVariable){
+            if(data.getVariable(n.getName()) instanceof DiscreteVariable){
                 nd.put(n.getName(), "Disc");
             } else {
                 nd.put(n.getName(), "Norm");

@@ -1,6 +1,7 @@
 package edu.pitt.csb.BioInf_Paper;
 
 import cern.colt.matrix.DoubleMatrix2D;
+import cern.colt.matrix.impl.DenseDoubleMatrix2D;
 import cern.colt.matrix.impl.SparseDoubleMatrix2D;
 import cern.jet.math.Functions;
 import edu.cmu.tetrad.data.ColtDataSet;
@@ -59,6 +60,7 @@ public class CPSS {
     public Graph runCPSSPar()
     {
         final ArrayList<Integer>inds  = new ArrayList<Integer>();
+        final ArrayList<Graph> graphs = new ArrayList<Graph>();
         for(int i = 0; i < data.getNumRows();i++)
         {
             inds.add(i);
@@ -82,7 +84,7 @@ public class CPSS {
                 this.to = to;
             }
 
-            //could avoid using syncronized if we keep track of array of mats and add at end, but that needs lots of
+            //could avoid using synchronized if we keep track of array of mats and add at end, but that needs lots of
             //memory
 
             private synchronized ArrayList<Integer> createTemp(ArrayList<Integer> inds) {
@@ -91,14 +93,26 @@ public class CPSS {
                 return temp;
             }
 
+            private synchronized void addToGraphs(Graph g){graphs.add(g);}
             private synchronized void addToMat(Graph g, DataSet data, DoubleMatrix2D edgeCounts)
             {
                 for(Edge e:g.getEdges())
                 {
                     int x = data.getColumn(data.getVariable(e.getNode1().getName()));
                     int y = data.getColumn(data.getVariable(e.getNode2().getName()));
-                    edgeCounts.set(x,y,edgeCounts.get(x,y)+1);
-                    edgeCounts.set(y,x,edgeCounts.get(y,x)+1);
+                    try {
+                        edgeCounts.set(x, y, edgeCounts.get(x, y) + 1);
+                        edgeCounts.set(y, x, edgeCounts.get(y, x) + 1);
+                    }
+                    catch(Exception e2)
+                    {
+                        System.out.println(e + "\t" + data + "\t" + g);
+                        System.out.println(x + "\t" + y);
+                        System.out.println(data.getVariable(e.getNode1().getName()));
+                        System.out.println(data.getVariable(e.getNode2().getName()));
+                        e2.printStackTrace();
+                        System.exit(-1);
+                    }
                 }
             }
 
@@ -138,12 +152,14 @@ public class CPSS {
                         m.learnEdges(1000);
                         Graph g = m.graphFromMGM();
                         totalVars[s]+=g.getNumEdges();
-                        addToMat(g,data,edgeCounts);
+                       //addToMat(g,data,edgeCounts);
+                        addToGraphs(g);
                         m = new MGM(data2,lambda);
                         m.learnEdges(1000);
                         g = m.graphFromMGM();
+                        addToGraphs(g);
                         totalVars[s]+=g.getNumEdges();
-                        addToMat(g,data,edgeCounts);
+                        //addToMat(g,data,edgeCounts);
                     }
 
                     return;
@@ -170,6 +186,17 @@ public class CPSS {
         for(int i = 0; i < totalVars.length;i++)
         {
             sum+=totalVars[i];
+        }
+        for(int i = 0 ; i< graphs.size();i++)
+        {
+            Graph curr = graphs.get(i);
+            for(Edge e: curr.getEdges())
+            {
+                int x = data.getColumn(data.getVariable(e.getNode1().getName()));
+                int y = data.getColumn(data.getVariable(e.getNode2().getName()));
+                edgeCounts.set(x, y, edgeCounts.get(x, y) + 1);
+                edgeCounts.set(y, x, edgeCounts.get(y, x) + 1);
+            }
         }
         System.out.println("Done");
         double avgVars = sum/(double)(B*2);

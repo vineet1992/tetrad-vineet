@@ -24,7 +24,7 @@ public class runSteps {
         String stabilityFile = "";
         String graphFile = "";
         int ns = 20;
-        double g = 0.03;
+        double g = 0.01;
         int numLambdas = 40;
         double lambdaLow = 0.05;
         double lambdaHigh = 0.95;
@@ -110,6 +110,10 @@ public class runSteps {
         if(graphFile.equals(""))
             graphFile = "Graph_" + file;
 
+        for(String s: varsToRemove)
+        {
+            d.removeColumn(d.getVariable(s));
+        }
         System.out.println(d);
         STEPS s = new STEPS(d,lambda,g,d.getNumRows(),LOO);
         Graph g2 = s.runStepsPar();
