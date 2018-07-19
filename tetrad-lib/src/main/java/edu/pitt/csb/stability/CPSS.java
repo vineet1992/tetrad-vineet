@@ -41,6 +41,7 @@ public class CPSS {
     private int boundIndex;
     private DataSet data;
     private double [] lambda; //Array of lambda values for MGM
+    private int [][] subs;
 
 
     public CPSS(DataSet data, double [] lambda, double bound)
@@ -59,16 +60,62 @@ public class CPSS {
         this.p = data.getNumColumns()*(data.getNumColumns()-1)/2;
     }
 
+    public CPSS(DataSet data, double [] lambda, double bound, int [][]subs)
+    {
+        this.data = data;
+        this.lambda = lambda;
+        this.bound = bound;
+        if(bound<=0.001)
+            boundIndex=0;
+        else if(bound<=0.01)
+            boundIndex=1;
+        else if(bound <=0.05)
+            boundIndex=2;
+        else
+            boundIndex = 3;
+        this.p = data.getNumColumns()*(data.getNumColumns()-1)/2;
+        this.subs = subs;
+    }
+
+    public static int[][] createSubs(DataSet data, int B)
+    {
+        ArrayList<Integer>tempInds  = new ArrayList<Integer>();
+        for(int i = 0; i < data.getNumRows();i++)
+            tempInds.add(i);
+        int [][] subs = new int[B*2][];
+        for(int i = 0; i < B;i++)
+        {
+            Collections.shuffle(tempInds);
+            int[] d1 = new int[tempInds.size() / 2];
+            for (int j = 0; j < d1.length; j++) {
+                d1[j] = tempInds.get(j);
+            }
+            int size2 = tempInds.size() / 2;
+            if (tempInds.size() % 2 == 1)
+                size2 = tempInds.size() / 2 + 1;
+            int[] d2 = new int[size2];
+            for (int j = d1.length; j < tempInds.size(); j++) {
+                d2[j - d1.length] = tempInds.get(j);
+            }
+
+            subs[2*i] = d1;
+            subs[2*i+1] = d2;
+            if(runPriors.checkForVariance(data.subsetRows(d1),data)!=-1 || runPriors.checkForVariance(data.subsetRows(d2),data)!=-1)
+                --i;
+        }
+        return subs;
+    }
+    private int[][] createSubs(DataSet data)
+    {
+        return createSubs(data,B);
+    }
     public ArrayList<LatentPrediction.Pair> runCPSSLatent(final String algName, double alpha)
     {
         final double tempAlpha = alpha;
         final double [] tempLambda = lambda;
-        final ArrayList<Integer>inds  = new ArrayList<Integer>();
+        if(subs==null)
+            subs = createSubs(data);
         final ArrayList<Graph> graphs = new ArrayList<Graph>();
-        for(int i = 0; i < data.getNumRows();i++)
-        {
-            inds.add(i);
-        }
         final DoubleMatrix2D edgeCounts = new SparseDoubleMatrix2D(data.getNumColumns(),data.getNumColumns());
         final int [] totalVars = new int[B];
         System.out.print("Computing " + B*2 + " Graphs in parallel... using " + algName);
@@ -139,31 +186,8 @@ public class CPSS {
             protected void compute(){
                 if (to - from <= chunk) {
                     for (int s = from; s < to; s++) {
-                        //System.out.println(s);
-                        ArrayList<Integer> tempInds = createTemp(inds);
-                        DataSet data1 = createData();
-                        DataSet data2 = createData();
-                        boolean done = false;
-                        while(!done) {
-                            Collections.shuffle(tempInds);
-                            int[] d1 = new int[tempInds.size() / 2];
-                            for (int j = 0; j < d1.length; j++) {
-                                d1[j] = tempInds.get(j);
-                            }
-                            int size2 = tempInds.size() / 2;
-                            if (tempInds.size() % 2 == 1)
-                                size2 = tempInds.size() / 2 + 1;
-                            int[] d2 = new int[size2];
-                            for (int j = d1.length; j < tempInds.size(); j++) {
-                                d2[j - d1.length] = tempInds.get(j);
-                            }
-
-                            data1 = subset(d1);
-                            data2 = subset(d2);
-                            done = true;
-                            if(runPriors.checkForVariance(data1,data)!=-1 || runPriors.checkForVariance(data2,data)!=-1)
-                                done = false;
-                        }
+                            DataSet data1 = subset(subs[2*s]);
+                            DataSet data2 = subset(subs[2*s+1]);
                         Graph g1 = new EdgeListGraph(data.getVariables());
                         Graph g2 = new EdgeListGraph(data.getVariables());
                         if(algName.equals("FCI") || algName.equals("MGM-FCI"))
@@ -254,7 +278,7 @@ public class CPSS {
         double theta = avgVars/p;
         System.out.println("Avg # Edges: " + avgVars + ", Total # of Vars: " + totalVars);
         System.out.println("Theta is: " + theta);
-        double t = computeTao();
+        tao = computeTao();
         System.out.println("Tao is: " + tao);
         ArrayList<LatentPrediction.Pair> finalResult = new ArrayList<LatentPrediction.Pair>();
         for(int i = 0; i < edgeCounts.rows();i++)
@@ -522,10 +546,12 @@ public class CPSS {
         //TODO Debug this
         try {
             BufferedReader b = new BufferedReader(new FileReader("tao_values.txt"));
+            if(theta < 0.01)
+                theta = 0.01;
             while(b.ready())
             {
                 String [] line = b.readLine().split("\t");
-                if(theta>Double.parseDouble(line[0]) && theta < (Double.parseDouble(line[0])+thetaInc))
+                if(theta>=Double.parseDouble(line[0]) && theta <= (Double.parseDouble(line[0])+thetaInc))
                     return Double.parseDouble(line[boundIndex+1]);
             }
             System.err.println("Theta out of bounds");

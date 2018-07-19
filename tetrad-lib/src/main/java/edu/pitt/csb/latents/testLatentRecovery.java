@@ -12,6 +12,7 @@ import edu.cmu.tetrad.graph.NodeType;
 import edu.cmu.tetrad.search.DagToPag;
 import edu.pitt.csb.latents.LatentPrediction;
 import edu.pitt.csb.mgm.MixedUtils;
+import edu.pitt.csb.stability.CPSS;
 import edu.pitt.csb.stability.StabilityUtils;
 import org.apache.commons.math3.distribution.NormalDistribution;
 
@@ -26,7 +27,7 @@ import java.util.Map;
 /**
  * Created by vinee_000 on 10/9/2017.
  */
-
+    //TODO Modify this script to save and load these partitions properly for the CPSS methods
 public class testLatentRecovery {
     public static void main(String [] args)throws Exception
     {
@@ -35,12 +36,12 @@ public class testLatentRecovery {
         boolean requireFullEdge = false; //Require the edge to be present in the full dataset to count
         boolean noDiscreteLatents = true; //Don't allow discrete variables to be latents (no discrete variables in the TCGA)
         int numLambdas = 40;
-        int numVariables = 50;
-        int numLatents = 10;
-        int numEdges = 50;
+        int numVariables = 200;
+        int numLatents = 20;
+        int numEdges = 200;
         int sampleSize = 1000;
         int numSubsamples = 20;
-        int numRuns = 15;
+        int numRuns = 20;
         int index = 0;
         int numCategories = 4;
         //int numSubSets = numVariables/5;
@@ -52,6 +53,10 @@ public class testLatentRecovery {
         boolean saveData = true;
         boolean reuseData = true;
         boolean rerunAlgorithms = true;
+        int B = 50; //Number of partitions for CPSS
+        double cpAlpha = 0.05;
+        double [] cpLambda = {0.2,0.2,0.2};
+        double bound = 0.001;
         String directory = ".";
 
         //String[] algs = {"FCI","MGM-FCI","MGM-FCI-MAX","Latent_FCI","Latent_MGM-FCI","Latent_MGM-FCI-MAX"};
@@ -59,7 +64,8 @@ public class testLatentRecovery {
        // String [] algs = {"MGM-FCI-MAX","Latent_MGM-FCI-MAX"};
         //String [] algs= {"Latent_FCI","Latent_MGM-FCI-MAX"};
        // String [] algs = {"MGM-FCI-MAX","FCI"};
-        String [] algs = {"MGM-FCI-MAX"};
+        String [] algs = {"FCI","MGM-FCI-MAX","CPSS-FCI","CPSS-MGM-FCI-MAX"};
+        //String [] algs = {"FCI","MGM-FCI","MGM-FCI-MAX","CPSS-FCI","CPSS-MGM-FCI","CPSS-MGM-FCI-MAX"};
         double [][][] precision = new double[numRuns][algs.length][4];
         double [][][] recall = new double[numRuns][algs.length][4];
         double [][][] identRecall = new double[numRuns][algs.length][4];
@@ -133,6 +139,11 @@ public class testLatentRecovery {
             }
         }
 
+        boolean cpss = false;
+        for(String s:algs)
+            if(s.contains("CPSS"))
+                cpss = true;
+
         double [] initLambdas = new double[numLambdas];
         double low = .05;
         double high = .9;
@@ -150,6 +161,7 @@ public class testLatentRecovery {
         File estFile = new File("Estimated");
         File egFile = new File("Estimated Graphs");
         File subFile = new File("Subsamples");
+        File partFile = new File("Partitions");
         File runFile = new File("Runtimes");
         if(saveData) {
             if (!gFile.isDirectory())
@@ -166,6 +178,8 @@ public class testLatentRecovery {
                 egFile.mkdir();
             if(!runFile.isDirectory())
                 runFile.mkdir();
+            if(!partFile.isDirectory())
+                partFile.mkdir();
         }
 
         /*PrintStream pri = new PrintStream(directory + "/mgm_priors_" + amountPrior + "_" + numExperts + "_" + numVariables +  "_" + sampleSize + "_" + numSubsamples + ".txt");
@@ -201,6 +215,7 @@ public class testLatentRecovery {
                 c.simulate(p);
             }
             int[][] subsamples = new int[numSubsamples][];
+            int [][] partitions = new int[B*2][];
             if(reuseData)
             {
                 boolean foundFile = false;
@@ -252,6 +267,19 @@ public class testLatentRecovery {
 
                         }
                     }
+                    f = new File("Partitions/Partition_" + i + "_" + numVariables + "_" + sampleSize + "_" + numLatents + ".txt");
+                        if(f.exists()) {
+                            BufferedReader b2 = new BufferedReader(new FileReader(f.getAbsolutePath()));
+                            for (int j = 0; j < B * 2; j++) {
+                                String[] line = b2.readLine().split("\t");
+                                partitions[j] = new int[line.length];
+                                for (int k = 0; k < line.length; k++) {
+                                    partitions[j][k] = Integer.parseInt(line[k]);
+                                }
+
+                            }
+                            b2.close();
+                        }
                 }
 
             }
@@ -320,6 +348,7 @@ public class testLatentRecovery {
                 System.out.println(i);
                 try {
                     boolean nullSub = false;
+                    boolean nullParts = false;
                     for(int j = 0; j < subsamples.length;j++)
                     {
                         if(subsamples[j]==null)
@@ -327,6 +356,13 @@ public class testLatentRecovery {
                             nullSub = true;
                         }
                     }
+                    for(int j = 0; j < partitions.length;j++)
+                    {
+                        if(partitions[j]==null)
+                            nullParts = true;
+                    }
+                    if(nullParts)
+                        partitions = CPSS.createSubs(c.getDataSet(0),B);
                     if(nullSub) {
                         int b = (int) Math.floor(10 * Math.sqrt(c.getDataSet(0).getNumRows()));
                         if (b > c.getDataSet(0).getNumRows())
@@ -334,6 +370,7 @@ public class testLatentRecovery {
                         subsamples = StabilityUtils.subSampleNoReplacement(c.getDataSet(0).getNumRows(), b, numSubsamples);
 
                     }
+
 
 
 
@@ -346,6 +383,11 @@ public class testLatentRecovery {
                                 String temp = algs[j].replace("Latent_","");
                                 LatentPrediction lp = new LatentPrediction(c.getDataSet(0),numSubSets,tao,subsamples);
                              //   lp.setAlpha(0.01);
+                                if(algs[j].contains("CPSS"))
+                                {
+                                    temp = temp.replace("CPSS-","");
+                                    lp.setCPSS(B,cpAlpha,cpLambda,bound,partitions);
+                                }
                                 lp.setStarsGamma(starsGamma);
                                 lp.setStepsGamma(stepsGamma);
                                 lp.setGraph(c.getTrueGraph());
@@ -366,6 +408,11 @@ public class testLatentRecovery {
                             if(estimatedGraphs.get(j)==null) {
                                 String temp = algs[j].replace("Latent_","");
                                 LatentPrediction lp = new LatentPrediction(c.getDataSet(0),numSubSets,tao,subsamples);
+                                if(algs[j].contains("CPSS"))
+                                {
+                                    temp = temp.replace("CPSS-","");
+                                    lp.setCPSS(B,cpAlpha,cpLambda,bound,partitions);
+                                }
                                 lp.setStarsGamma(starsGamma);
                                 lp.setStepsGamma(stepsGamma);
                                 lp.setGraph(c.getTrueGraph());
@@ -465,7 +512,17 @@ public class testLatentRecovery {
                 }
                 p2.flush();
                 p2.close();
-
+                p2 = new PrintStream("Partitions/Partition_" + i + "_" + numVariables + "_" + sampleSize + "_" + numLatents + ".txt");
+                for(int j = 0; j < partitions.length;j++)
+                {
+                    for(int k = 0; k < partitions[j].length;k++)
+                    {
+                        p2.print(partitions[j][k] + "\t");
+                    }
+                    p2.println();
+                }
+                p2.flush();
+                p2.close();
             }
         }
         for(int i = 0; i < types.length;i++)

@@ -55,7 +55,7 @@ public class STARS {
             alpha = alp;
             d = dat;
             b = (int)Math.floor( 10*Math.sqrt(dat.getNumRows()));
-            if (b > d.getNumRows())
+            if (b >= d.getNumRows())
                 b = d.getNumRows()/2;
 
         }
@@ -66,7 +66,7 @@ public class STARS {
         alpha = alp;
         d = dat;
         b = (int)Math.floor( 10*Math.sqrt(dat.getNumRows()));
-        if (b > d.getNumRows())
+        if (b >= d.getNumRows())
             b = d.getNumRows()/2;
         alg = a;
 
@@ -88,7 +88,7 @@ public class STARS {
         alpha = alp;
         d = dat;
         b = (int)Math.floor( 10*Math.sqrt(dat.getNumRows()));
-        if (b > d.getNumRows())
+        if (b >= d.getNumRows())
             b = d.getNumRows()/2;
         alg = a;
 
@@ -111,7 +111,7 @@ public class STARS {
             alpha = alp;
             d = dat;
             b = (int)Math.floor( 10*Math.sqrt(dat.getNumRows()));
-            if (b > d.getNumRows())
+            if (b >= d.getNumRows())
                 b = d.getNumRows()/2;
 
         }

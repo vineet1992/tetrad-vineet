@@ -62,6 +62,7 @@ public class LatentPrediction {
     private double [] cpssLambda = {0.2,0.2,0.2};
     private int B = 50;
     private double bound;
+    private int [][] cpSubs;
     public LatentPrediction(DataSet d,int numSubSets, double tao, int numSubsamples)
     {
         data = d;
@@ -88,7 +89,7 @@ public class LatentPrediction {
     }
 
 
-    public void setCPSS(int B, double alpha, double [] lambda, double bound){runCPSS = true; this.bound = bound; this.B = B; this.cpssAlpha = alpha; this.cpssLambda = lambda; }
+    public void setCPSS(int B, double alpha, double [] lambda, double bound, int [][] cpSubs){this.cpSubs = cpSubs; runCPSS = true; this.bound = bound; this.B = B; this.cpssAlpha = alpha; this.cpssLambda = lambda; }
     public void setStarsGamma(double starsGamma)
     {
         starsG = starsGamma;
@@ -212,7 +213,7 @@ public class LatentPrediction {
         Graph gTotal = null;
         if(runCPSS)
         {
-            CPSS cp = new CPSS(data,cpssLambda,bound);
+            CPSS cp = new CPSS(data,cpssLambda,bound,cpSubs);
             return cp.runCPSSLatent(algName,cpssAlpha);
         }
         else {

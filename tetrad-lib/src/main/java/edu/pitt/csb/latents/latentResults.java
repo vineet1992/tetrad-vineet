@@ -18,14 +18,15 @@ import java.util.*;
  */
 public class latentResults {
     public static void main(String [] args) throws Exception{
-        int numRuns = 15;
-        int numVars = 100;
-        int sampleSize = 500;
-        int numLatents = 10;
+        int numRuns = 20;
+        int numVars = 200;
+        int sampleSize = 1000;
+        int numLatents = 20;
         int numSubsamples = 20;
         int numSubSets = 4;
-        String [] algs = {"FCI","MGM-FCI-MAX","Latent_FCI","Latent_MGM-FCI-MAX"};
+        //String [] algs = {"FCI","MGM-FCI-MAX","Latent_FCI","Latent_MGM-FCI-MAX"};
         //String [] algs = {"Latent_FCI","Latent_MGM-FCI-MAX"};
+        String [] algs = {"FCI","MGM-FCI-MAX","CPSS-FCI","CPSS-MGM-FCI-MAX"};
         PrintStream [] ps = new PrintStream[algs.length];
         PrintStream [] ps2 = new PrintStream[algs.length];
         /************************************************
@@ -38,8 +39,10 @@ public class latentResults {
         for(int i = 0; i < algs.length;i++) {
             ps[i] = new PrintStream(algs[i] + "_Distribution.txt");
             ps[i].println("Run\tEdge Type\tStability\tTrue_Edge\tIdentifiable");
-            ps2[i] = new PrintStream(algs[i] + "_Orientations.txt");
-            ps2[i].println("Run\tEdge Type\tStability\tTrue_Edge\tIdentifiable\tRule_1\tRule_2\tRule_1_Stability\tRule_2_Stability\tRule_1_Stability_Precise\tRule_2_Stability_Precise");
+            if (!algs[i].contains("CPSS")) {
+                ps2[i] = new PrintStream(algs[i] + "_Orientations.txt");
+                ps2[i].println("Run\tEdge Type\tStability\tTrue_Edge\tIdentifiable\tRule_1\tRule_2\tRule_1_Stability\tRule_2_Stability\tRule_1_Stability_Precise\tRule_2_Stability_Precise");
+            }
         }
         for (int i = 0; i < numRuns; i++) {
 
@@ -186,186 +189,171 @@ public class latentResults {
                     map.put(line[0],result);
                 }
 
-                for(String x:map.keySet())
-                {
-                    String [] nodes = x.split(",");
+                if(!algs[j].contains("CPSS")) {
+                    for (String x : map.keySet()) {
+                        String[] nodes = x.split(",");
 
 
-                    //If we get to this if statement, then we should have predicted this to be a latent variable edge at least in the final graph,
-                    //but not necessarily above the threshold of tao for the full sample graph
+                        //If we get to this if statement, then we should have predicted this to be a latent variable edge at least in the final graph,
+                        //but not necessarily above the threshold of tao for the full sample graph
 
-                    if(map.get(nodes[1]+","+nodes[0])!=null)
-                    {
-                        String []zero = map.get(x).split("\t");
-                        String []one = map.get(nodes[1]+","+nodes[0]).split("\t");
-                        HashMap<String,String>  rules0 = new HashMap<String,String>();
-                        HashMap<String,String> rules1 = new HashMap<String,String>();
-                        String condSet0 = "";
-                        String condSet1 = "";
-                        for(int jj = 0; jj <zero.length;jj++)
-                        {
-                            String [] temp = zero[jj].split(",");
-                            String z = temp[1];
-                            for(int k = 2; k < temp.length;k++)
-                                z+=(","+temp[k]);
+                        if (map.get(nodes[1] + "," + nodes[0]) != null) {
+                            String[] zero = map.get(x).split("\t");
+                            String[] one = map.get(nodes[1] + "," + nodes[0]).split("\t");
+                            HashMap<String, String> rules0 = new HashMap<String, String>();
+                            HashMap<String, String> rules1 = new HashMap<String, String>();
+                            String condSet0 = "";
+                            String condSet1 = "";
+                            for (int jj = 0; jj < zero.length; jj++) {
+                                String[] temp = zero[jj].split(",");
+                                String z = temp[1];
+                                for (int k = 2; k < temp.length; k++)
+                                    z += ("," + temp[k]);
 
-                            rules0.put(temp[0],z);
-                        }
-
-                        for(int jj = 0; jj <one.length;jj++)
-                        {
-                            String [] temp = one[jj].split(",");
-                            String z = temp[1];
-                            for(int k = 2; k < temp.length;k++)
-                                z+=(","+temp[k]);
-
-                            rules1.put(temp[0],z);
-                        }
-                        double stab0 = 0;
-                        double stab1 = 0;
-
-                        if(rules0.get("FINAL")==null || rules1.get("FINAL")==null)
-                            continue;
-
-                        int rule0 = Integer.parseInt(rules0.get("FINAL").split(",")[0]);
-                        int rule1 = Integer.parseInt(rules1.get("FINAL").split(",")[0]);
-                        for(String key: rules0.keySet())
-                        {
-                            if(!key.equals("FINAL"))
-                            {
-                                String res = rules0.get(key).split(",")[0];
-                                if(Integer.parseInt(res)==rule0)
-                                    stab0+=1/(double)numSubsamples;
+                                rules0.put(temp[0], z);
                             }
-                            else
-                            {
-                                condSet0= rules0.get(key);//res = 0,X40,X35
-                            }
-                        }
-                        for(String key: rules1.keySet())
-                        {
-                            if(!key.equals("FINAL"))
-                            {
-                                String res = rules1.get(key).split(",")[0];
-                                if(Integer.parseInt(res)==rule1)
-                                    stab1+=1/(double)numSubsamples;
-                            }
-                            else
-                            {
-                                condSet1 = rules1.get(key);
-                            }
-                        }
-                        double precStab0 = 0; //precise stability
-                        double precStab1 = 0;
-                        System.out.println(rules0 + "\t" + condSet0);
-                        for(String key:rules0.keySet())
-                        {
-                           if(key.equals("FINAL"))
-                               continue;
-                           String [] real = condSet0.split(",");
-                           String [] curr = rules0.get(key).split(",");
-                           if(rule0!=Integer.parseInt(curr[0]))
-                               continue;
-                           ArrayList<String> realList = new ArrayList<String>();
-                           ArrayList<String> currList = new ArrayList<String>();
-                           for(int a = 1; a < real.length;a++)
-                               realList.add(real[a]);
-                           for(int a = 1; a < curr.length;a++)
-                               currList.add(curr[a]);
 
-                           int intersection = 0;
-                           int union = 0;
-                            Set<String> tempSet = new HashSet<String>();
-                            for(int a = 0; a < realList.size();a++)
-                            {
-                                if(currList.contains(realList.get(a)))
-                                    intersection++;
-                                tempSet.add(realList.get(a));
+                            for (int jj = 0; jj < one.length; jj++) {
+                                String[] temp = one[jj].split(",");
+                                String z = temp[1];
+                                for (int k = 2; k < temp.length; k++)
+                                    z += ("," + temp[k]);
 
+                                rules1.put(temp[0], z);
                             }
-                            for(int a = 0; a < currList.size();a++)
-                                tempSet.add(currList.get(a));
+                            double stab0 = 0;
+                            double stab1 = 0;
 
-                            union = tempSet.size();
-                            if(realList.isEmpty()&&currList.isEmpty())
-                                precStab0+=1;
-                            else
-                                precStab0 += intersection/(double)union;
-
-                        }
-                        for(String key:rules1.keySet())
-                        {
-                            if(key.equals("FINAL"))
+                            if (rules0.get("FINAL") == null || rules1.get("FINAL") == null)
                                 continue;
-                            String [] real = condSet1.split(",");
-                            String [] curr = rules1.get(key).split(",");
-                            if(rule1!=Integer.parseInt(curr[0]))
-                                continue;
-                            ArrayList<String> realList = new ArrayList<String>();
-                            ArrayList<String> currList = new ArrayList<String>();
-                            for(int a = 1; a < real.length;a++)
-                                realList.add(real[a]);
-                            for(int a = 1; a < curr.length;a++)
-                                currList.add(curr[a]);
 
-                            int intersection = 0;
-                            int union = 0;
-                            Set<String> tempSet = new HashSet<String>();
-                            for(int a = 0; a < realList.size();a++)
-                            {
-                                if(currList.contains(realList.get(a)))
-                                    intersection++;
-                                tempSet.add(realList.get(a));
+                            int rule0 = Integer.parseInt(rules0.get("FINAL").split(",")[0]);
+                            int rule1 = Integer.parseInt(rules1.get("FINAL").split(",")[0]);
+                            for (String key : rules0.keySet()) {
+                                if (!key.equals("FINAL")) {
+                                    String res = rules0.get(key).split(",")[0];
+                                    if (Integer.parseInt(res) == rule0)
+                                        stab0 += 1 / (double) numSubsamples;
+                                } else {
+                                    condSet0 = rules0.get(key);//res = 0,X40,X35
+                                }
+                            }
+                            for (String key : rules1.keySet()) {
+                                if (!key.equals("FINAL")) {
+                                    String res = rules1.get(key).split(",")[0];
+                                    if (Integer.parseInt(res) == rule1)
+                                        stab1 += 1 / (double) numSubsamples;
+                                } else {
+                                    condSet1 = rules1.get(key);
+                                }
+                            }
+                            double precStab0 = 0; //precise stability
+                            double precStab1 = 0;
+                            System.out.println(rules0 + "\t" + condSet0);
+                            for (String key : rules0.keySet()) {
+                                if (key.equals("FINAL"))
+                                    continue;
+                                String[] real = condSet0.split(",");
+                                String[] curr = rules0.get(key).split(",");
+                                if (rule0 != Integer.parseInt(curr[0]))
+                                    continue;
+                                ArrayList<String> realList = new ArrayList<String>();
+                                ArrayList<String> currList = new ArrayList<String>();
+                                for (int a = 1; a < real.length; a++)
+                                    realList.add(real[a]);
+                                for (int a = 1; a < curr.length; a++)
+                                    currList.add(curr[a]);
+
+                                int intersection = 0;
+                                int union = 0;
+                                Set<String> tempSet = new HashSet<String>();
+                                for (int a = 0; a < realList.size(); a++) {
+                                    if (currList.contains(realList.get(a)))
+                                        intersection++;
+                                    tempSet.add(realList.get(a));
+
+                                }
+                                for (int a = 0; a < currList.size(); a++)
+                                    tempSet.add(currList.get(a));
+
+                                union = tempSet.size();
+                                if (realList.isEmpty() && currList.isEmpty())
+                                    precStab0 += 1;
+                                else
+                                    precStab0 += intersection / (double) union;
 
                             }
-                            for(int a = 0; a < currList.size();a++)
-                                tempSet.add(currList.get(a));
+                            for (String key : rules1.keySet()) {
+                                if (key.equals("FINAL"))
+                                    continue;
+                                String[] real = condSet1.split(",");
+                                String[] curr = rules1.get(key).split(",");
+                                if (rule1 != Integer.parseInt(curr[0]))
+                                    continue;
+                                ArrayList<String> realList = new ArrayList<String>();
+                                ArrayList<String> currList = new ArrayList<String>();
+                                for (int a = 1; a < real.length; a++)
+                                    realList.add(real[a]);
+                                for (int a = 1; a < curr.length; a++)
+                                    currList.add(curr[a]);
 
-                            union = tempSet.size();
-                            if(realList.isEmpty()&&currList.isEmpty())
-                                precStab1 = 1;
+                                int intersection = 0;
+                                int union = 0;
+                                Set<String> tempSet = new HashSet<String>();
+                                for (int a = 0; a < realList.size(); a++) {
+                                    if (currList.contains(realList.get(a)))
+                                        intersection++;
+                                    tempSet.add(realList.get(a));
+
+                                }
+                                for (int a = 0; a < currList.size(); a++)
+                                    tempSet.add(currList.get(a));
+
+                                union = tempSet.size();
+                                if (realList.isEmpty() && currList.isEmpty())
+                                    precStab1 = 1;
+                                else
+                                    precStab1 += intersection / (double) union;
+
+                            }
+                            precStab0 = precStab0 / numSubsamples;
+                            precStab1 = precStab1 / numSubsamples;
+                            //intersection over union for each subsample * 1/numSubsamples
+                            //sum all of those to get overall stability (if different rule than the full graph rule, contributes 0 to stability)
+                            //How to compare final set of variables to other sets of variables of potentially different sizes with partial overlap
+
+
+                            String edgeType = "";
+                            double stability = 0;
+                            String trueEdge = "";
+                            String identifiable = "";
+                            String o = nodes[0] + "," + nodes[1];
+                            String o2 = nodes[1] + "," + nodes[0];
+                            if (types.get(o) != null)
+                                edgeType = types.get(o);
+                            else if (types.get(o2) == null)
+                                continue;
                             else
-                                 precStab1 += intersection/(double)union;
+                                edgeType = types.get(o2);
+                            if (stabilities.get(o) != null)
+                                stability = stabilities.get(o);
+                            else
+                                stability = stabilities.get(o2);
+                            if (truth.get(o) != null)
+                                trueEdge = truth.get(o);
+                            else
+                                trueEdge = truth.get(o2);
+                            if (ident.get(o) != null)
+                                identifiable = truth.get(o);
+                            else
+                                identifiable = truth.get(o2);
+
+                            ps2[j].println(i + "\t" + edgeType + "\t" + stability + "\t" + trueEdge + "\t" + identifiable + "\t" + rule0 + "\t" + rule1 + "\t" + stab0 + "\t" + stab1 + "\t" + precStab0 + "\t" + precStab1);
+
 
                         }
-                        precStab0 = precStab0/numSubsamples;
-                        precStab1 = precStab1/numSubsamples;
-                        //intersection over union for each subsample * 1/numSubsamples
-                        //sum all of those to get overall stability (if different rule than the full graph rule, contributes 0 to stability)
-                        //How to compare final set of variables to other sets of variables of potentially different sizes with partial overlap
-
-
-                        String edgeType = "";
-                        double stability = 0;
-                        String trueEdge = "";
-                        String identifiable = "";
-                        String o = nodes[0]+","+nodes[1];
-                        String o2 = nodes[1] + "," + nodes[0];
-                        if(types.get(o)!=null)
-                            edgeType = types.get(o);
-                        else if(types.get(o2)==null)
-                            continue;
-                        else
-                            edgeType = types.get(o2);
-                        if(stabilities.get(o)!=null)
-                            stability = stabilities.get(o);
-                        else
-                            stability = stabilities.get(o2);
-                        if(truth.get(o)!=null)
-                            trueEdge = truth.get(o);
-                        else
-                            trueEdge = truth.get(o2);
-                        if(ident.get(o)!=null)
-                            identifiable = truth.get(o);
-                        else
-                            identifiable = truth.get(o2);
-
-                        ps2[j].println(i + "\t" + edgeType + "\t" + stability + "\t" + trueEdge + "\t" + identifiable + "\t" + rule0 + "\t" + rule1 + "\t"  + stab0 + "\t" + stab1 + "\t" + precStab0 + "\t" + precStab1);
-
-
                     }
                 }
-
                 b.close();
                 ps[j].flush();
             }
