@@ -47,7 +47,7 @@ public class STEPS {
         lambda = lam;
         d = dat;
         b = (int)Math.floor( 10*Math.sqrt(dat.getNumRows()));
-        if (b > d.getNumRows())
+        if (b >= d.getNumRows())
             b = d.getNumRows()/2;
 
 
@@ -66,7 +66,7 @@ public class STEPS {
         lambda = lam;
         d = dat;
         b = (int)Math.floor( 10*Math.sqrt(dat.getNumRows()));
-        if (b > d.getNumRows())
+        if (b >= d.getNumRows())
             b = d.getNumRows()/2;
         this.subs = subsamples;
 
@@ -80,7 +80,7 @@ public class STEPS {
         lambda = lam;
         d = dat;
         b = (int)Math.floor( 10*Math.sqrt(dat.getNumRows()));
-        if (b > d.getNumRows())
+        if (b >= d.getNumRows())
             b = d.getNumRows()/2;
 
 
