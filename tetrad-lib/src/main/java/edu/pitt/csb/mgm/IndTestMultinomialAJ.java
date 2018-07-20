@@ -142,7 +142,7 @@ public class IndTestMultinomialAJ implements IndependenceTest {
         }
     }
 
-    private List<Node> expandVariable(DataSet dataSet, Node node) {
+    private synchronized List<Node> expandVariable(DataSet dataSet, Node node) {
         if (node instanceof ContinuousVariable) {
             return Collections.singletonList(node);
         }
