@@ -3,6 +3,8 @@ package edu.pitt.csb.BioInf_Paper;
 import edu.cmu.tetrad.algcomparison.simulation.MixedLeeHastieSimulation;
 import edu.cmu.tetrad.algcomparison.simulation.Parameters;
 import edu.cmu.tetrad.data.DataSet;
+import edu.cmu.tetrad.data.DiscreteVariable;
+import edu.cmu.tetrad.graph.EdgeListGraph;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.GraphUtils;
 import edu.cmu.tetrad.search.*;
@@ -13,6 +15,8 @@ import edu.pitt.csb.mgm.MixedUtils;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
+import java.util.HashMap;
+import java.util.List;
 
 /**
  * Created by vinee_000 on 7/10/2018.
@@ -26,10 +30,11 @@ public class CompareMethods {
         int [] numVariables = {50,200};
         int [] numSamples = {500,100};
         int numCats = 3;
+        int bound = 4;
         int maxDegree = 10;
         int avgDegree = 2;
-        String [] algs = {"MGMPCS","MGMCPCS"};
-        //String [] algs = {"CPCS","CPSS","PCS","CG","MGMPCS","MGMCPCS"};
+        //String [] algs = {"MGMPCS","MGMCPCS"};
+        String [] algs = {"CPCS","CPSS","PCS","CG","MGMPCS","MGMCPCS"};
         //String [] algs = {"CPCS","CPSS","PCS","CG","MGMPCS","MGMCPCS","Copula"};
         //String [] algs = {"Copula"};
         //String [] algs = {"CPSS"};
@@ -103,14 +108,23 @@ public class CompareMethods {
                     data = MixedUtils.loadDataSet2(directory + "/Data/Data_" + j + ".txt");
                 }
                 else {
+                    Graph g = GraphUtils.randomDag(numVariables[i],0,2*numVariables[i],maxDegree,maxDegree,maxDegree,false);
                     System.out.print("Simulating data for run " + j + " ...");
+                    m.setTrueGraph(g);
+
                     m.simulate(p);
+                    while(!checkData(m.getDataSet(0),bound))
+                        m.simulate(p);
                     trueGraph = m.getTrueGraph();
                     //DagToPattern dtp = new DagToPattern(trueGraph);
-                    IndependenceTest itd = new IndTestDSep(trueGraph);
-                    PcStable pcs = new PcStable(itd);
+
+                    EdgeListGraph elg = new EdgeListGraph(trueGraph);
+                    SearchGraphUtils.basicPattern(elg,false);
+                    MeekRules rules = new MeekRules();
+                    rules.orientImplied(elg);
+                    truePattern = elg;
                     System.out.println("Converting to pattern");
-                    truePattern = pcs.search();
+
                     //truePattern = dtp.convert();
                     data = m.getDataSet(0);
                     System.out.println("Done");
@@ -239,6 +253,30 @@ public class CompareMethods {
             }
 
         }
+
+    }
+    public static boolean checkData(DataSet data, int bound)
+    {
+        for(int i = 0; i < data.getNumColumns();i++)
+        {
+            if(data.getVariable(i)instanceof DiscreteVariable) {
+                HashMap<Integer, Integer> map = new HashMap<Integer, Integer>();
+                DiscreteVariable dv = (DiscreteVariable) data.getVariable(i);
+                List<String> cats = dv.getCategories();
+                for (int j = 0; j < cats.size(); j++)
+                    map.put(Integer.parseInt(cats.get(j)), 0);
+
+                for (int j = 0; j < data.getNumRows(); j++) {
+                    map.put(data.getInt(j, i), map.get(data.getInt(j, i)) + 1);
+                }
+                for (int j = 0; j < cats.size(); j++)
+                {
+                    if(map.get(Integer.parseInt(cats.get(j)))<bound)
+                        return false;
+                }
+            }
+        }
+        return true;
 
     }
 }

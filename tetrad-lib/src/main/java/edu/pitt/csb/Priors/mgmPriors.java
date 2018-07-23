@@ -57,6 +57,7 @@ public class mgmPriors {
     public double [] normalizedExpertWeights;
     public double [] normalizedTao;
     public double [] pValues;
+    public double [] uncorrectedPValues;
     public double [][] betas;
     private TetradMatrix stability;
     private boolean logging = false;
@@ -241,6 +242,7 @@ public class mgmPriors {
         }
         if(normalize)
         {
+            uncorrectedPValues = pValues;
             pValues = adjustPValues(pValues);
             normalizedTao = normalTao;
             double [] normAlpha = getAlpha(normalTao);
@@ -304,6 +306,7 @@ public class mgmPriors {
             //How confident are we about source tr?
             //tao = average deviation between our predicted probability from prior (phi) and actual counts u
         }
+        uncorrectedPValues = pValues;
         pValues = adjustPValues(pValues);
 
         for(int tr = 0; tr < priors.length;tr++)

@@ -358,15 +358,16 @@ public class runPriors {
         double[] weights = m.normalizedExpertWeights;
         double[] pValues = m.pValues;
         double[] normalizedTao = m.normalizedTao;
+        double [] uncorrectedPVals = m.uncorrectedPValues;
 
         PrintStream out = new PrintStream(runName + "/Graph.txt");
         out.println(g);
         out.flush();
         out.close();
         out = new PrintStream(runName + "/Prior_Scores.txt");
-        out.println("Name\tPrior_Weight\tCorrected p-Value\tNormalized Deviance Score");
+        out.println("Name\tPrior_Weight\tCorrected p-Value\tUncorrected p-Value\tNormalized Deviance Score");
         for (int i = 0; i < weights.length; i++) {
-            out.println(map.get(i) + "\t" + weights[i] + "\t" + pValues[i] + "\t" + normalizedTao[i]);
+            out.println(map.get(i) + "\t" + weights[i] + "\t" + pValues[i] + "\t" + uncorrectedPVals[i] + "\t" + normalizedTao[i]);
         }
 
         out.flush();
