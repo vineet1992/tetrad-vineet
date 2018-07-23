@@ -362,10 +362,8 @@ public class LatentPrediction {
                         {
                             if(already.get(two.getName())==null||already.get(two.getName())!=one.getName())
                             {
-
                                 result.add(new Pair(one,two));
                                 already.put(one.getName(),two.getName());
-
                             }
                         }
                     }
@@ -461,6 +459,13 @@ public class LatentPrediction {
     }
 
 
+    public static boolean isIdentifiable(Graph truePag, Node one, Node two)
+    {
+        Edge e = truePag.getEdge(truePag.getNode(one.getName()),truePag.getNode(two.getName()));
+        if(e==null || e.getEndpoint1()!=Endpoint.ARROW || e.getEndpoint2()!=Endpoint.ARROW)
+            return false;
+        return true;
+    }
 
     public static double getIdentifiableRecall(Graph PAG, ArrayList<Pair> latents, Graph trueDAG, DataSet d, String type, int [][] splits)
     {

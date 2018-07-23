@@ -18,11 +18,11 @@ import java.util.*;
  */
 public class latentResults {
     public static void main(String [] args) throws Exception{
-        int numRuns = 20;
-        int numVars = 200;
-        int sampleSize = 1000;
-        int numLatents = 20;
-        int numSubsamples = 20;
+        int numRuns = 25;
+        int numVars = 50;
+        int sampleSize = 200;
+        int numLatents = 10;
+        int numSubsamples = 10;
         int numSubSets = 4;
         //String [] algs = {"FCI","MGM-FCI-MAX","Latent_FCI","Latent_MGM-FCI-MAX"};
         //String [] algs = {"Latent_FCI","Latent_MGM-FCI-MAX"};
@@ -131,7 +131,7 @@ public class latentResults {
                         ps[j].print("DD\t");
                     }
                     else {
-                        types.put(line[0]+","+line[1],"CC");
+                        types.put(line[0]+","+line[1],"CD");
                         ps[j].print("CD\t");
                     }
                     stabilities.put(line[0]+","+line[1],Double.parseDouble(line[2]));
@@ -140,8 +140,7 @@ public class latentResults {
 
 
 
-
-
+                    //list has every single latent variable in it
                     //TODO Do i need to use the splits for anything here? Or do anything differently for Latents?
                     boolean found = false;
                         for (LatentPrediction.Pair p : list) {
@@ -353,6 +352,24 @@ public class latentResults {
 
                         }
                     }
+                    List<LatentPrediction.Pair> l = LatentPrediction.getLatents(g,d,"All");
+                    for(int jj = 0; jj < l.size();jj++)
+                    {
+                        if(map.get(l.get(jj).one.getName() + "," + l.get(jj).two.getName())==null)
+                        {
+
+                            if(l.get(jj).one instanceof ContinuousVariable && l.get(jj).two instanceof ContinuousVariable)
+                                ps2[j].println(i + "\t" + "CC" + "\t" + 0 + "\tT\t" + LatentPrediction.isIdentifiable(truePag,l.get(jj).one,l.get(jj).two) + "\t0\t0\t0\t0\t0\t0");
+                            else if(l.get(jj).one instanceof DiscreteVariable && l.get(jj).two instanceof DiscreteVariable)
+                                ps2[j].println(i + "\t" + "DD" + "\t" + 0 + "\tT\t" + LatentPrediction.isIdentifiable(truePag,l.get(jj).one,l.get(jj).two) + "\t0\t0\t0\t0\t0\t0");
+                            else
+                                ps2[j].println(i + "\t" + "CD" + "\t" + 0 + "\tT\t" + LatentPrediction.isIdentifiable(truePag,l.get(jj).one,l.get(jj).two) + "\t0\t0\t0\t0\t0\t0");
+
+                        }
+
+                    }
+
+
                 }
                 b.close();
                 ps[j].flush();

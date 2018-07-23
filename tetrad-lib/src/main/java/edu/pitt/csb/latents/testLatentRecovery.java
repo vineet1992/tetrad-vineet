@@ -22,6 +22,7 @@ import java.io.FileReader;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -36,12 +37,12 @@ public class testLatentRecovery {
         boolean requireFullEdge = false; //Require the edge to be present in the full dataset to count
         boolean noDiscreteLatents = true; //Don't allow discrete variables to be latents (no discrete variables in the TCGA)
         int numLambdas = 40;
-        int numVariables = 200;
-        int numLatents = 20;
+        int numVariables = 50;
+        int numLatents = 10;
         int numEdges = 200;
-        int sampleSize = 1000;
-        int numSubsamples = 20;
-        int numRuns = 20;
+        int sampleSize = 200;
+        int numSubsamples = 10;
+        int numRuns = 25;
         int index = 0;
         int numCategories = 4;
         //int numSubSets = numVariables/5;
@@ -393,9 +394,12 @@ public class testLatentRecovery {
                                 lp.setGraph(c.getTrueGraph());
                                 lp.setRunNumber(i);
                                 long time = System.nanoTime();
-                                ArrayList<LatentPrediction.Pair> latents = lp.runRegularAlgorithm(temp,requireFullEdge);
 
+                                ArrayList<LatentPrediction.Pair> latents = lp.runRegularAlgorithm(temp,requireFullEdge);
+                                System.out.println(latents);
                                 runtimes[i][j] = (System.nanoTime()-time)/(Math.pow(10,9));
+                                addNonPredictedLatents(latents, c.getTrueGraph(),c.getDataSet(0));
+                                System.out.println(latents);
                                 estimatedGraphs.set(j,latents);
                                 orientations.set(j,lp.orientations);
                                // System.out.println(orientations.get(j));
@@ -420,6 +424,9 @@ public class testLatentRecovery {
                                 long time = System.nanoTime();
                                 ArrayList<LatentPrediction.Pair> latents = lp.runAlgorithm(temp,prune,requireFullEdge);
                                 runtimes[i][j] = (System.nanoTime()-time)/Math.pow(10,9);
+
+                                //TODO this doesn't take splits into account so need to note that
+                                addNonPredictedLatents(latents, c.getTrueGraph(),c.getDataSet(0));
                                 estimatedGraphs.set(j,latents);
                                 splits.set(j,lp.getLastSplit());
                                 orientations.set(j,lp.orientations);
@@ -583,6 +590,24 @@ public class testLatentRecovery {
         }
         out.flush();
         out.close();
+    }
+
+    private static void addNonPredictedLatents(List<LatentPrediction.Pair> latents, Graph trueGraph, DataSet data)
+    {
+        List<LatentPrediction.Pair> allLatents = LatentPrediction.getLatents(trueGraph,data,"All");
+        for(int i = 0; i < allLatents.size();i++)
+        {
+            boolean found = false;
+            for(int j = 0; j < latents.size();j++ )
+            {
+                if((latents.get(j).colIDOne==allLatents.get(i).colIDOne && latents.get(j).colIDTwo==allLatents.get(i).colIDTwo) || (latents.get(j).colIDTwo==allLatents.get(i).colIDOne && latents.get(j).colIDOne==allLatents.get(i).colIDTwo))
+                {
+                   found = true;
+                }
+            }
+            if(found)
+                latents.add(new LatentPrediction.Pair(data.getVariable(allLatents.get(i).one.getName()),data.getVariable(allLatents.get(i).two.getName()),0.0));
+        }
     }
     private static boolean badLatent(DataSet d, Graph g)
     {
