@@ -338,16 +338,21 @@ public class runPriors {
         PrintStream out = new PrintStream(runName + "/Edge_Scores.txt");
         for(int i = 0; i < d.getNumColumns();i++)
         {
-            out.print(d.getVariable(i) + "\t");
+            if(i==d.getNumColumns()-1)
+                out.println(d.getVariable(i));
+            else
+                out.print(d.getVariable(i) + "\t");
         }
         for(int i = 0; i < scores.length;i++)
         {
             out.print(d.getVariable(i) + "\t");
             for(int j = 0; j < scores[i].length;j++)
             {
-                out.print(scores[i][j] + "\t");
+                if(j==scores[i].length-1)
+                    out.println(scores[i][j]);
+                else
+                    out.print(scores[i][j] + "\t");
             }
-            out.println();
         }
         out.flush();
         out.close();

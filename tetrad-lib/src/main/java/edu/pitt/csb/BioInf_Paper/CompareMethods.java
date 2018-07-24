@@ -15,6 +15,7 @@ import edu.pitt.csb.mgm.MixedUtils;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
@@ -34,16 +35,16 @@ public class CompareMethods {
         int maxDegree = 10;
         int avgDegree = 2;
         //String [] algs = {"MGMPCS","MGMCPCS"};
-        String [] algs = {"CPCS","CPSS","PCS","CG","MGMPCS","MGMCPCS"};
+        String [] algs = {"CPCS","CPSS","PCS","MGMPCS","MGMCPCS"};
         //String [] algs = {"CPCS","CPSS","PCS","CG","MGMPCS","MGMCPCS","Copula"};
         //String [] algs = {"Copula"};
         //String [] algs = {"CPSS"};
         String [] types = {"CC","CD","DD","All"};
         double [] alphas = {0.001,0.01,0.05,0.1};
-        //double [] lambdas = {0.2,0.28,0.4,0.57,0.8};
-        double [] lambdas = {0.05,0.071,0.1,0.14,0.2};
+        double [] lambdas = {0.2,0.28,0.4,0.57,0.8};
+        //double [] lambdas = {0.05,0.071,0.1,0.14,0.2};
         boolean reload = false;
-        for(int i = 0; i < 1;i++)
+        for(int i = 1; i < 2;i++)
         {
             int numMeasures = numVariables[i];
             int samples = numSamples[i];
@@ -82,8 +83,15 @@ public class CompareMethods {
             p.setValue("maxDegree",maxDegree);
             p.setValue("numEdges",numMeasures*2);
 
+
+            boolean runMGM = false;
+            for(String x:algs)
+                if(x.contains("MGM"))
+                    runMGM = true;
             MixedLeeHastieSimulation m = new MixedLeeHastieSimulation();
             PrintStream [] result = new PrintStream[algs.length];
+            if(runMGM)
+                result = new PrintStream[algs.length+1];
             if(!justGenerate) {
                 for (int x = 0; x < algs.length; x++) {
                     if(reload)
@@ -94,6 +102,9 @@ public class CompareMethods {
                     }
                     result[x].flush();
                 }
+                result[result.length-1] = new PrintStream(directory + "/Results/MGM.txt");
+                result[result.length-1].println("Alpha\tLambda\tType\tRun\tAP\tAR\tAHP\tAHR\tSHD\tTime");
+                result[result.length-1].flush();
             }
             RUN:for(int j = 0; j < numRuns;j++)
             {
@@ -147,6 +158,18 @@ public class CompareMethods {
                 //Run each algorithm on the data and save the output to Estimated folder
                 for(int k = 0; k < algs.length;k++)
                 {
+                    ArrayList<Graph> cpGraphs = null;
+                    CPSS cpss = null;
+                    if(algs[k].equals("CPSS"))
+                    {
+                        double alp = 0.05;
+                        double lb = 0.1;
+                        if(i!=0)
+                            lb = 0.2;
+                        //TODO CPC should be part of the estimation procedure I believe
+                        cpss = new CPSS(data,new double[]{lb,lb,lb});
+                        cpGraphs = cpss.getGraphs();
+                    }
                     A:for(int a = 0; a < alphas.length;a++)
                     {
                         IndependenceTest ind = new IndTestMultinomialAJ(data,alphas[a],true);
@@ -173,13 +196,8 @@ public class CompareMethods {
                                 if(b!=0)
                                     continue A;
                                 double alp = 0.05;
-                                double lb = 0.1;
-                                if(i!=0)
-                                    lb = 0.2;
-                                //TODO CPC should be part of the estimation procedure I believe
-                                CPSS cp = new CPSS(data,new double[]{lb,lb,lb},alphas[a]);
-                                Graph init = cp.runCPSSPar();
-                                IndependenceTest cpssTest = new IndTestMultinomialAJ(data,alp);
+                                Graph init = cpss.learnGraph(cpGraphs,alphas[a]);
+                                IndTestMultinomialAJ cpssTest = new IndTestMultinomialAJ(data,alp,true);
                                 CpcStable cpc = new CpcStable(cpssTest);
                                 if(init.getNumEdges()>0)
                                     cpc.setInitialGraph(init);
@@ -210,7 +228,10 @@ public class CompareMethods {
                             else if(algs[k].equals("MGMPCS"))
                             {
                                 MGM mgm = new MGM(data,lambda);
+                                long mgmTime = System.nanoTime();
                                 mgm.learnEdges(1000);
+                                mgmTime = System.nanoTime()-mgmTime;
+                                result[result.length-1].println(alphas[a] + "\t" + lambdas[b] + "\t" + "All" + "\t" + j + "\t0\t0\t0\t0\t0" + mgmTime/Math.pow(10,9));
                                 Graph temp = mgm.graphFromMGM();
                                 PcStable cp = new PcStable(ind);
                                 cp.setInitialGraph(temp);
@@ -219,7 +240,10 @@ public class CompareMethods {
                             else if(algs[k].equals("MGMCPCS"))
                             {
                                 MGM mgm = new MGM(data,lambda);
+                                long mgmTime = System.nanoTime();
                                 mgm.learnEdges(1000);
+                                mgmTime = System.nanoTime()-mgmTime;
+                                result[result.length-1].println(alphas[a] + "\t" + lambdas[b] + "\t" + "All" + "\t" + j + "\t0\t0\t0\t0\t0" + mgmTime/Math.pow(10,9));
                                 Graph temp = mgm.graphFromMGM();
                                 CpcStable cp = new CpcStable(ind);
                                 cp.setInitialGraph(temp);

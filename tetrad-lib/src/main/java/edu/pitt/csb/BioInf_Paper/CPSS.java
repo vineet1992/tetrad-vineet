@@ -38,6 +38,7 @@ public class CPSS {
     private int boundIndex;
     private DataSet data;
     private double [] lambda; //Array of lambda values for MGM
+    private int [] lastTotalVars;
 
 
     public CPSS(DataSet data, double [] lambda, double bound)
@@ -45,18 +46,185 @@ public class CPSS {
         this.data = data;
         this.lambda = lambda;
         this.bound = bound;
+        computeBound(bound);
+        this.p = data.getNumColumns()*(data.getNumColumns()-1)/2;
+    }
+
+    public CPSS(DataSet data, double [] lambda)
+    {
+        this.data = data;
+        this.lambda = lambda;
+        this.p = data.getNumColumns()*(data.getNumColumns()-1)/2;
+    }
+
+    private void computeBound(double bound)
+    {
         if(bound<=0.001)
             boundIndex=0;
         else if(bound<=0.01)
-             boundIndex=1;
+            boundIndex=1;
         else if(bound <=0.05)
             boundIndex=2;
         else
             boundIndex = 3;
-        this.p = data.getNumColumns()*(data.getNumColumns()-1)/2;
     }
 
+    public Graph learnGraph(ArrayList<Graph> graphs , double bound)
+    {
+        this.bound = bound;
+        computeBound(bound);
+        int [] totalVars = lastTotalVars;
+        int sum = 0;
+        for(int i = 0; i < totalVars.length;i++)
+        {
+            sum+=totalVars[i];
+        }
+        final DoubleMatrix2D edgeCounts = new SparseDoubleMatrix2D(data.getNumColumns(),data.getNumColumns());
 
+        for(int i = 0 ; i< graphs.size();i++)
+        {
+            Graph curr = graphs.get(i);
+            for(Edge e: curr.getEdges())
+            {
+                int x = data.getColumn(data.getVariable(e.getNode1().getName()));
+                int y = data.getColumn(data.getVariable(e.getNode2().getName()));
+                edgeCounts.set(x, y, edgeCounts.get(x, y) + 1);
+                edgeCounts.set(y, x, edgeCounts.get(y, x) + 1);
+            }
+        }
+        System.out.println("Done");
+        double avgVars = sum/(double)(B*2);
+        theta = avgVars/p;
+        System.out.println("Avg # Edges: " + avgVars + ", Total # of Vars: " + totalVars);
+        System.out.println("Theta is: " + theta);
+        tao = computeTao();
+        System.out.println("Tao is: " + tao);
+        Graph finalGraph = new EdgeListGraphSingleConnections(data.getVariables());
+        for(int i = 0; i < edgeCounts.rows();i++)
+        {
+            for(int j = i+1; j < edgeCounts.columns();j++)
+            {
+                if(edgeCounts.get(i,j)/(B*2)>=tao)
+                {
+                    finalGraph.addUndirectedEdge(data.getVariable(i),data.getVariable(j));
+                }
+            }
+        }
+        //Partition the data B times and run MGM on each partition to get a count of each edge's appearence
+        //Based on the average number of selected variables per run, compute theta
+        //use theta, q, and the bound to get a value for tao
+        //only keep the edges with probability greater than tao
+        //Return the graph with these edges
+        return finalGraph;
+    }
+    public ArrayList<Graph> getGraphs()
+    {
+        final ArrayList<Integer>inds  = new ArrayList<Integer>();
+        final ArrayList<Graph> graphs = new ArrayList<Graph>();
+        for(int i = 0; i < data.getNumRows();i++)
+        {
+            inds.add(i);
+        }
+        final int [] totalVars = new int[B];
+        System.out.print("Computing " + B*2 + " MGM Graphs in parallel...");
+
+
+
+        final ForkJoinPool pool = ForkJoinPoolInstance.getInstance().getPool();
+
+        class StabilityAction extends RecursiveAction {
+            private int chunk;
+            private int from;
+            private int to;
+
+            public StabilityAction(int chunk, int from, int to) {
+                this.chunk = chunk;
+                this.from = from;
+                this.to = to;
+            }
+
+            //could avoid using synchronized if we keep track of array of mats and add at end, but that needs lots of
+            //memory
+
+            private synchronized ArrayList<Integer> createTemp(ArrayList<Integer> inds) {
+                ArrayList<Integer> temp = new ArrayList<Integer>();
+                temp.addAll(inds);
+                return temp;
+            }
+
+            private synchronized void addToGraphs(Graph g){graphs.add(g);}
+
+
+            private synchronized DataSet createData(){return new ColtDataSet(data.getNumColumns(),data.getVariables());}
+
+            private synchronized DataSet subset(int [] x){return data.subsetRows(x);}
+            @Override
+            protected void compute(){
+                if (to - from <= chunk) {
+                    for (int s = from; s < to; s++) {
+                        //System.out.println(s);
+                        ArrayList<Integer> tempInds = createTemp(inds);
+                        DataSet data1 = createData();
+                        DataSet data2 = createData();
+                        boolean done = false;
+                        while(!done) {
+                            Collections.shuffle(tempInds);
+                            int[] d1 = new int[tempInds.size() / 2];
+                            for (int j = 0; j < d1.length; j++) {
+                                d1[j] = tempInds.get(j);
+                            }
+                            int size2 = tempInds.size() / 2;
+                            if (tempInds.size() % 2 == 1)
+                                size2 = tempInds.size() / 2 + 1;
+                            int[] d2 = new int[size2];
+                            for (int j = d1.length; j < tempInds.size(); j++) {
+                                d2[j - d1.length] = tempInds.get(j);
+                            }
+
+                            data1 = subset(d1);
+                            data2 = subset(d2);
+                            done = true;
+                            if(runPriors.checkForVariance(data1,data)!=-1 || runPriors.checkForVariance(data2,data)!=-1)
+                                done = false;
+                        }
+                        MGM m = new MGM(data1,lambda);
+                        m.learnEdges(1000);
+                        Graph g = m.graphFromMGM();
+                        totalVars[s]+=g.getNumEdges();
+                        //addToMat(g,data,edgeCounts);
+                        addToGraphs(g);
+                        m = new MGM(data2,lambda);
+                        m.learnEdges(1000);
+                        g = m.graphFromMGM();
+                        addToGraphs(g);
+                        totalVars[s]+=g.getNumEdges();
+                        //addToMat(g,data,edgeCounts);
+                    }
+
+                    return;
+                } else {
+                    List<StabilityAction> tasks = new ArrayList<>();
+
+                    final int mid = (to + from) / 2;
+
+                    tasks.add(new StabilityAction(chunk, from, mid));
+                    tasks.add(new StabilityAction(chunk, mid, to));
+
+                    invokeAll(tasks);
+
+                    return;
+                }
+            }
+
+        }
+
+        final int chunk = 2;
+
+        pool.invoke(new StabilityAction(chunk, 0,B));
+        lastTotalVars = totalVars;
+        return graphs;
+
+    }
     public Graph runCPSSPar()
     {
         final ArrayList<Integer>inds  = new ArrayList<Integer>();
