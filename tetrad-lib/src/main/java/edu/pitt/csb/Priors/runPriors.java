@@ -342,13 +342,14 @@ public class runPriors {
                     }
                     else
                     {
-                        cats.put(full.getInt(j,i),full.getInt(j,i)+1);
+                        cats.put(d.getInt(j,i),cats.get(d.getInt(j,i))+1);
                     }
                 }
                 for(Integer ii: cats.keySet())
                 {
-                    if(cats.get(ii)<=4)
+                    if(cats.get(ii)<4) {
                         return i;
+                    }
                 }
             }
         }

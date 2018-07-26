@@ -753,6 +753,20 @@ public class StabilityUtils {
         return D;
     }
 
+
+    public static int[][] subSampleNoReplacement(int sampSize, int numSub){
+
+        int subSize =(int) (10*Math.sqrt(sampSize));
+        if(subSize>sampSize)
+            subSize = sampSize/2;
+        if (subSize < 1) {
+            throw new IllegalArgumentException("Sample size must be > 0.");
+        }
+
+       return subSampleNoReplacement(sampSize,subSize,numSub);
+    }
+
+
     //returns an numSub by subSize matrix of subsamples of the sequence 1:sampSize
     public static int[][] subSampleNoReplacement(int sampSize, int subSize, int numSub){
 

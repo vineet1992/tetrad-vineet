@@ -64,9 +64,9 @@ public class LatentPrediction {
         searchParams = new double[4];
         initializeArrays();
         orientations = new HashMap<String,String>();
-        this.subs = StabilityUtils.generateSubsamples(numSubsamples,data.getNumRows());
+        this.subs = StabilityUtils.subSampleNoReplacement(data.getNumRows(),numSubsamples);
         while(!ensureVariance())
-            subs = StabilityUtils.generateSubsamples(numSubsamples,data.getNumRows());
+            subs = StabilityUtils.subSampleNoReplacement(data.getNumRows(),numSubsamples);
 
     }
     public LatentPrediction(DataSet d, int numSubSets, double tao, int [][] subs)
