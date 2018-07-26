@@ -44,6 +44,7 @@ public class runPriors {
         double high = 0.95;
         boolean loocv = false;
         boolean makeScores = false;
+        boolean fullCounts = false;
         int index = 0;
         List<String> toRemove = new ArrayList<String>();
         try {
@@ -63,6 +64,11 @@ public class runPriors {
                 } else if(args[index].equals("-run")) {
                     runName = args[index+1];
                     index+=2;
+                }
+                else if(args[index].equals("-fullCounts"))
+                {
+                    fullCounts = true;
+                    index++;
                 }
                 else if (args[index].equals("-priors")) {
                     priorDirectory = args[index + 1];
@@ -289,6 +295,11 @@ public class runPriors {
                 double [][] scores = m.edgeScores;
                 printScores(scores,d,runName);
             }
+            if(fullCounts)
+            {
+                TetradMatrix tm = m.fullCounts;
+                printCounts(tm,d,runName);
+            }
             System.out.println("Done");
         }
         catch(Exception e)
@@ -311,28 +322,63 @@ public class runPriors {
                 double [] curr = t.getColumn(i).toArray();
                 curr = StatUtils.standardizeData(curr);
                 double var = StatUtils.variance(curr);
-                if(var <= 0.000001)
+                if(var <= 0.0001)
                     return i;
 
             }
             else
             {
-                HashSet<Integer> cats = new HashSet<Integer>();
+                HashMap<Integer,Integer> cats = new HashMap<Integer,Integer>();
                 for(int j = 0; j < full.getNumRows();j++)
                 {
-                    cats.add(full.getInt(j,i));
+                    cats.put(full.getInt(j,i),0);
                 }
                 for(int j = 0; j < d.getNumRows();j++)
                 {
-                    cats.remove(d.getInt(j,i));
+                    if(cats.get(d.getInt(j,i))==null)
+                    {
+                        System.err.println("Found a category not in the full dataset");
+                        System.exit(-1);
+                    }
+                    else
+                    {
+                        cats.put(full.getInt(j,i),full.getInt(j,i)+1);
+                    }
                 }
-                if(!cats.isEmpty())
-                    return i;
+                for(Integer ii: cats.keySet())
+                {
+                    if(cats.get(ii)<=4)
+                        return i;
+                }
             }
         }
         return -1;
     }
 
+    public static void printCounts(TetradMatrix t, DataSet d, String runName) throws Exception
+    {
+        PrintStream out = new PrintStream(runName + "/Edge_Counts.txt");
+        for(int i = 0; i < d.getNumColumns();i++)
+        {
+            if(i==d.getNumColumns()-1)
+                out.println(d.getVariable(i));
+            else
+                out.print(d.getVariable(i) + "\t");
+        }
+        for(int i = 0; i < t.rows();i++)
+        {
+            out.print(d.getVariable(i) + "\t");
+            for(int j = 0; j < t.columns();j++)
+            {
+                if(j==t.columns()-1)
+                    out.println(t.get(i,j));
+                else
+                    out.print(t.get(i,j) + "\t");
+            }
+        }
+        out.flush();
+        out.close();
+    }
     public static void printScores(double [][] scores, DataSet d, String runName) throws Exception
     {
         PrintStream out = new PrintStream(runName + "/Edge_Scores.txt");

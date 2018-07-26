@@ -11,6 +11,7 @@ import edu.cmu.tetrad.search.IndependenceTest;
 import edu.cmu.tetrad.util.ForkJoinPoolInstance;
 import edu.pitt.csb.Pref_Div.Functions;
 import edu.pitt.csb.Pref_Div.Gene;
+import edu.pitt.csb.Priors.runPriors;
 import edu.pitt.csb.latents.mirnaPrediction;
 import edu.pitt.csb.mgm.*;
 import edu.pitt.csb.stability.SearchWrappers;
@@ -64,6 +65,8 @@ public class LatentPrediction {
         initializeArrays();
         orientations = new HashMap<String,String>();
         this.subs = StabilityUtils.generateSubsamples(numSubsamples,data.getNumRows());
+        while(!ensureVariance())
+            subs = StabilityUtils.generateSubsamples(numSubsamples,data.getNumRows());
 
     }
     public LatentPrediction(DataSet d, int numSubSets, double tao, int [][] subs)
@@ -762,6 +765,17 @@ public class LatentPrediction {
 
         return result;
     }
+    private boolean ensureVariance()
+    {
+        int [][] sb = this.subs;
+        for(int i = 0; i < subs.length;i++)
+        {
+            if(runPriors.checkForVariance(data.subsetRows(sb[i]),data)!=-1)
+                return false;
+
+        }
+        return true;
+    }
     private int [] shuffleArray(int[] x)
     {
             // If running on Java 6 or older, use `new Random()` on RHS here
@@ -776,6 +790,8 @@ public class LatentPrediction {
             }
             return x;
     }
+
+
     public static class Pair
     {
         public Node one;

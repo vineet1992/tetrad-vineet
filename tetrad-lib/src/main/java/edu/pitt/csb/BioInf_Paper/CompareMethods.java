@@ -102,9 +102,11 @@ public class CompareMethods {
                     }
                     result[x].flush();
                 }
-                result[result.length-1] = new PrintStream(directory + "/Results/MGM.txt");
-                result[result.length-1].println("Alpha\tLambda\tType\tRun\tAP\tAR\tAHP\tAHR\tSHD\tTime");
-                result[result.length-1].flush();
+                if(runMGM) {
+                    result[result.length - 1] = new PrintStream(directory + "/Results/MGM.txt");
+                    result[result.length - 1].println("Alpha\tLambda\tType\tRun\tAP\tAR\tAHP\tAHR\tSHD\tTime");
+                    result[result.length - 1].flush();
+                }
             }
             RUN:for(int j = 0; j < numRuns;j++)
             {
@@ -231,7 +233,7 @@ public class CompareMethods {
                                 long mgmTime = System.nanoTime();
                                 mgm.learnEdges(1000);
                                 mgmTime = System.nanoTime()-mgmTime;
-                                result[result.length-1].println(alphas[a] + "\t" + lambdas[b] + "\t" + "All" + "\t" + j + "\t0\t0\t0\t0\t0" + mgmTime/Math.pow(10,9));
+                                result[result.length-1].println(alphas[a] + "\t" + lambdas[b] + "\t" + "All" + "\t" + j + "\t0\t0\t0\t0\t0\t" + mgmTime/Math.pow(10,9));
                                 Graph temp = mgm.graphFromMGM();
                                 PcStable cp = new PcStable(ind);
                                 cp.setInitialGraph(temp);
@@ -243,7 +245,7 @@ public class CompareMethods {
                                 long mgmTime = System.nanoTime();
                                 mgm.learnEdges(1000);
                                 mgmTime = System.nanoTime()-mgmTime;
-                                result[result.length-1].println(alphas[a] + "\t" + lambdas[b] + "\t" + "All" + "\t" + j + "\t0\t0\t0\t0\t0" + mgmTime/Math.pow(10,9));
+                                result[result.length-1].println(alphas[a] + "\t" + lambdas[b] + "\t" + "All" + "\t" + j + "\t0\t0\t0\t0\t0\t" + mgmTime/Math.pow(10,9));
                                 Graph temp = mgm.graphFromMGM();
                                 CpcStable cp = new CpcStable(ind);
                                 cp.setInitialGraph(temp);
