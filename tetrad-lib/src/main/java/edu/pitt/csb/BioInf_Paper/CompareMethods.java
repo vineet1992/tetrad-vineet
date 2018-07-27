@@ -26,6 +26,7 @@ public class CompareMethods {
     public static void main(String [] args)throws Exception
     {
         boolean justGenerate = false;
+        boolean directedCPSS = true;
         //int numRuns = 50;
         int numRuns = 50;
         int [] numVariables = {50,200};
@@ -35,16 +36,16 @@ public class CompareMethods {
         int maxDegree = 10;
         int avgDegree = 2;
         //String [] algs = {"MGMPCS","MGMCPCS"};
-        String [] algs = {"CPCS","CPSS","PCS","MGMPCS","MGMCPCS"};
+        //String [] algs = {"CPCS","CPSS","PCS","MGMPCS","MGMCPCS"};
         //String [] algs = {"CPCS","CPSS","PCS","CG","MGMPCS","MGMCPCS","Copula"};
         //String [] algs = {"Copula"};
-        //String [] algs = {"CPSS"};
+        String [] algs = {"CPSS"};
         String [] types = {"CC","CD","DD","All"};
         double [] alphas = {0.001,0.01,0.05,0.1};
-        double [] lambdas = {0.2,0.28,0.4,0.57,0.8};
-        //double [] lambdas = {0.05,0.071,0.1,0.14,0.2};
+        //double [] lambdas = {0.2,0.28,0.4,0.57,0.8};
+        double [] lambdas = {0.05,0.071,0.1,0.14,0.2};
         boolean reload = false;
-        for(int i = 1; i < 2;i++)
+        for(int i = 0; i < 1;i++)
         {
             int numMeasures = numVariables[i];
             int samples = numSamples[i];
@@ -168,9 +169,15 @@ public class CompareMethods {
                         double lb = 0.1;
                         if(i!=0)
                             lb = 0.2;
-                        //TODO CPC should be part of the estimation procedure I believe
-                        cpss = new CPSS(data,new double[]{lb,lb,lb});
-                        cpGraphs = cpss.getGraphs();
+                        if(directedCPSS)
+                        {
+                            cpss = new CPSS(data,new double[]{lb,lb,lb},alp,0.05);
+                            cpGraphs = cpss.getGraphsDirected();
+                        }
+                        else {
+                            cpss = new CPSS(data, new double[]{lb, lb, lb});
+                            cpGraphs = cpss.getGraphs();
+                        }
                     }
                     A:for(int a = 0; a < alphas.length;a++)
                     {
@@ -198,12 +205,18 @@ public class CompareMethods {
                                 if(b!=0)
                                     continue A;
                                 double alp = 0.05;
-                                Graph init = cpss.learnGraph(cpGraphs,alphas[a]);
-                                IndTestMultinomialAJ cpssTest = new IndTestMultinomialAJ(data,alp,true);
-                                CpcStable cpc = new CpcStable(cpssTest);
-                                if(init.getNumEdges()>0)
-                                    cpc.setInitialGraph(init);
-                                est = cpc.search();
+                                if(directedCPSS)
+                                {
+                                    est = cpss.learnGraphDirected(cpGraphs,alphas[a]);
+                                }
+                                else {
+                                    Graph init = cpss.learnGraph(cpGraphs, alphas[a]);
+                                    IndTestMultinomialAJ cpssTest = new IndTestMultinomialAJ(data, alp, true);
+                                    CpcStable cpc = new CpcStable(cpssTest);
+                                    if (init.getNumEdges() > 0)
+                                        cpc.setInitialGraph(init);
+                                    est = cpc.search();
+                                }
                             }
                             else if(algs[k].equals("Copula"))
                             {

@@ -8,9 +8,13 @@ import edu.cmu.tetrad.data.ColtDataSet;
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.graph.Edge;
 import edu.cmu.tetrad.graph.EdgeListGraphSingleConnections;
+import edu.cmu.tetrad.graph.Endpoint;
 import edu.cmu.tetrad.graph.Graph;
+import edu.cmu.tetrad.search.CpcStable;
+import edu.cmu.tetrad.search.IndependenceTest;
 import edu.cmu.tetrad.util.ForkJoinPoolInstance;
 import edu.pitt.csb.Priors.runPriors;
+import edu.pitt.csb.mgm.IndTestMultinomialAJ;
 import edu.pitt.csb.mgm.MGM;
 import edu.pitt.csb.mgm.MixedUtils;
 import edu.pitt.csb.stability.DataGraphSearch;
@@ -38,6 +42,7 @@ public class CPSS {
     private int boundIndex;
     private DataSet data;
     private double [] lambda; //Array of lambda values for MGM
+    private double alpha; //Alpha value for Directed version
     private int [] lastTotalVars;
 
 
@@ -55,6 +60,16 @@ public class CPSS {
         this.data = data;
         this.lambda = lambda;
         this.p = data.getNumColumns()*(data.getNumColumns()-1)/2;
+    }
+
+    public CPSS(DataSet data, double [] lambda,double alpha,double bound)
+    {
+        this.bound = bound;
+        computeBound(bound);
+        this.data = data;
+        this.lambda = lambda;
+        this.p = data.getNumColumns()*(data.getNumColumns()-1)/2;
+        this.alpha = alpha;
     }
 
     private void computeBound(double bound)
@@ -117,6 +132,204 @@ public class CPSS {
         //Return the graph with these edges
         return finalGraph;
     }
+
+    public Graph learnGraphDirected(ArrayList<Graph> graphs , double bound)
+    {
+        this.bound = bound;
+        computeBound(bound);
+        int [] totalVars = lastTotalVars;
+        int sum = 0;
+        for(int i = 0; i < totalVars.length;i++)
+        {
+            sum+=totalVars[i];
+        }
+        final DoubleMatrix2D orientations = new SparseDoubleMatrix2D(data.getNumColumns(),data.getNumColumns());
+        final DoubleMatrix2D undirected = new SparseDoubleMatrix2D(data.getNumColumns(),data.getNumColumns());
+
+
+        for(int i = 0 ; i< graphs.size();i++)
+        {
+            Graph curr = graphs.get(i);
+            for(Edge e: curr.getEdges())
+            {
+                int x = data.getColumn(data.getVariable(e.getNode1().getName()));
+                int y = data.getColumn(data.getVariable(e.getNode2().getName()));
+                if((e.getEndpoint1()== Endpoint.ARROW && e.getEndpoint2()==Endpoint.ARROW)||(e.getEndpoint1()==Endpoint.TAIL&&e.getEndpoint2()==Endpoint.TAIL))
+                {
+                    undirected.set(x,y,undirected.get(x,y)+1);
+                    undirected.set(y,x,undirected.get(y,x)+1);
+                }
+                  if(e.isDirected() && e.pointsTowards(e.getNode1()))
+                  {
+                      //y-->x
+                      orientations.set(y,x,orientations.get(y,x)+1);
+                  }
+                   else if(e.isDirected() && e.pointsTowards(e.getNode2()))
+                  {
+                      orientations.set(x,y,orientations.get(x,y)+1);
+                  }
+            }
+        }
+        System.out.println("Done");
+        double avgVars = sum/(double)(B*2);
+        theta = avgVars/p;
+        System.out.println("Avg # Edges: " + avgVars + ", Total # of Vars: " + totalVars);
+        System.out.println("Theta is: " + theta);
+        tao = computeTao();
+        System.out.println("Tao is: " + tao);
+        Graph finalGraph = new EdgeListGraphSingleConnections(data.getVariables());
+        for(int i = 0; i < orientations.rows();i++)
+        {
+            for(int j = 0; j < orientations.columns();j++)
+            {
+                if(i==j)
+                    continue;
+                if(orientations.get(i,j)/(B*2)>=tao)
+                {
+                    if(orientations.get(i,j) > orientations.get(j,i))
+                        finalGraph.addDirectedEdge(data.getVariable(i),data.getVariable(j));
+                }
+            }
+        }
+
+        for(int i = 0; i < undirected.rows();i++)
+        {
+            for(int j = 0; j < undirected.columns();j++)
+            {
+                if(i==j)
+                    continue;
+                if(undirected.get(i,j)/(B*2)>=tao)
+                {
+                    if(finalGraph.getEdge(data.getVariable(i),data.getVariable(j))==null)
+                        finalGraph.addUndirectedEdge(data.getVariable(i),data.getVariable(j));
+                }
+            }
+        }
+        //Partition the data B times and run MGM on each partition to get a count of each edge's appearence
+        //Based on the average number of selected variables per run, compute theta
+        //use theta, q, and the bound to get a value for tao
+        //only keep the edges with probability greater than tao
+        //Return the graph with these edges
+        return finalGraph;
+    }
+
+    public ArrayList<Graph> getGraphsDirected()
+    {
+        final ArrayList<Integer>inds  = new ArrayList<Integer>();
+        final ArrayList<Graph> graphs = new ArrayList<Graph>();
+        for(int i = 0; i < data.getNumRows();i++)
+        {
+            inds.add(i);
+        }
+        final int [] totalVars = new int[B];
+        System.out.print("Computing " + B*2 + " MGM-CPC-Stable Graphs in parallel...");
+
+
+
+        final ForkJoinPool pool = ForkJoinPoolInstance.getInstance().getPool();
+
+        class StabilityAction extends RecursiveAction {
+            private int chunk;
+            private int from;
+            private int to;
+
+            public StabilityAction(int chunk, int from, int to) {
+                this.chunk = chunk;
+                this.from = from;
+                this.to = to;
+            }
+
+            //could avoid using synchronized if we keep track of array of mats and add at end, but that needs lots of
+            //memory
+
+            private synchronized ArrayList<Integer> createTemp(ArrayList<Integer> inds) {
+                ArrayList<Integer> temp = new ArrayList<Integer>();
+                temp.addAll(inds);
+                return temp;
+            }
+
+            private synchronized void addToGraphs(Graph g){graphs.add(g);}
+
+
+            private synchronized DataSet createData(){return new ColtDataSet(data.getNumColumns(),data.getVariables());}
+
+            private synchronized DataSet subset(int [] x){return data.subsetRows(x);}
+            @Override
+            protected void compute(){
+                if (to - from <= chunk) {
+                    for (int s = from; s < to; s++) {
+                        //System.out.println(s);
+                        ArrayList<Integer> tempInds = createTemp(inds);
+                        DataSet data1 = createData();
+                        DataSet data2 = createData();
+                        boolean done = false;
+                        while(!done) {
+                            Collections.shuffle(tempInds);
+                            int[] d1 = new int[tempInds.size() / 2];
+                            for (int j = 0; j < d1.length; j++) {
+                                d1[j] = tempInds.get(j);
+                            }
+                            int size2 = tempInds.size() / 2;
+                            if (tempInds.size() % 2 == 1)
+                                size2 = tempInds.size() / 2 + 1;
+                            int[] d2 = new int[size2];
+                            for (int j = d1.length; j < tempInds.size(); j++) {
+                                d2[j - d1.length] = tempInds.get(j);
+                            }
+
+                            data1 = subset(d1);
+                            data2 = subset(d2);
+                            done = true;
+                            if(runPriors.checkForVariance(data1,data)!=-1 || runPriors.checkForVariance(data2,data)!=-1)
+                                done = false;
+                        }
+                        MGM m = new MGM(data1,lambda);
+                        m.learnEdges(1000);
+                        Graph g = m.graphFromMGM();
+                        IndependenceTest ii = new IndTestMultinomialAJ(data1,alpha,true);
+                        CpcStable cpcs  = new CpcStable(ii);
+                        cpcs.setInitialGraph(g);
+                        g = cpcs.search();
+                        totalVars[s]+=g.getNumEdges();
+                        //addToMat(g,data,edgeCounts);
+                        addToGraphs(g);
+                        m = new MGM(data2,lambda);
+                        m.learnEdges(1000);
+                        g = m.graphFromMGM();
+                        ii = new IndTestMultinomialAJ(data2,alpha,true);
+                        cpcs = new CpcStable(ii);
+                        cpcs.setInitialGraph(g);
+                        g = cpcs.search();
+                        addToGraphs(g);
+                        totalVars[s]+=g.getNumEdges();
+                        //addToMat(g,data,edgeCounts);
+                    }
+
+                    return;
+                } else {
+                    List<StabilityAction> tasks = new ArrayList<>();
+
+                    final int mid = (to + from) / 2;
+
+                    tasks.add(new StabilityAction(chunk, from, mid));
+                    tasks.add(new StabilityAction(chunk, mid, to));
+
+                    invokeAll(tasks);
+
+                    return;
+                }
+            }
+
+        }
+
+        final int chunk = 2;
+
+        pool.invoke(new StabilityAction(chunk, 0,B));
+        lastTotalVars = totalVars;
+        return graphs;
+
+    }
+
     public ArrayList<Graph> getGraphs()
     {
         final ArrayList<Integer>inds  = new ArrayList<Integer>();
