@@ -691,7 +691,7 @@ public class mgmPriors {
         {
             int x = rand.nextInt(priors[0].rows());
             int y = rand.nextInt(priors[0].rows());
-            while(t.get(x,y)==1 || x==y)
+            while(t.get(x,y)!=0 || x==y)
             {
                 x = rand.nextInt(priors[0].rows());
                 y = rand.nextInt(priors[0].rows());
