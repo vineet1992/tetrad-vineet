@@ -244,40 +244,9 @@ public class runPriors {
             if(t.exists())
                 t.deleteOnExit();
 
-            int b = (int) Math.floor(10 * Math.sqrt(d.getNumRows()));
-            if (b >= d.getNumRows())
-                b = d.getNumRows() / 2;
-            int [][] samps = new int[ns][];
-            boolean done = false;
-            int attempts = 10000;
-            DataSet[] subsamples = new DataSet[ns];
-            System.out.print("Generating subsamples and ensuring variance...");
-            while(!done && attempts > 0) {
-                done = true;
-                if (loocv)
-                    samps = StabilityUtils.generateSubsamples(d.getNumRows());
-                else
-                    samps = StabilityUtils.subSampleNoReplacement(d.getNumRows(), b, ns);
 
-                for (int j = 0; j < ns; j++) {
-                    subsamples[j] = d.subsetRows(samps[j]);
-                    int col = checkForVariance(subsamples[j],d);
-                    if(col!=-1)
-                    {
-                        if(loocv)
-                        {
-                            System.out.println("Can't perform Leave-one-out Cross Validation...leaving out sample " + j + " makes " + d.getVariable(col) + " have no variance");
-                            System.exit(-1);
-                        }
-                        else {
-                            attempts--;
-                            done = false;
-                        }
-                    }
-                }
-            }
 
-            subsamples = null;
+            int [][] samps = genSubs(d,ns,loocv);
             System.out.println("Done");
             System.out.print("Generating Lambda Params...");
             mgmPriors m = new mgmPriors(ns,initLambdas,d,priors,samps,verbose);
@@ -312,6 +281,42 @@ public class runPriors {
     }
 
 
+    public static int [][] genSubs(DataSet d, int ns, boolean loocv)
+    {
+        int b = (int) Math.floor(10 * Math.sqrt(d.getNumRows()));
+        if (b >= d.getNumRows())
+            b = d.getNumRows() / 2;
+        int [][] samps = new int[ns][];
+        boolean done = false;
+        int attempts = 10000;
+        DataSet[] subsamples = new DataSet[ns];
+        System.out.print("Generating subsamples and ensuring variance...");
+        while(!done && attempts > 0) {
+            done = true;
+            if (loocv)
+                samps = StabilityUtils.generateSubsamples(d.getNumRows());
+            else
+                samps = StabilityUtils.subSampleNoReplacement(d.getNumRows(), b, ns);
+
+            for (int j = 0; j < ns; j++) {
+                subsamples[j] = d.subsetRows(samps[j]);
+                int col = checkForVariance(subsamples[j],d);
+                if(col!=-1)
+                {
+                    if(loocv)
+                    {
+                        System.out.println("Can't perform Leave-one-out Cross Validation...leaving out sample " + j + " makes " + d.getVariable(col) + " have no variance");
+                        System.exit(-1);
+                    }
+                    else {
+                        attempts--;
+                        done = false;
+                    }
+                }
+            }
+        }
+        return samps;
+    }
     public static synchronized int checkForVariance(DataSet d, DataSet full)
     {
         TetradMatrix t = d.getDoubleData();
