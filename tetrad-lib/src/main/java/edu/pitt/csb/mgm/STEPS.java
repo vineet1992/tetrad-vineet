@@ -25,6 +25,8 @@ import static edu.pitt.csb.stability.StabilityUtils.StabilitySearchPar;
 /**
  * Created by vinee_000 on 10/5/2016.
  */
+
+//TODO Incorporate iterLimit into all parts of StEPS searches for efficiency
 public class STEPS {
     private DataSet d;
     private int N;
