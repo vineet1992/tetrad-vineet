@@ -233,8 +233,7 @@ public class ProximalGradient {
 
             printIter = 1;
             if (iterCount % printIter == 0) {
-           //     System.out.println("Iter: " + iterCount + " |dx|/|x|: " + dx + " normX: " + norm2(X) + " nll: ");
-                 //       Fx + " reg: " + Gx + " DiffEdges: " + diffEdges + " L: " + L);
+                System.out.println("Iter: " + iterCount + " |dx|/|x|: " + dx + " normX: " + norm2(X) + " nll: " + Fx + " reg: " + Gx + " DiffEdges: " + diffEdges + " L: " + L);
               //  System.out.println("Iter: " + iterCount + " |dx|/|x|: " + dx + " nll: " + negLogLikelihood(params) + " reg: " + regTerm(params));
             }
             //System.out.println("t: " + t);

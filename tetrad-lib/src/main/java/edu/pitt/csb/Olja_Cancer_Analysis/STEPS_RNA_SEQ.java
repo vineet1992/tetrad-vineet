@@ -5,9 +5,11 @@ import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.data.DelimiterType;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.Node;
+import edu.cmu.tetrad.search.CpcStable;
 import edu.cmu.tetrad.search.FciMaxP;
 import edu.cmu.tetrad.search.IndependenceTest;
 import edu.cmu.tetrad.search.PcStable;
+import edu.pitt.csb.Priors.runPriors;
 import edu.pitt.csb.mgm.IndTestMultinomialAJ;
 import edu.pitt.csb.mgm.MGM;
 import edu.pitt.csb.mgm.MixedUtils;
@@ -21,6 +23,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.PrintStream;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * This class can actually be used for both Microarray analysis and RNA-Seq analysis
@@ -55,11 +58,11 @@ public class STEPS_RNA_SEQ {
        // d.removeColumn(d.getVariable("Age"));
         //  DataSet d3 = MixedUtils.completeCases(d);
 
-
+System.out.println(d);
         //ns set to number of samples since we're doing leave-one-out cross validation
-        int ns = d.getNumRows();
-        double g = 0.01;
-        int numLambdas = 40;
+        int ns = 5;
+        double g = 0.05;
+        int numLambdas = 10;
         double [] lambda = new double[numLambdas];
         for(int i = 0; i < numLambdas;i++)
         {
@@ -83,14 +86,14 @@ public class STEPS_RNA_SEQ {
             String[] stuff = line.split("\\[")[1].split(",");
             l = new double[]{Double.parseDouble(stuff[0]), Double.parseDouble(stuff[1].trim()), Double.parseDouble(stuff[2].replace("]", "").trim())};
             MGM m = new MGM(d, l);
-            m.learnEdges(1000);
+            m.learnEdges(100);
             g2 = m.graphFromMGM();
             stab = StabilityUtils.StabilitySearchPar(d, new SearchWrappers.MGMWrapper(lambda)).toArray();
         }
 
 
 else {
-            STEPS s = new STEPS(d, lambda, g, d.getNumRows(), true);
+            STEPS s = new STEPS(d, lambda, g, ns, false);
             System.out.print("Running StEPS...");
             g2 = s.runStepsPar();
             System.out.println("Done");
@@ -105,8 +108,8 @@ else {
         double [] params = {l[0],l[1],l[2]};
         DataGraphSearch gs = new SearchWrappers.MGMWrapper(params);
         int [][] samps = StabilityUtils.generateSubsamples(d.getNumRows());
-        DataSet [] subs = new DataSet[ns];
-        for(int i = 0; i < ns;i++) {
+        DataSet [] subs = new DataSet[d.getNumRows()];
+        for(int i = 0; i < d.getNumRows();i++) {
             subs[i] = d.copy();
             Arrays.sort(samps[i]);
             subs[i] = subs[i].subsetRows(samps[i]);
@@ -128,7 +131,7 @@ else {
         PrintStream out = new PrintStream(args[1]);
         out.println(g2);
         IndependenceTest iTest = new IndTestMultinomialAJ(d,0.05);
-        PcStable pcs = new PcStable(iTest);
+        CpcStable pcs = new CpcStable(iTest);
         pcs.setInitialGraph(g2);
         Graph g3 = pcs.search();
         out.flush();
@@ -200,7 +203,7 @@ try {
 
         if (lam == null) {
             System.out.print("Lambda is null so running steps...");
-            STEPS s = new STEPS(train, lambda, g, ns, true);
+            STEPS s = new STEPS(train, lambda, g, ns, false);
             gOut = s.runStepsPar();
             stabs = s.stabilities;
             lam = new double[]{s.lastLambda[0], s.lastLambda[1], s.lastLambda[2]};
@@ -214,7 +217,7 @@ try {
 
         System.out.print("Running PCS...");
         IndependenceTest indy = new IndTestMultinomialAJ(train, 0.05);
-        PcStable pc = new PcStable(indy);
+        CpcStable pc = new CpcStable(indy);
         pc.setInitialGraph(gOut);
         Graph gOut2 = pc.search();
         System.out.println("Done");
@@ -234,11 +237,19 @@ try {
         }
 
 
-        //PCS Direct Causes Only
-        for (Node n : gOut2.getParents(gOut2.getNode(target))) {
-            int x = d.getColumn(d.getVariable(n.getName()));
-            int y = d.getColumn(d.getVariable(target));
-            p3.println(n.getName() + "\t" + stabs[x][y]);
+        //PCS Markov Blanket Only
+        List<Node> neighbors = gOut2.getAdjacentNodes(gOut2.getNode(target));
+        for (Node n : gOut2.getChildren(gOut2.getNode(target))) {
+            for(Node pp: gOut2.getParents(n))
+            {
+                if(!neighbors.contains(pp))
+                {
+                    int x = d.getColumn(d.getVariable(pp.getName()));
+                    int y = d.getColumn(d.getVariable(target));
+                    p3.println(n.getName() + "\t" + stabs[x][y]);
+                }
+            }
+
         }
 
 
