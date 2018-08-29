@@ -27,31 +27,33 @@ import java.util.*;
  */
 public class simulatePrefDivData {
 
-
-
-
     public static void main(String [] args) {
-        int numRuns = 15;
+        int numRuns = 25;
         int numGenes = 100;
         int sampleSize = 200;
-        int ns = 20;
-        int minTargetParents = 5;
-        double[] noises = {-3,-2,-1,-0.5,-0.25,0};
+        int ns = 20; //number of subsamples
+        int nf = 5;//number of folds for cross-validation
+        int minTargetParents = 5; //How many true parents of the target are there?
+       // double[] noises = {-3,-2,-1,-0.5,-0.25,0};
+        double[] noises = {0.001,0.1,0.25,0.5,0.75,1.0};
+         //   double [] noises = {1.0};
         for (int nn = 0; nn < noises.length; nn++) {
-            double intensityNoise = 0.4;
-            double dissimilarityNoise = 0.4;
-            boolean targetContinuous = true;
-            boolean clusterSimulation = false;
-            boolean evenDistribution = false;
-            boolean clusterStability = false;
-            int numComponents = 10;
-            double stabilityThreshold = 0.1;
+            double intensityNoise = noises[nn];
+            double dissimilarityNoise = noises[nn];
+            boolean stabilitySelection = true; //Should we use the stability selection version or the StARS version
+            boolean targetContinuous = true; //Is the target variable continuous?
+            boolean clusterSimulation = false; //Are we simulating the data in clusters?
+            boolean evenDistribution = false; //Is the distribution of nodes in each cluster even?
+            boolean clusterStability = false; //Do we use the stability of the clusters to determine the choice of alpha?
+            boolean useCausalGraph = false;//Do we use the causal graph to select regression features? (Only for CPSS version)
+            int numComponents = 10; //How many components do we have for cluster simulation?
+            double stabilityThreshold = 0.1; //How much instability do we tolerate to choose alpha?
             double percentMissing = 0;
-            int numCategories = 4;
+            int numCategories = 4; //number of categories for discrete variables
 
-            double radius = noises[nn];
-            double accuracy = 0.5;
-            int topK = minTargetParents;
+            double radius = 0.5; //Radius of similarity for Pref-Div
+            double accuracy = 0.5; //A parameter in Pref-Div
+            int topK = minTargetParents; //How many genes are we choosing with our method?
 
             int index = 0;
             while (index < args.length) {
@@ -73,7 +75,11 @@ public class simulatePrefDivData {
                 } else if (args[index].equals("-nc")) {
                     numComponents = Integer.parseInt(args[index + 1]);
                     index += 2;
-                } else if (args[index].equals("-stabThresh")) {
+                }else if(args[index].equals("-stabSelect"))
+                {
+                    stabilitySelection = true;
+                    index++;
+                }else if (args[index].equals("-stabThresh")) {
                     stabilityThreshold = Double.parseDouble(args[index + 1]);
                     index += 2;
                 } else if (args[index].equals("-noise")) {
@@ -92,6 +98,9 @@ public class simulatePrefDivData {
                 } else if (args[index].equals("-clusterStab")) {
                     clusterStability = true;
                     index++;
+                } else if(args[index].equals("-useCG")){
+                        useCausalGraph = true;
+                        index++;
                 } else {
                     System.err.println("Unidentified argument: " + args[index]);
                     System.exit(-1);
@@ -101,7 +110,7 @@ public class simulatePrefDivData {
 
             String runName = "";
             if (clusterSimulation)
-                runName = numGenes + "_" + sampleSize + "_" + ns + "_" + minTargetParents + "_" + intensityNoise + "_" + targetContinuous + "_" + stabilityThreshold + "_" + numComponents + "_" + radius + "_" + evenDistribution + "_" + clusterStability; //Name to append at the beginning of all output files
+                runName = numGenes + "_" + sampleSize + "_" + ns + "_" + minTargetParents + "_" + intensityNoise + "_" + targetContinuous + "_" + stabilityThreshold + "_" + numComponents + "_" + radius + "_" + evenDistribution + "_" + clusterStability + "_" + stabilitySelection + "_" + useCausalGraph; //Name to append at the beginning of all output files
             else
                 runName = numGenes + "_" + sampleSize + "_" + ns + "_" + minTargetParents + "_" + intensityNoise + "_" + targetContinuous + "_" + stabilityThreshold + "_" + radius + "_" + clusterStability; //Name to append at the beginning of all output files
             boolean saveData = true;
@@ -185,10 +194,19 @@ public class simulatePrefDivData {
                     r.close();
                 }
                 stabPS = new PrintStream("Results/Result_" + runName + "_stabilities.txt");
-                if (outStabAcc)
-                    stabPS.println("Run\tAlpha\tStability\tPrecision\tRecall\tPredicted\tActual\tClusters");
-                else
-                    stabPS.println("Run\tAlpha\tStability\tClusters");
+                if(stabilitySelection)
+                {
+                    if (outStabAcc)
+                        stabPS.println("Run\tAlpha\tCV Accuracy\tCV Stability\tStability\tPrecision\tRecall\tPredicted\tActual\tClusters");
+                    else
+                        stabPS.println("Run\tAlpha\tCV Accuracy\tCV Stability\tStability\tClusters");
+                }
+                else {
+                    if (outStabAcc)
+                        stabPS.println("Run\tAlpha\tStability\tPrecision\tRecall\tPredicted\tActual\tClusters");
+                    else
+                        stabPS.println("Run\tAlpha\tStability\tClusters");
+                }
             } catch (Exception e) {
                 System.err.println("Unable to create stability file");
                 System.exit(-1);
@@ -458,9 +476,9 @@ public class simulatePrefDivData {
                 }
                 File subsFile = null;
                 if (clusterSimulation)
-                    subsFile = new File("Subsamples/Subsample_" + numGenes + "_" + sampleSize + "_" + minTargetParents + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + j + ".txt");
+                    subsFile = new File("Subsamples/Subsample_" + numGenes + "_" + sampleSize + "_" + minTargetParents + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + stabilitySelection + "_" + nf + "_" +  j +  ".txt");
                 else
-                    subsFile = new File("Subsamples/Subsample_" + numGenes + "_" + sampleSize + "_" + minTargetParents + "_" + targetContinuous + "_" + j + ".txt");
+                    subsFile = new File("Subsamples/Subsample_" + numGenes + "_" + sampleSize + "_" + minTargetParents + "_" + targetContinuous + "_" + stabilitySelection + "_" + nf + "_" + j + ".txt");
                 int[][] subs = null;
                 if (subsFile.exists()) {
                     try {
@@ -493,17 +511,20 @@ public class simulatePrefDivData {
 
                 if (subs != null)
                     r.setSubs(subs);
+                r.useStabilitySelection();
                 r.setApproxCorrelations(false);
                 r.setClusterStability(clusterStability);
                 r.setRadius(radius);
                 r.setAccuracy(accuracy);
                 r.setNS(ns);
                 r.setTopK(topK);
+                r.setNumFolds(nf);
                 r.setThreshold(stabilityThreshold);
                 r.setStabilityOutput(outStabAcc);
                 r.setTargets(g.getAdjacentNodes(g.getNode(target)));
                 r.setRun(j);
                 r.usePartialCorrelation(false);
+                r.setCausalGraph(useCausalGraph);
                 if (accuracyResults.size() <= j) {
                     ArrayList<Gene> result = r.runPD();
                     System.out.println("Top Genes: " + result);
@@ -575,6 +596,7 @@ public class simulatePrefDivData {
             }
             out.flush();
             out.close();
+
 
             for (int i = 0; i < stabilityResults.size(); i++) {
                 stabPS.println(stabilityResults.get(i));
