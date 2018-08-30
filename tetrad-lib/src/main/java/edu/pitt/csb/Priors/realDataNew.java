@@ -145,7 +145,17 @@ public class realDataNew {
         int b = (int) Math.floor(10 * Math.sqrt(data.getNumRows()));
         if (b > data.getNumRows())
             b = 3*data.getNumRows() / 4;
-        int[][] samps = StabilityUtils.subSampleNoReplacement(data.getNumRows(), b, numSub);
+        int [][] samps = null;
+        boolean exit = false;
+        while(!exit) {
+            samps = StabilityUtils.subSampleNoReplacement(data.getNumRows(), b, numSub);
+            exit = true;
+            for(int i = 0; i < samps.length;i++)
+            {
+                if(runPriors.checkForVariance(data.subsetRows(samps[i]),data)!=-1)
+                    exit = false;
+            }
+        }
         File temp = new File(runDir + "/Subsamples/Subsamples.txt");
         if(!temp.exists())
         {

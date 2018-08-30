@@ -5,6 +5,7 @@ import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.Node;
 import edu.pitt.csb.Priors.mgmPriors;
+import edu.pitt.csb.Priors.runPriors;
 import edu.pitt.csb.mgm.MGM;
 import edu.pitt.csb.mgm.MGM_Priors;
 import edu.pitt.csb.mgm.MixedUtils;
@@ -85,7 +86,20 @@ public class CrossValidationSets {
             return;
         }
         //Generate Cross-Validation Subsamples
+        boolean exit = false;
         int [][] samps = StabilityUtils.generateSubsamples(k,data.getNumRows());
+
+        while(!exit)
+        {
+            exit = true;
+            for(int i = 0; i < samps.length;i++)
+            {
+                if(runPriors.checkForVariance(data.subsetRows(samps[i]),data)!=-1)
+                    exit = false;
+            }
+            if(!exit)
+                samps = StabilityUtils.generateSubsamples(k,data.getNumRows());
+        }
 
 
         //Write subsamples to file
