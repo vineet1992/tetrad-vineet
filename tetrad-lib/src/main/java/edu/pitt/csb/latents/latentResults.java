@@ -18,7 +18,7 @@ import java.util.*;
  */
 public class latentResults {
     public static void main(String [] args) throws Exception{
-        int numRuns = 25;
+        int numRuns = 15;
         int numVars = 50;
         int sampleSize = 200;
         int numLatents = 10;
@@ -26,7 +26,7 @@ public class latentResults {
         int numSubSets = 4;
         //String [] algs = {"FCI","MGM-FCI-MAX","Latent_FCI","Latent_MGM-FCI-MAX"};
         //String [] algs = {"Latent_FCI","Latent_MGM-FCI-MAX"};
-        String [] algs = {"FCI","MGM-FCI-MAX","CPSS-FCI","CPSS-MGM-FCI-MAX"};
+        String [] algs = {"FCI","MGM-FCI-MAX","CPSS-FCI","CPSS-MGM-FCI-MAX","Bootstrap-FCI","Bootstrap-MGM-FCI-MAX"};
         PrintStream [] ps = new PrintStream[algs.length];
         PrintStream [] ps2 = new PrintStream[algs.length];
         /************************************************
@@ -39,7 +39,7 @@ public class latentResults {
         for(int i = 0; i < algs.length;i++) {
             ps[i] = new PrintStream(algs[i] + "_Distribution.txt");
             ps[i].println("Run\tEdge Type\tStability\tTrue_Edge\tIdentifiable");
-            if (!algs[i].contains("CPSS")) {
+            if (!algs[i].contains("CPSS") && !algs[i].contains("Bootstrap")) {
                 ps2[i] = new PrintStream(algs[i] + "_Orientations.txt");
                 ps2[i].println("Run\tEdge Type\tStability\tTrue_Edge\tIdentifiable\tRule_1\tRule_2\tRule_1_Stability\tRule_2_Stability\tRule_1_Stability_Precise\tRule_2_Stability_Precise");
             }
@@ -188,7 +188,7 @@ public class latentResults {
                     map.put(line[0],result);
                 }
 
-                if(!algs[j].contains("CPSS")) {
+                if(!algs[j].contains("CPSS") && !algs[j].contains("Bootstrap")) {
                     for (String x : map.keySet()) {
                         String[] nodes = x.split(",");
 

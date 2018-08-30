@@ -31,6 +31,7 @@ import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.GraphUtils;
 import edu.cmu.tetrad.graph.Node;
 import edu.cmu.tetrad.util.ForkJoinPoolInstance;
+import edu.pitt.csb.Priors.runPriors;
 import edu.pitt.csb.mgm.MGM;
 import edu.pitt.csb.mgm.MixedUtils;
 
@@ -176,7 +177,11 @@ public class StabilityUtils {
                 if (to - from <= chunk) {
                     for (int s = from; s < to; s++) {
                         DataSet dataSubSamp = data.subsetRows(samps[s]).copy();
-
+                        System.out.println("Running sample: " + s);
+                        if(runPriors.checkForVariance(dataSubSamp,data)!=-1)
+                        {
+                            System.err.println("Variance issue with dataset: " + s);
+                        }
                         DataGraphSearch curGs = gs.copy();
                         Graph g = curGs.search(dataSubSamp);
 
@@ -333,8 +338,20 @@ public class StabilityUtils {
         final int numVars = data.getNumColumns();
         final DoubleMatrix2D thetaMat = DoubleFactory2D.dense.make(numVars, numVars, 0.0);
 
-        final int[][] samps = subSampleNoReplacement(data.getNumRows(), b, N);
+        int[][] samp = subSampleNoReplacement(data.getNumRows(), b, N);
+        boolean done = false;
+        while(!done)
+        {
+            done = true;
+            for(int i = 0; i < samp.length;i++)
+            {
+                if(runPriors.checkForVariance(data.subsetRows(samp[i]),data)!=-1)
+                    done = false;
+            }
+            samp = subSampleNoReplacement(data.getNumRows(), b, N);
+        }
 
+        final int [][] samps = samp;
         final ForkJoinPool pool = ForkJoinPoolInstance.getInstance().getPool();
 
         class StabilityAction extends RecursiveAction{
@@ -358,6 +375,7 @@ public class StabilityUtils {
             protected void compute(){
                 if (to - from <= chunk) {
                     for (int s = from; s < to; s++) {
+                        System.out.println("Running sample: " + s);
                         DataSet dataSubSamp = data.subsetRows(samps[s]).copy();
                         DataGraphSearch curGs = gs.copy();
                         Graph g = curGs.search(dataSubSamp);
@@ -752,6 +770,20 @@ public class StabilityUtils {
 
         return D;
     }
+
+
+    public static int[][] subSampleNoReplacement(int sampSize, int numSub){
+
+        int subSize =(int) (10*Math.sqrt(sampSize));
+        if(subSize>sampSize)
+            subSize = sampSize/2;
+        if (subSize < 1) {
+            throw new IllegalArgumentException("Sample size must be > 0.");
+        }
+
+       return subSampleNoReplacement(sampSize,subSize,numSub);
+    }
+
 
     //returns an numSub by subSize matrix of subsamples of the sequence 1:sampSize
     public static int[][] subSampleNoReplacement(int sampSize, int subSize, int numSub){

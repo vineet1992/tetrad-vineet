@@ -1386,6 +1386,27 @@ public final class DataUtils {
 
         return ColtDataSet.makeData(data.getVariables(), data.getDoubleData().getSelection(rows, cols));
     }
+/*
+@return a 2-D Array with numSamples rows
+ where each row consists of an array of indices which can be used to create a bootstrapped sample of size sampleSize from
+ the DataSet data
+ */
+    public static int[][] getBootstrapIndices(DataSet data, int sampleSize, int numSamples) {
+        int [][] samps = new int[numSamples][sampleSize];
+        for(int j = 0; j < numSamples;j++) {
+            int actualSampleSize = data.getNumRows();
+
+            int[] rows = new int[sampleSize];
+
+            for (int i = 0; i < rows.length; i++) {
+                rows[i] = RandomUtil.getInstance().nextInt(actualSampleSize);
+            }
+            samps[j] = rows;
+        }
+
+        return samps;
+    }
+
 
     /**
      * @return a sample without replacement with the given sample size from the

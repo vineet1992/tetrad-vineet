@@ -86,9 +86,15 @@ public class MGM extends ConvexProximal implements GraphSearch{
     int p;
     int q;
     int n;
+    private long timeout = -1;
 
     //parameter weights
     private DoubleMatrix1D weights;
+
+
+
+    public double timePerIter = 0;
+    public int iterCount = 0;
 
     public MGM(DoubleMatrix2D x, DoubleMatrix2D y, List<Node> variables, int[] l, double[] lambda){
 
@@ -1069,6 +1075,11 @@ public class MGM extends ConvexProximal implements GraphSearch{
     }*/
 
 
+    public void setTimeout(long time)
+    {
+        timeout = time;
+    }
+
     /**
      *  Learn MGM traditional way with objective function tolerance. Recommended for inference applications that need
      *  accurate pseudolikelihood
@@ -1089,7 +1100,14 @@ public class MGM extends ConvexProximal implements GraphSearch{
      */
     public void learnEdges(int iterLimit){
         ProximalGradient pg = new ProximalGradient(.5, .9, true);
-        setParams(new MGMParams(pg.learnBackTrack(this, params.toMatrix1D(), 0.0, iterLimit), p, lsum));
+        if(timeout!=-1)
+            setParams(new MGMParams(pg.learnBackTrack(this, params.toMatrix1D(), 0.0, iterLimit,timeout), p, lsum));
+        else
+            setParams(new MGMParams(pg.learnBackTrack(this, params.toMatrix1D(), 0.0, iterLimit), p, lsum));
+
+        timePerIter = pg.timePerIter;
+        iterCount = pg.iterComplete;
+
     }
 
     /**

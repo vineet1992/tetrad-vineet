@@ -38,7 +38,7 @@ public class RunPrefDiv {
     private DataSet data;
     private Random rand;
     //private final double largeError = 1E8;
-    private final int B = 50; //Number of Subsamples for CPSS
+    private int B = 50; //Number of Subsamples for CPSS
     private ArrayList<Gene> genes;
     private float[] dissimilarity;
     private int numSubs = 20; //Number of subsamples
@@ -69,6 +69,7 @@ public class RunPrefDiv {
     private Graph trueGraph;
 
     private boolean useStabilitySelection = false;
+    private boolean useCausalGraph = false;
 
     public RunPrefDiv(float [] dissimilarity, ArrayList<Gene> genes, DataSet data,String target,boolean leaveOneOut)
     {
@@ -137,6 +138,8 @@ public class RunPrefDiv {
     public ArrayList<Gene> getLastGeneSet(){return lastGeneSet;}
     public void usePartialCorrelation(boolean pc){partialCorr = pc;}
     public void useStabilitySelection(){useStabilitySelection = true;}
+    public void setCausalGraph(boolean cg){useCausalGraph = cg;}
+    public void setB(int B){this.B = B;}
 
     public ArrayList<Gene> runPD()
     {
@@ -220,47 +223,61 @@ public class RunPrefDiv {
                     ArrayList<Gene> genes = lastGeneSet;
                     System.out.println(genes);
                     List<Node> cols = new ArrayList<Node>();
-
-                    //Create a dataset with only those variables selected by PD
-                    cols.add(train.getVariable(target));
-                    for (int k = 0; k < genes.size(); k++) {
-                        cols.add(train.getVariable(genes.get(k).symbol));
-                    }
-
-
-
-                    //Generate subsamples for StEPS, and run to get a graph with the currently generate gene set
-                    DataSet temp = train.subsetColumns(cols);
-                    if(!temp.isMixed())
+                    List<Node> dNeighbors = new ArrayList<Node>();
+                    if(useCausalGraph)
                     {
-                        temp.addVariable(new DiscreteVariable("Dummy"));
-                        int col = temp.getColumn(temp.getVariable("Dummy"));
-                        Random rand = new Random();
-                        for(int x = 0; x < temp.getNumRows();x++)
+                        //Create a dataset with only those variables selected by PD
+                        cols.add(train.getVariable(target));
+                        for (int k = 0; k < genes.size(); k++) {
+                            cols.add(train.getVariable(genes.get(k).symbol));
+                        }
+
+
+
+                        //Generate subsamples for StEPS, and run to get a graph with the currently generate gene set
+                        DataSet temp = train.subsetColumns(cols);
+                        if(!temp.isMixed())
                         {
-                            temp.setInt(x,col,rand.nextInt(2));
+                            temp.addVariable(new DiscreteVariable("Dummy"));
+                            int col = temp.getColumn(temp.getVariable("Dummy"));
+                            Random rand = new Random();
+                            for(int x = 0; x < temp.getNumRows();x++)
+                            {
+                                temp.setInt(x,col,rand.nextInt(2));
+                            }
+                        }
+                        DataSet[] subsampled = new DataSet[numSubs];
+                        for (int k = 0; k < subsampled.length; k++) {
+                            subsampled[k] = temp.subsetRows(trainSubs[k]);
+                        }
+                        double[] lambdas = new double[numAlphas];
+                        for (int k = 0; k < lambdas.length; k++) {
+                            lambdas[k] = lambdaLow + (lambdaHigh - lambdaLow) * k / numAlphas;
+                        }
+                        STEPS s = new STEPS(temp, lambdas, g, trainSubs);
+                        System.out.print("Running StEPS...");
+                        s.runStepsArrayPar();
+                        System.out.println("Done");
+                        List<Node> neighbors = s.lastGraph.getAdjacentNodes(s.lastGraph.getNode(target));
+                        dNeighbors = new ArrayList<Node>();
+                        for(Node n:neighbors)
+                        {
+                            if(n.getName().equals("Dummy"))
+                                continue;
+                            dNeighbors.add(train.getVariable(n.getName()));
                         }
                     }
-                    DataSet[] subsampled = new DataSet[numSubs];
-                    for (int k = 0; k < subsampled.length; k++) {
-                        subsampled[k] = temp.subsetRows(trainSubs[k]);
-                    }
-                    double[] lambdas = new double[numAlphas];
-                    for (int k = 0; k < lambdas.length; k++) {
-                        lambdas[k] = lambdaLow + (lambdaHigh - lambdaLow) * k / numAlphas;
-                    }
-                    STEPS s = new STEPS(temp, lambdas, g, trainSubs);
-                    System.out.print("Running StEPS...");
-                    s.runStepsArrayPar();
-                    System.out.println("Done");
-                    List<Node> neighbors = s.lastGraph.getAdjacentNodes(s.lastGraph.getNode(target));
-                    List<Node> dNeighbors = new ArrayList<Node>();
-                    for(Node n:neighbors)
+                    else
                     {
-                        if(n.getName().equals("Dummy"))
-                            continue;
-                        dNeighbors.add(train.getVariable(n.getName()));
+                        for(Gene g:lastGeneSet)
+                        {
+                            if(g.symbol.equals("Dummy"))
+                                continue;
+                            dNeighbors.add(train.getVariable(g.symbol));
+                        }
                     }
+
+
 
                     //Randomly select a gene to be connected if none are connected in the causal graph?
                     if(dNeighbors.size()==0)

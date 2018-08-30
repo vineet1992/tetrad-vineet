@@ -12,6 +12,7 @@ import edu.cmu.tetrad.graph.NodeType;
 import edu.cmu.tetrad.search.DagToPag;
 import edu.pitt.csb.latents.LatentPrediction;
 import edu.pitt.csb.mgm.MixedUtils;
+import edu.pitt.csb.stability.Bootstrap;
 import edu.pitt.csb.stability.CPSS;
 import edu.pitt.csb.stability.StabilityUtils;
 import org.apache.commons.math3.distribution.NormalDistribution;
@@ -40,11 +41,12 @@ public class testLatentRecovery {
         int numVariables = 50;
         int numLatents = 10;
         int numEdges = 200;
-        int sampleSize = 200;
+        int sampleSize = 500;
         int numSubsamples = 10;
-        int numRuns = 25;
+        int numRuns = 15;
         int index = 0;
         int numCategories = 4;
+        int BS = 100;
         //int numSubSets = numVariables/5;
         int numSubSets = 4;
         double percentDiscrete = 2;
@@ -57,7 +59,8 @@ public class testLatentRecovery {
         int B = 50; //Number of partitions for CPSS
         double cpAlpha = 0.05;
         double [] cpLambda = {0.2,0.2,0.2};
-        double bound = 0.001;
+        double bound = 0.05;
+        double bootstrapBound = 0;
         String directory = ".";
 
         //String[] algs = {"FCI","MGM-FCI","MGM-FCI-MAX","Latent_FCI","Latent_MGM-FCI","Latent_MGM-FCI-MAX"};
@@ -65,7 +68,10 @@ public class testLatentRecovery {
        // String [] algs = {"MGM-FCI-MAX","Latent_MGM-FCI-MAX"};
         //String [] algs= {"Latent_FCI","Latent_MGM-FCI-MAX"};
        // String [] algs = {"MGM-FCI-MAX","FCI"};
-        String [] algs = {"FCI","MGM-FCI-MAX","CPSS-FCI","CPSS-MGM-FCI-MAX"};
+        String [] algs = {"FCI","MGM-FCI-MAX","CPSS-FCI","CPSS-MGM-FCI-MAX","Bootstrap-FCI","Bootstrap-MGM-FCI-MAX"};
+
+      //  String [] algs = {"Bootstrap-FCI","Bootstrap-MGM-FCI-MAX"};
+
         //String [] algs = {"FCI","MGM-FCI","MGM-FCI-MAX","CPSS-FCI","CPSS-MGM-FCI","CPSS-MGM-FCI-MAX"};
         double [][][] precision = new double[numRuns][algs.length][4];
         double [][][] recall = new double[numRuns][algs.length][4];
@@ -164,6 +170,7 @@ public class testLatentRecovery {
         File subFile = new File("Subsamples");
         File partFile = new File("Partitions");
         File runFile = new File("Runtimes");
+        File bootFile = new File("Bootstraps");
         if(saveData) {
             if (!gFile.isDirectory())
                 gFile.mkdir();
@@ -181,6 +188,8 @@ public class testLatentRecovery {
                 runFile.mkdir();
             if(!partFile.isDirectory())
                 partFile.mkdir();
+            if(!bootFile.isDirectory())
+                bootFile.mkdir();
         }
 
         /*PrintStream pri = new PrintStream(directory + "/mgm_priors_" + amountPrior + "_" + numExperts + "_" + numVariables +  "_" + sampleSize + "_" + numSubsamples + ".txt");
@@ -217,6 +226,7 @@ public class testLatentRecovery {
             }
             int[][] subsamples = new int[numSubsamples][];
             int [][] partitions = new int[B*2][];
+            int [][] bootParts = new int[BS][];
             if(reuseData)
             {
                 boolean foundFile = false;
@@ -281,6 +291,21 @@ public class testLatentRecovery {
                             }
                             b2.close();
                         }
+
+                    f = new File("Bootstraps/Bootstraps_" + i + "_" + numVariables + "_" + sampleSize + "_" + numLatents + ".txt");
+                    if(f.exists()) {
+                        BufferedReader b2 = new BufferedReader(new FileReader(f.getAbsolutePath()));
+                        for (int j = 0; j < BS; j++) {
+                            String[] line = b2.readLine().split("\t");
+                            bootParts[j] = new int[line.length];
+                            for (int k = 0; k < line.length; k++) {
+                                bootParts[j][k] = Integer.parseInt(line[k]);
+                            }
+
+                        }
+                        b2.close();
+                    }
+
                 }
 
             }
@@ -350,6 +375,7 @@ public class testLatentRecovery {
                 try {
                     boolean nullSub = false;
                     boolean nullParts = false;
+                    boolean nullBoots = false;
                     for(int j = 0; j < subsamples.length;j++)
                     {
                         if(subsamples[j]==null)
@@ -362,6 +388,12 @@ public class testLatentRecovery {
                         if(partitions[j]==null)
                             nullParts = true;
                     }
+                    for(int j = 0; j < bootParts.length;j++)
+                    {
+                        if(bootParts[j]==null)
+                            nullBoots = true;
+                    }
+
                     if(nullParts)
                         partitions = CPSS.createSubs(c.getDataSet(0),B);
                     if(nullSub) {
@@ -370,6 +402,10 @@ public class testLatentRecovery {
                             b = c.getDataSet(0).getNumRows() / 2;
                         subsamples = StabilityUtils.subSampleNoReplacement(c.getDataSet(0).getNumRows(), b, numSubsamples);
 
+                    }
+                    if(nullBoots)
+                    {
+                        bootParts = Bootstrap.createSubs(c.getDataSet(0),BS);
                     }
 
 
@@ -388,6 +424,11 @@ public class testLatentRecovery {
                                 {
                                     temp = temp.replace("CPSS-","");
                                     lp.setCPSS(B,cpAlpha,cpLambda,bound,partitions);
+                                }
+                                if(algs[j].contains("Bootstrap"))
+                                {
+                                    temp = temp.replace("Bootstrap-","");
+                                    lp.setBootstrap(BS,cpAlpha,cpLambda,bootstrapBound,bootParts);
                                 }
                                 lp.setStarsGamma(starsGamma);
                                 lp.setStepsGamma(stepsGamma);
@@ -416,6 +457,11 @@ public class testLatentRecovery {
                                 {
                                     temp = temp.replace("CPSS-","");
                                     lp.setCPSS(B,cpAlpha,cpLambda,bound,partitions);
+                                }
+                                if(algs[j].contains("Bootstrap"))
+                                {
+                                    temp = temp.replace("CPSS-","");
+                                    lp.setBootstrap(BS,cpAlpha,cpLambda,bootstrapBound,bootParts);
                                 }
                                 lp.setStarsGamma(starsGamma);
                                 lp.setStepsGamma(stepsGamma);
@@ -525,6 +571,17 @@ public class testLatentRecovery {
                     for(int k = 0; k < partitions[j].length;k++)
                     {
                         p2.print(partitions[j][k] + "\t");
+                    }
+                    p2.println();
+                }
+                p2.flush();
+                p2.close();
+                p2 = new PrintStream("Bootstraps/Bootstrap_" + i + "_" + numVariables + "_" + sampleSize + "_" + numLatents + ".txt");
+                for(int j = 0; j < bootParts.length;j++)
+                {
+                    for(int k = 0; k < bootParts[j].length;k++)
+                    {
+                        p2.print(bootParts[j][k] + "\t");
                     }
                     p2.println();
                 }

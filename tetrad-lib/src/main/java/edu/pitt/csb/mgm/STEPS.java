@@ -25,6 +25,8 @@ import static edu.pitt.csb.stability.StabilityUtils.StabilitySearchPar;
 /**
  * Created by vinee_000 on 10/5/2016.
  */
+
+//TODO Incorporate iterLimit into all parts of StEPS searches for efficiency
 public class STEPS {
     private DataSet d;
     private int N;
@@ -32,7 +34,7 @@ public class STEPS {
     private double [] lambda;
     private double gamma;
     private boolean includeZeros = true;
-    private final int iterLimit = 1000;
+    private int iterLimit = 500;
     public double origLambda;
     public Graph pdGraph;
     public Graph lastGraph;
@@ -40,6 +42,7 @@ public class STEPS {
     private boolean leaveOneOut = false;
     public double [][] stabilities = null;
     private int [][] subs;
+    private boolean computeStabs;
     public STEPS(DataSet dat,double [] lam,double g,int numSub)
     {
         N = numSub;
@@ -86,6 +89,11 @@ public class STEPS {
 
     }
 
+    public void setIterLimit(int iterLimit)
+    {
+        this.iterLimit = iterLimit;
+    }
+    public void setComputeStabs(boolean stabs){computeStabs = stabs;}
     public double [][] runStepsArrayPar()
     {
         double [][] result = new double[lambda.length][4];
@@ -1026,13 +1034,15 @@ System.out.println("Lambdas: " + Arrays.toString(lambda));
         MGM m = new MGM(d,lambda);
         m.learnEdges(iterLimit);
         DoubleMatrix2D stabs;
-        if(subs!=null)
-            stabs = StabilityUtils.StabilitySearchPar(d,new SearchWrappers.MGMWrapper(lambda),subs);
-        else if(leaveOneOut)
-             stabs = StabilityUtils.StabilitySearchPar(d,new SearchWrappers.MGMWrapper(lambda));
-        else
-           stabs = StabilityUtils.StabilitySearchPar(d,new SearchWrappers.MGMWrapper(lambda),N,b);
-        this.stabilities = stabs.toArray();
+        if(computeStabs) {
+            if (subs != null)
+                stabs = StabilityUtils.StabilitySearchPar(d, new SearchWrappers.MGMWrapper(lambda), subs);
+            else if (leaveOneOut)
+                stabs = StabilityUtils.StabilitySearchPar(d, new SearchWrappers.MGMWrapper(lambda));
+            else
+                stabs = StabilityUtils.StabilitySearchPar(d, new SearchWrappers.MGMWrapper(lambda), N, b);
+            this.stabilities = stabs.toArray();
+        }
         lastLambda = lambda;
         return m.graphFromMGM();
     }

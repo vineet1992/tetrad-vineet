@@ -1,11 +1,14 @@
 package edu.pitt.csb.stability;
 
+import cern.colt.matrix.impl.SparseDoubleMatrix2D;
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.Node;
+import edu.pitt.csb.Priors.mgmPriors;
 import edu.pitt.csb.mgm.MGM;
 import edu.pitt.csb.mgm.MGM_Priors;
 import edu.pitt.csb.mgm.MixedUtils;
+import edu.pitt.csb.mgm.STEPS;
 
 import java.io.File;
 import java.io.PrintStream;
@@ -28,6 +31,10 @@ public class CrossValidationSets {
     private boolean [][] havePrior;
     private int k; //K-Fold cross validation
     private String runName;
+    private int ns;
+    private int numLambdas = 15;
+    private double stabThreshold = 0.05;
+    private SparseDoubleMatrix2D []  priors;
 
 
     public CrossValidationSets(DataSet d, double [] lambda, String dir,String dirOut, String t, int k, String runName)
@@ -40,6 +47,7 @@ public class CrossValidationSets {
         this.k = k;
         this.runName = runName;
         this.outDirectory = dirOut;
+        this.ns = 5;
     }
     public CrossValidationSets(DataSet d, double [] lambda, double [] lambdaWP, String dir, String dirOut, String t, boolean [][] havePrior, int k, String runName)
     {
@@ -53,8 +61,13 @@ public class CrossValidationSets {
         this.k = k;
         this.runName = runName;
         this.outDirectory = dirOut;
+        this.ns = 5;
     }
 
+    public void setPriors(SparseDoubleMatrix2D [] priors)
+    {
+        this.priors = priors;
+    }
 
     //Writes the generated features and generated subsampled sets directly to the output directory
     public void crossValidate()
@@ -78,7 +91,6 @@ public class CrossValidationSets {
         //Write subsamples to file
         for(int i = 0; i < samps.length;i++)
         {
-
             Arrays.sort(samps[i]);
             try {
                 File f = new File(directory + "/Cross_Validation_Test_" + i + ".txt");
@@ -129,13 +141,20 @@ public class CrossValidationSets {
                 System.out.println("Couldn't load Training Data");
                 return;
             }
-
+            double lLow = 0.05;
+            double lHigh = 0.95;
+            double [] initLambdas = new double[numLambdas];
+            for(int j = 0; j < initLambdas.length;j++)
+            {
+                initLambdas[j] = lLow + j*(lHigh-lLow)/numLambdas;
+            }
             //When running MGM with prior information
             if(prior)
             {
-                MGM_Priors m = new MGM_Priors(train,lambda,lambdaWP,havePrior);
-                m.learnEdges(1000);
-                Graph g = m.graphFromMGM();
+
+                mgmPriors m2 = new mgmPriors(ns,initLambdas,train,priors);
+
+                Graph g = m2.runPriors();
                 try{
                     for(Node n: g.getAdjacentNodes(g.getNode(target)))
                         out.print(n + "\t");
@@ -151,9 +170,8 @@ public class CrossValidationSets {
             //Otherwise
             else
             {
-                MGM m = new MGM(train,lambda);
-                m.learnEdges(1000);
-                Graph g = m.graphFromMGM();
+                STEPS s = new STEPS(train,initLambdas,stabThreshold,ns);
+                Graph g = s.runSteps();
                 try {
                     for (Node n : g.getAdjacentNodes(g.getNode(target))) {
                         out.print(n + "\t");

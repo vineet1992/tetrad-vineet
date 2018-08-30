@@ -36,10 +36,10 @@ import edu.cmu.tetrad.util.StatUtils;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.lang.reflect.Constructor;
 import java.text.ParseException;
 import java.util.*;
-
 
 /**
  * Created by ajsedgewick on 7/29/15.
@@ -75,6 +75,23 @@ public class MixedUtils {
         reader.setVariablesSupplied(true);
         reader.setMaxIntegralDiscrete(5);
         return reader.parseTabular(file);
+    }
+
+
+    public static DataSet getNonparanormalTransform(DataSet data)
+    {
+        DataSet cont = DataUtils.getNonparanormalTransformed(MixedUtils.getContinousData(data));
+        int ix = 0;
+        for(int i = 0; i < data.getNumColumns();i++)
+        {
+            if(data.getVariable(i)instanceof ContinuousVariable) {
+                for (int j = 0; j < data.getNumRows(); j++) {
+                    data.setDouble(j,i,cont.getDouble(j,ix));
+                }
+                ix++;
+            }
+        }
+        return data;
     }
     public static DataSet completeCases(DataSet d)
     {

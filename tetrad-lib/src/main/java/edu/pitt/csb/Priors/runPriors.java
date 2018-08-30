@@ -44,6 +44,7 @@ public class runPriors {
         double high = 0.95;
         boolean loocv = false;
         boolean makeScores = false;
+        boolean fullCounts = false;
         int index = 0;
         List<String> toRemove = new ArrayList<String>();
         try {
@@ -63,6 +64,11 @@ public class runPriors {
                 } else if(args[index].equals("-run")) {
                     runName = args[index+1];
                     index+=2;
+                }
+                else if(args[index].equals("-fullCounts"))
+                {
+                    fullCounts = true;
+                    index++;
                 }
                 else if (args[index].equals("-priors")) {
                     priorDirectory = args[index + 1];
@@ -238,40 +244,9 @@ public class runPriors {
             if(t.exists())
                 t.deleteOnExit();
 
-            int b = (int) Math.floor(10 * Math.sqrt(d.getNumRows()));
-            if (b >= d.getNumRows())
-                b = d.getNumRows() / 2;
-            int [][] samps = new int[ns][];
-            boolean done = false;
-            int attempts = 10000;
-            DataSet[] subsamples = new DataSet[ns];
-            System.out.print("Generating subsamples and ensuring variance...");
-            while(!done && attempts > 0) {
-                done = true;
-                if (loocv)
-                    samps = StabilityUtils.generateSubsamples(d.getNumRows());
-                else
-                    samps = StabilityUtils.subSampleNoReplacement(d.getNumRows(), b, ns);
 
-                for (int j = 0; j < ns; j++) {
-                    subsamples[j] = d.subsetRows(samps[j]);
-                    int col = checkForVariance(subsamples[j],d);
-                    if(col!=-1)
-                    {
-                        if(loocv)
-                        {
-                            System.out.println("Can't perform Leave-one-out Cross Validation...leaving out sample " + j + " makes " + d.getVariable(col) + " have no variance");
-                            System.exit(-1);
-                        }
-                        else {
-                            attempts--;
-                            done = false;
-                        }
-                    }
-                }
-            }
 
-            subsamples = null;
+            int [][] samps = genSubs(d,ns,loocv);
             System.out.println("Done");
             System.out.print("Generating Lambda Params...");
             mgmPriors m = new mgmPriors(ns,initLambdas,d,priors,samps,verbose);
@@ -289,6 +264,11 @@ public class runPriors {
                 double [][] scores = m.edgeScores;
                 printScores(scores,d,runName);
             }
+            if(fullCounts)
+            {
+                TetradMatrix tm = m.fullCounts;
+                printCounts(tm,d,runName);
+            }
             System.out.println("Done");
         }
         catch(Exception e)
@@ -301,7 +281,43 @@ public class runPriors {
     }
 
 
-    public static int checkForVariance(DataSet d, DataSet full)
+    public static int [][] genSubs(DataSet d, int ns, boolean loocv)
+    {
+        int b = (int) Math.floor(10 * Math.sqrt(d.getNumRows()));
+        if (b >= d.getNumRows())
+            b = d.getNumRows() / 2;
+        int [][] samps = new int[ns][];
+        boolean done = false;
+        int attempts = 10000;
+        DataSet[] subsamples = new DataSet[ns];
+        System.out.print("Generating subsamples and ensuring variance...");
+        while(!done && attempts > 0) {
+            done = true;
+            if (loocv)
+                samps = StabilityUtils.generateSubsamples(d.getNumRows());
+            else
+                samps = StabilityUtils.subSampleNoReplacement(d.getNumRows(), b, ns);
+
+            for (int j = 0; j < ns; j++) {
+                subsamples[j] = d.subsetRows(samps[j]);
+                int col = checkForVariance(subsamples[j],d);
+                if(col!=-1)
+                {
+                    if(loocv)
+                    {
+                        System.out.println("Can't perform Leave-one-out Cross Validation...leaving out sample " + j + " makes " + d.getVariable(col) + " have no variance");
+                        System.exit(-1);
+                    }
+                    else {
+                        attempts--;
+                        done = false;
+                    }
+                }
+            }
+        }
+        return samps;
+    }
+    public static synchronized int checkForVariance(DataSet d, DataSet full)
     {
         TetradMatrix t = d.getDoubleData();
         for(int i = 0; i < d.getNumColumns();i++)
@@ -311,43 +327,84 @@ public class runPriors {
                 double [] curr = t.getColumn(i).toArray();
                 curr = StatUtils.standardizeData(curr);
                 double var = StatUtils.variance(curr);
-                if(var <= 0.000001)
+                if(var <= 0.0001)
                     return i;
 
             }
             else
             {
-                HashSet<Integer> cats = new HashSet<Integer>();
+                HashMap<Integer,Integer> cats = new HashMap<Integer,Integer>();
                 for(int j = 0; j < full.getNumRows();j++)
                 {
-                    cats.add(full.getInt(j,i));
+                    cats.put(full.getInt(j,i),0);
                 }
                 for(int j = 0; j < d.getNumRows();j++)
                 {
-                    cats.remove(d.getInt(j,i));
+                    if(cats.get(d.getInt(j,i))==null)
+                    {
+                        System.err.println("Found a category not in the full dataset");
+                        System.exit(-1);
+                    }
+                    else
+                    {
+                        cats.put(d.getInt(j,i),cats.get(d.getInt(j,i))+1);
+                    }
                 }
-                if(!cats.isEmpty())
-                    return i;
+                for(Integer ii: cats.keySet())
+                {
+                    if(cats.get(ii)<4) {
+                        return i;
+                    }
+                }
             }
         }
         return -1;
     }
 
+    public static void printCounts(TetradMatrix t, DataSet d, String runName) throws Exception
+    {
+        PrintStream out = new PrintStream(runName + "/Edge_Counts.txt");
+        for(int i = 0; i < d.getNumColumns();i++)
+        {
+            if(i==d.getNumColumns()-1)
+                out.println(d.getVariable(i));
+            else
+                out.print(d.getVariable(i) + "\t");
+        }
+        for(int i = 0; i < t.rows();i++)
+        {
+            out.print(d.getVariable(i) + "\t");
+            for(int j = 0; j < t.columns();j++)
+            {
+                if(j==t.columns()-1)
+                    out.println(t.get(i,j));
+                else
+                    out.print(t.get(i,j) + "\t");
+            }
+        }
+        out.flush();
+        out.close();
+    }
     public static void printScores(double [][] scores, DataSet d, String runName) throws Exception
     {
         PrintStream out = new PrintStream(runName + "/Edge_Scores.txt");
         for(int i = 0; i < d.getNumColumns();i++)
         {
-            out.print(d.getVariable(i) + "\t");
+            if(i==d.getNumColumns()-1)
+                out.println(d.getVariable(i));
+            else
+                out.print(d.getVariable(i) + "\t");
         }
         for(int i = 0; i < scores.length;i++)
         {
             out.print(d.getVariable(i) + "\t");
             for(int j = 0; j < scores[i].length;j++)
             {
-                out.print(scores[i][j] + "\t");
+                if(j==scores[i].length-1)
+                    out.println(scores[i][j]);
+                else
+                    out.print(scores[i][j] + "\t");
             }
-            out.println();
         }
         out.flush();
         out.close();
@@ -358,15 +415,16 @@ public class runPriors {
         double[] weights = m.normalizedExpertWeights;
         double[] pValues = m.pValues;
         double[] normalizedTao = m.normalizedTao;
+        double [] uncorrectedPVals = m.uncorrectedPValues;
 
         PrintStream out = new PrintStream(runName + "/Graph.txt");
         out.println(g);
         out.flush();
         out.close();
         out = new PrintStream(runName + "/Prior_Scores.txt");
-        out.println("Name\tPrior_Weight\tCorrected p-Value\tNormalized Deviance Score");
+        out.println("Name\tPrior_Weight\tCorrected p-Value\tUncorrected p-Value\tNormalized Deviance Score");
         for (int i = 0; i < weights.length; i++) {
-            out.println(map.get(i) + "\t" + weights[i] + "\t" + pValues[i] + "\t" + normalizedTao[i]);
+            out.println(map.get(i) + "\t" + weights[i] + "\t" + pValues[i] + "\t" + uncorrectedPVals[i] + "\t" + normalizedTao[i]);
         }
 
         out.flush();
