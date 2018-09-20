@@ -779,6 +779,120 @@ public class MixedUtils {
         return allEdgeStats(pT, pE, nd);
     }
 
+    public static int [][] allEdgeStatsBioInf(Graph pT, Graph pE,DataSet data)
+    {
+        HashMap<String, String> nd = new HashMap<String, String>();
+
+        //Estimated graph more likely to have correct node types...
+        for(Node n : pE.getNodes()){
+            if(data.getVariable(n.getName()) instanceof DiscreteVariable){
+                nd.put(n.getName(), "Disc");
+            } else {
+                nd.put(n.getName(), "Norm");
+            }
+        }
+        return allEdgeStatsBioInf(pT, pE, nd);
+    }
+
+    public static int [][] allEdgeStatsBioInf(Graph pT, Graph pE, HashMap<String,String> nodeDists)
+    {
+        int atp = 0;
+        int afp = 1;
+        int afn = 2;
+        int dtp = 3;
+        int dfp = 4;
+        int dfn = 5;
+        int shd = 6;
+        int[][] stats = new int[4][7]; //4 Types by Adj TP, Adj FP, Adj FN, Dir TP, Dir FP, Dir FN, SHD
+        for(int i=0; i<stats.length; i++){
+            for(int j=0; j<stats[0].length; j++){
+                stats[i][j] = 0;
+            }
+        }
+        //enforce patterns?
+        //Graph pT = SearchGraphUtils.patternFromDag(tg);
+        //Graph pE = SearchGraphUtils.patternFromDag(eg);
+
+        //check that variable names are the same...
+
+        Set<Edge> edgesT = pT.getEdges();
+        Set<Edge> edgesE = pE.getEdges();
+
+        //differences += Math.abs(e1.size() - e2.size());
+
+        //for (int i = 0; i < e1.size(); i++) {
+        int edgeType;
+        for(Edge eT: edgesT){
+            Node n1 = pE.getNode(eT.getNode1().getName());
+            Node n2 = pE.getNode(eT.getNode2().getName());
+            if(nodeDists.get(n1.getName()).equals("Norm") && nodeDists.get(n2.getName()).equals("Norm")) {
+                edgeType = 0;
+            } else if(nodeDists.get(n1.getName()).equals("Disc") && nodeDists.get(n2.getName()).equals("Disc")) {
+                edgeType = 2;
+            } else {
+                edgeType = 1;
+            }
+
+            Edge eE = pE.getEdge(n1, n2);
+            if (eE == null) {
+                if (eT.isDirected()) {
+                    stats[edgeType][shd]+=2;
+                    stats[edgeType][dfn]++; //False Negative Directed -- FND
+                }
+                else
+                    stats[edgeType][shd]++;
+                stats[edgeType][afn]++; //False Negative Undirected -- FNU
+            } else if (eE.isDirected()){
+                if (eT.isDirected() && eT.pointsTowards(eT.getNode1()) == eE.pointsTowards(n1)){
+                    stats[edgeType][dtp]++; //True Directed -- TD
+                } else if (eT.isDirected()){
+                    stats[edgeType][dfp]++; //FLip
+                    stats[edgeType][shd]++;
+                } else {
+                    stats[edgeType][shd]++;
+                    stats[edgeType][dfp]++; //Falsely Directed -- FD
+                }
+                stats[edgeType][atp]++;
+            } else { //so eE is undirected
+                if(eT.isDirected()) {
+                    stats[edgeType][shd]++;
+                    stats[edgeType][dfn]++; //Falsely Undirected -- FU
+                }
+                stats[edgeType][atp]++;
+            }
+        }
+
+        for(Edge eE: edgesE){
+            Node n1 = pT.getNode(eE.getNode1().getName());
+            Node n2 = pT.getNode(eE.getNode2().getName());
+
+            if(nodeDists.get(n1.getName()).equals("Norm") && nodeDists.get(n2.getName()).equals("Norm")) {
+                edgeType = 0;
+            } else if(nodeDists.get(n1.getName()).equals("Disc") && nodeDists.get(n2.getName()).equals("Disc")) {
+                edgeType = 2;
+            } else {
+                edgeType = 1;
+            }
+
+            Edge eT = pT.getEdge(n1, n2);
+            if(eT == null) {
+                if(eE.isDirected()){
+                    stats[edgeType][shd]+=2;
+                    stats[edgeType][dfp]++; //False Positive Directed -- FPD
+                }
+                else
+                    stats[edgeType][shd]++;
+                stats[edgeType][afp]++; //False Positive Undirected -- FUD
+            }
+        }
+        for(int t = 0; t < stats[0].length;t++)
+        {
+            stats[3][t] = stats[0][t] + stats[1][t] + stats[2][t];
+        }
+        return stats;
+    }
+
+
     // break out stats by node distributions, here only "Norm" and "Disc"
     // so three types of possible edges, cc, cd, dd, output is edge type by stat type
     // counts bidirected

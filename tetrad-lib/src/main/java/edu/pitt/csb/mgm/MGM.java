@@ -1220,7 +1220,7 @@ public class MGM extends ConvexProximal implements GraphSearch{
      */
     public Graph search(){
         long startTime = System.currentTimeMillis();
-        learnEdges(1000); //unlikely to hit this limit
+        learnEdges(500); //unlikely to hit this limit
         elapsedTime = System.currentTimeMillis() - startTime;
         return graphFromMGM();
     }

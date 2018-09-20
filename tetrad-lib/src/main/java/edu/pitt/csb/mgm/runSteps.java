@@ -114,6 +114,10 @@ public class runSteps {
         if(graphFile.equals(""))
             graphFile = "Graph_" + file;
 
+        for(String s: varsToRemove)
+        {
+            d.removeColumn(d.getVariable(s));
+        }
         System.out.println(d);
         STEPS s = new STEPS(d,lambda,g,d.getNumRows(),LOO);
         s.setComputeStabs(true);

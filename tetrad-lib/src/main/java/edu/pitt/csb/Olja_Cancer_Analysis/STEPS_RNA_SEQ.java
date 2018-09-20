@@ -5,9 +5,11 @@ import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.data.DelimiterType;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.Node;
+import edu.cmu.tetrad.search.CpcStable;
 import edu.cmu.tetrad.search.FciMaxP;
 import edu.cmu.tetrad.search.IndependenceTest;
 import edu.cmu.tetrad.search.PcStable;
+import edu.pitt.csb.Priors.runPriors;
 import edu.pitt.csb.mgm.IndTestMultinomialAJ;
 import edu.pitt.csb.mgm.MGM;
 import edu.pitt.csb.mgm.MixedUtils;
@@ -20,7 +22,9 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.PrintStream;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * This class can actually be used for both Microarray analysis and RNA-Seq analysis
@@ -32,20 +36,27 @@ public class STEPS_RNA_SEQ {
     {
         String stepsFile = ""; //Allows reloading of the work that has already been done to avoid extra STEPS runs
         DelimiterType d2 = DelimiterType.TAB;
+        int iterLimit = 100;
         DataSet d = MixedUtils.loadDataSet2(args[0],d2);
         String graphOut = args[1];
         String stabOut = args[2];
         String subDir = args[3];
         String target = args[4];
+        boolean fullData = false;
         for(int i = 5; i < args.length;i++)
         {
             d.removeColumn(d.getVariable(args[i]));
         }
 
+
+
         File f = new File(subDir);
         if(!f.exists())
             f.mkdir();
-
+        PrintStream pi1 = new PrintStream(subDir + "/Predictions.txt");
+        PrintStream pi2 = new PrintStream(subDir + "/Features.txt");
+        pi1.println("Run\tPrediction_MGM\tPrediction_CPC\tPrediction_CPC_MB\tActual");
+        pi2.println("Run\tFeatures_MGM\tFeatures_CPC\tFeatures_CPC_MB");
        /* d.removeColumn(d.getVariable("Response"));
         d.removeColumn(d.getVariable("IgG_Week0"));
         d.removeColumn(d.getVariable("IgG_Week12"));
@@ -55,11 +66,11 @@ public class STEPS_RNA_SEQ {
        // d.removeColumn(d.getVariable("Age"));
         //  DataSet d3 = MixedUtils.completeCases(d);
 
-
+System.out.println(d);
         //ns set to number of samples since we're doing leave-one-out cross validation
-        int ns = d.getNumRows();
-        double g = 0.01;
-        int numLambdas = 40;
+        int ns = 10;
+        double g = 0.02;
+        int numLambdas = 10;
         double [] lambda = new double[numLambdas];
         for(int i = 0; i < numLambdas;i++)
         {
@@ -69,44 +80,42 @@ public class STEPS_RNA_SEQ {
         double [][] stab = null;
         Graph g2 = null;
         BufferedReader b = null;
+        if(fullData) {
+            if (!stepsFile.equals("")) {
+                b = new BufferedReader(new FileReader(stepsFile));
 
-        if(!stepsFile.equals("")) {
-            b = new BufferedReader(new FileReader(stepsFile));
+                String line = "";
+                while (true) {
+                    line = b.readLine();
+                    if (line.startsWith("Lambdas"))
+                        break;
+                }
 
-            String line = "";
-            while (true) {
-                line = b.readLine();
-                if (line.startsWith("Lambdas"))
-                    break;
+                String[] stuff = line.split("\\[")[1].split(",");
+                l = new double[]{Double.parseDouble(stuff[0]), Double.parseDouble(stuff[1].trim()), Double.parseDouble(stuff[2].replace("]", "").trim())};
+                MGM m = new MGM(d, l);
+                m.learnEdges(iterLimit);
+                g2 = m.graphFromMGM();
+                stab = StabilityUtils.StabilitySearchPar(d, new SearchWrappers.MGMWrapper(lambda)).toArray();
+            } else {
+                STEPS s = new STEPS(d, lambda, g, ns, false);
+                s.setComputeStabs(true);
+                s.setIterLimit(iterLimit);
+                System.out.print("Running StEPS...");
+                g2 = s.runStepsPar();
+                System.out.println("Done");
+                stab = s.stabilities;
+                l = s.lastLambda;
             }
-
-            String[] stuff = line.split("\\[")[1].split(",");
-            l = new double[]{Double.parseDouble(stuff[0]), Double.parseDouble(stuff[1].trim()), Double.parseDouble(stuff[2].replace("]", "").trim())};
-            MGM m = new MGM(d, l);
-            m.learnEdges(1000);
-            g2 = m.graphFromMGM();
-            stab = StabilityUtils.StabilitySearchPar(d, new SearchWrappers.MGMWrapper(lambda)).toArray();
-        }
-
-
-else {
-            STEPS s = new STEPS(d, lambda, g, d.getNumRows(), true);
-            System.out.print("Running StEPS...");
-            g2 = s.runStepsPar();
-            System.out.println("Done");
-            stab = s.stabilities;
-            l = s.lastLambda;
-        }
-
-        System.out.println("Lambdas Chosen: " + Arrays.toString(l));
+        }       // System.out.println("Lambdas Chosen: " + Arrays.toString(l));
 
 
         //This first segment tells us what the model will look like using the full dataset
-        double [] params = {l[0],l[1],l[2]};
-        DataGraphSearch gs = new SearchWrappers.MGMWrapper(params);
+        //double [] params = {l[0],l[1],l[2]};
+        //DataGraphSearch gs = new SearchWrappers.MGMWrapper(params);
         int [][] samps = StabilityUtils.generateSubsamples(d.getNumRows());
-        DataSet [] subs = new DataSet[ns];
-        for(int i = 0; i < ns;i++) {
+        DataSet [] subs = new DataSet[d.getNumRows()];
+        for(int i = 0; i < d.getNumRows();i++) {
             subs[i] = d.copy();
             Arrays.sort(samps[i]);
             subs[i] = subs[i].subsetRows(samps[i]);
@@ -125,41 +134,39 @@ else {
             temp.close();
         }
 
-        PrintStream out = new PrintStream(args[1]);
-        out.println(g2);
-        IndependenceTest iTest = new IndTestMultinomialAJ(d,0.05);
-        PcStable pcs = new PcStable(iTest);
-        pcs.setInitialGraph(g2);
-        Graph g3 = pcs.search();
-        out.flush();
-        out.close();
-        out = new PrintStream(stabOut);
-        for(int i = 0; i < d.getNumColumns();i++)
-        {
-            out.print(d.getVariable(i).getName());
-            if(i < d.getNumColumns()-1)
-                out.print("\t");
-            else
-                out.println();
-        }
-        for(int i = 0; i < d.getNumColumns();i++)
-        {
-            out.print(d.getVariable(i).getName()+"\t");
-            for(int j = 0; j < d.getNumColumns();j++)
-            {
-                out.print(stab[i][j]);
-                if(j < d.getNumColumns()-1)
+        if(fullData) {
+            PrintStream out = new PrintStream(args[1]);
+            out.println(g2);
+            IndependenceTest iTest = new IndTestMultinomialAJ(d, 0.05);
+            CpcStable pcs = new CpcStable(iTest);
+            pcs.setInitialGraph(g2);
+            //Graph g3 = pcs.search();
+            out.flush();
+            out.close();
+            out = new PrintStream(stabOut);
+            for (int i = 0; i < d.getNumColumns(); i++) {
+                out.print(d.getVariable(i).getName());
+                if (i < d.getNumColumns() - 1)
                     out.print("\t");
                 else
                     out.println();
             }
+            for (int i = 0; i < d.getNumColumns(); i++) {
+                out.print(d.getVariable(i).getName() + "\t");
+                for (int j = 0; j < d.getNumColumns(); j++) {
+                    out.print(stab[i][j]);
+                    if (j < d.getNumColumns() - 1)
+                        out.print("\t");
+                    else
+                        out.println();
+                }
+            }
+
+            out = new PrintStream("PCS_" + graphOut);
+            //out.println(g3);
+            out.flush();
+            out.close();
         }
-
-        out = new PrintStream("PCS_" + graphOut);
-        out.println(g3);
-        out.flush();
-        out.close();
-
 
         //This portion tells us how good the modeling procedure is on this dataset (cross-validation of the full procedure)
 try {
@@ -200,7 +207,9 @@ try {
 
         if (lam == null) {
             System.out.print("Lambda is null so running steps...");
-            STEPS s = new STEPS(train, lambda, g, ns, true);
+            STEPS s = new STEPS(train, lambda, g, ns, false);
+            s.setComputeStabs(true);
+            s.setIterLimit(iterLimit);
             gOut = s.runStepsPar();
             stabs = s.stabilities;
             lam = new double[]{s.lastLambda[0], s.lastLambda[1], s.lastLambda[2]};
@@ -214,39 +223,69 @@ try {
 
         System.out.print("Running PCS...");
         IndependenceTest indy = new IndTestMultinomialAJ(train, 0.05);
-        PcStable pc = new PcStable(indy);
+        CpcStable pc = new CpcStable(indy);
         pc.setInitialGraph(gOut);
         Graph gOut2 = pc.search();
         System.out.println("Done");
 
+        List<Node> neighbors = new ArrayList<Node>();
         //MGM Adjacencies
         for (Node n : gOut.getAdjacentNodes(gOut.getNode(target))) {
             int x = d.getColumn(d.getVariable(n.getName()));
             int y = d.getColumn(d.getVariable(target));
+            neighbors.add(n);
             p.println(n.getName() + "\t" + stabs[x][y]);
         }
 
+        pi2.print(i + "\t" + neighbors + "\t");
+        double res = PriorPrediction.getRegressionResult(neighbors,train,d,i,target);
+        double actual = d.getDouble(i,d.getColumn(d.getVariable(target)));
+        pi1.print(i + "\t" + res + "\t");
+
+        List<Node> neighs = new ArrayList<Node>();
 //PCS Adjacencies
         for (Node n : gOut2.getAdjacentNodes(gOut2.getNode(target))) {
             int x = d.getColumn(d.getVariable(n.getName()));
             int y = d.getColumn(d.getVariable(target));
+            neighs.add(n);
             p2.println(n.getName() + "\t" + stabs[x][y]);
         }
+        if(neighs.size()==0)
+            neighs = neighbors;
+            res = PriorPrediction.getRegressionResult(neighs,train,d,i,target);
+        pi1.print(res + "\t");
+        pi2.print(neighs + "\t");
 
+        //PCS Markov Blanket Only
+        neighs = gOut2.getAdjacentNodes(gOut2.getNode(target));
+        for (Node n : gOut2.getChildren(gOut2.getNode(target))) {
+            for(Node pp: gOut2.getParents(n))
+            {
+                if(!neighs.contains(pp))
+                {
+                    neighs.add(pp);
+                    int x = d.getColumn(d.getVariable(pp.getName()));
+                    int y = d.getColumn(d.getVariable(target));
+                    p3.println(n.getName() + "\t" + stabs[x][y]);
+                }
+            }
 
-        //PCS Direct Causes Only
-        for (Node n : gOut2.getParents(gOut2.getNode(target))) {
-            int x = d.getColumn(d.getVariable(n.getName()));
-            int y = d.getColumn(d.getVariable(target));
-            p3.println(n.getName() + "\t" + stabs[x][y]);
         }
-
+        if(neighs.size()==0)
+            neighs = neighbors;
+        res = PriorPrediction.getRegressionResult(neighs,train,d,i,target);
+pi1.println(res + "\t" + actual);
+pi2.println(neighs);
 
         p.flush();
         p.close();
+        pi1.flush();
+        pi2.flush();
 
         System.out.println("Done");
     }
+    pi1.close();
+    pi2.close();
 }
 catch(Exception e)
 {

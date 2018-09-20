@@ -2407,7 +2407,6 @@ public class ExpressionManager {
                     throw new IllegalArgumentException("exps: " + expPrint + " err: " + err + " p: " + Arrays.toString(p)
                             + " p2: " + Arrays.toString(p2));
                 }
-
                 private double[] convert(double... p) {
                     /*for (double _p : p) {
                         if (_p < 0) throw new IllegalArgumentException("All arguments must be >= 0: " + _p);

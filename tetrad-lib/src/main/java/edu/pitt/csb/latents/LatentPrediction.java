@@ -71,7 +71,9 @@ public class LatentPrediction {
         searchParams = new double[4];
         initializeArrays();
         orientations = new HashMap<String,String>();
-        this.subs = StabilityUtils.generateSubsamples(numSubsamples,data.getNumRows());
+        this.subs = StabilityUtils.subSampleNoReplacement(data.getNumRows(),numSubsamples);
+        while(!ensureVariance())
+            subs = StabilityUtils.subSampleNoReplacement(data.getNumRows(),numSubsamples);
 
     }
     public LatentPrediction(DataSet d, int numSubSets, double tao, int [][] subs)
@@ -788,6 +790,17 @@ public class LatentPrediction {
 
         return result;
     }
+    private boolean ensureVariance()
+    {
+        int [][] sb = this.subs;
+        for(int i = 0; i < subs.length;i++)
+        {
+            if(runPriors.checkForVariance(data.subsetRows(sb[i]),data)!=-1)
+                return false;
+
+        }
+        return true;
+    }
     private int [] shuffleArray(int[] x)
     {
             // If running on Java 6 or older, use `new Random()` on RHS here
@@ -802,6 +815,8 @@ public class LatentPrediction {
             }
             return x;
     }
+
+
     public static class Pair
     {
         public Node one;

@@ -217,6 +217,7 @@ public class DagToPattern {
 
         List<Node> measured = new ArrayList<Node>();
 
+        System.out.println("Finding measured nodes");
         for (Node node : allNodes) {
             if (node.getNodeType() == NodeType.MEASURED) {
                 measured.add(node);
@@ -226,6 +227,7 @@ public class DagToPattern {
         graph = new EdgeListGraphSingleConnections(measured);
         graph.fullyConnect(Endpoint.CIRCLE);
 
+        System.out.println("Getting sepsets");
         for (int i = 0; i < measured.size(); i++) {
             for (int j = i + 1; j < measured.size(); j++) {
                 Node n1 = measured.get(i);
@@ -236,14 +238,19 @@ public class DagToPattern {
             }
         }
 
+        System.out.println("Enumerating triples");
         enumerateTriples();
 
+        System.out.println("PC Orient");
         SearchGraphUtils.pcOrientbk(knowledge, graph, measured);
+        System.out.println("Orient colliders");
         SearchGraphUtils.orientCollidersUsingSepsets(this.sepsets, knowledge, graph, verbose);
 
         MeekRules rules = new MeekRules();
         rules.setAggressivelyPreventCycles(this.aggressivelyPreventCycles);
         rules.setKnowledge(knowledge);
+
+        System.out.println("Meek Rules");
         rules.orientImplied(graph);
 
         this.logger.log("graph", "\nReturning this graph: " + graph);
