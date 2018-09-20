@@ -41,7 +41,7 @@ public class testLatentRecovery {
         int numVariables = 50;
         int numLatents = 10;
         int numEdges = 200;
-        int sampleSize = 500;
+        int sampleSize = 200;
         int numSubsamples = 10;
         int numRuns = 15;
         int index = 0;

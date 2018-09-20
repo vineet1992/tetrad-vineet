@@ -18,9 +18,9 @@ import java.util.*;
  */
 public class latentResults {
     public static void main(String [] args) throws Exception{
-        int numRuns = 15;
+        int numRuns = 25;
         int numVars = 50;
-        int sampleSize = 200;
+        int sampleSize = 500;
         int numLatents = 10;
         int numSubsamples = 10;
         int numSubSets = 4;

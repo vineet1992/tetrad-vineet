@@ -24,7 +24,7 @@ public class runSteps {
         String stabilityFile = "";
         String graphFile = "";
         int ns = 20;
-        double g = 0.03;
+        double g = 0.01;
         int numLambdas = 40;
         double lambdaLow = 0.05;
         double lambdaHigh = 0.95;
@@ -100,6 +100,10 @@ public class runSteps {
         }
         DelimiterType d2 = DelimiterType.TAB;
         DataSet d = MixedUtils.loadDataSet2(directory + "/" + file,d2,maxCategoriesForDiscrete);
+        for(int i = 0; i < varsToRemove.size();i++)
+        {
+            d.removeColumn(d.getVariable(varsToRemove.get(i)));
+        }
         double [] lambda = new double[numLambdas];
         for(int i = 0; i < numLambdas;i++)
         {
@@ -112,6 +116,7 @@ public class runSteps {
 
         System.out.println(d);
         STEPS s = new STEPS(d,lambda,g,d.getNumRows(),LOO);
+        s.setComputeStabs(true);
         Graph g2 = s.runStepsPar();
         double [][] stab = s.stabilities;
         PrintStream out = new PrintStream(directory + "/" + graphFile);

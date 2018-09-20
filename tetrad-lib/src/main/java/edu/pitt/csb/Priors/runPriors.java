@@ -327,8 +327,10 @@ public class runPriors {
                 double [] curr = t.getColumn(i).toArray();
                 curr = StatUtils.standardizeData(curr);
                 double var = StatUtils.variance(curr);
-                if(var <= 0.0001)
+                if(var <= 0.0001) {
+                    System.out.println(i + "\t" + var);
                     return i;
+                }
 
             }
             else
@@ -352,7 +354,8 @@ public class runPriors {
                 }
                 for(Integer ii: cats.keySet())
                 {
-                    if(cats.get(ii)<4) {
+                    if(cats.get(ii)<2) {
+                        System.out.println(i + "\t" + cats);
                         return i;
                     }
                 }
