@@ -11,11 +11,15 @@ Here is a pictoral description of my thesis:
 
 # Steps to use the releases of this thesis
 
-### 1. Install Java 
+### 1. Look at the releases tab on the main page of this github project
+
+Look over the description of each of the releases, and determine if any of them are useful for your data. The first number in the release version corresponds to the method. So 1.0 and 1.5 are all the same program just different versions. But 3.0 is a whole different program for a different purpose. 
+
+### 2. Install Java 
 
 In order to run these methods you will need to have Java installed on your machine, please see these instructions for doing so: https://www.informationweek.com/desktop/how-to-install-java-runtime-environment-in-windows/d/d-id/1099686
 
-### 2. Set Java Home
+### 3. Set Java Home
 
 Windows 10 and Windows 8
 1. In Search, search for and then select: System (Control Panel)
@@ -34,14 +38,14 @@ Note: If you have a different version of Java then you need to change the 1.8.0_
 
 For Mac OS, you usually don't need to do anything Step 2
 
-### 3. Organize your Data
+### 4. Organize your Data
 
 Next be absolutely sure that your .jar file, your datasets, and all files that will be used by your .jar file are in the same folder on you computer. 
 
 Then, navigate to the directory with your files on your windows command prompt or mac terminal by using the command "cd" 
 Example: cd C:/Users/vineet/Documents/Directory_With_My_Files
 
-### 4. Run the jar
+### 5. Run the jar
 
 Run the jar according to the instructions in that particular release. Note that the format will always be java -jar jarFileName.jar
 
