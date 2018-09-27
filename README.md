@@ -18,17 +18,23 @@ In order to run these methods you will need to have Java installed on your machi
 ### 2. Set Java Home
 
 Windows 10 and Windows 8
-In Search, search for and then select: System (Control Panel)
-Click the Advanced system settings link.
-Click Environment Variables. In the section System Variables, find the PATH environment variable and select it. Click Edit. If the PATH environment variable does not exist, click New.
-In the Edit System Variable (or New System Variable) window, specify the value of the PATH environment variable. Click OK. Close all remaining windows by clicking OK.
-Add the following to the PATH variable (**make sure this is separated by a semicolon from everything that was already in there**)
+1. In Search, search for and then select: System (Control Panel)
+2. Click the Advanced system settings link.
+3. Click Environment Variables. In the section System Variables, find the PATH environment variable and select it. Click Edit. If the PATH environment variable does not exist, click New.
+4. In the Edit System Variable (or New System Variable) window, add the following to the PATH variable (**make sure this is separated by a semicolon from everything that was already in there**)
 "C:/Program Files/Java/jre1.8.0_161/bin;" 
+5. Click OK. Close all remaining windows by clicking OK.
+6. Check to make sure it worked by opening a command prompt window and typing "java -version" and pressing enter. If it says "java" is not recognized as an internal command, then it did not work and you need to try again or contact me!
 
-If you have a different version of Java then you need to change the 1.8.0_161 to your version, navigate to this directory on your computer to double check!
+You should see something like this image: 
 
-For Mac OS, you usually don't need to do anything
+![Command](CMD.png)
 
+Note: If you have a different version of Java then you need to change the 1.8.0_161 in the path variable to your version, navigate to the Program Files/Java/ directory on your computer to double check!
+
+For Mac OS, you usually don't need to do anything Step 2
+
+### 3. Organize your Data
 
 Next be absolutely sure that your .jar file, your datasets, and all files that will be used by your .jar file are in the same folder on you computer. 
 
