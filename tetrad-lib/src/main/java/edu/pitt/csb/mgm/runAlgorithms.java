@@ -24,12 +24,11 @@ package edu.pitt.csb.mgm;
 import cern.colt.matrix.DoubleMatrix2D;
 import com.google.gson.JsonArray;
 import com.google.gson.stream.JsonReader;
+import edu.cmu.tetrad.algcomparison.statistic.AdjacencyPrecision;
+import edu.cmu.tetrad.algcomparison.statistic.ArrowheadPrecision;
 import edu.cmu.tetrad.cmd.TetradCmd;
 import edu.cmu.tetrad.data.*;
-import edu.cmu.tetrad.graph.Edge;
-import edu.cmu.tetrad.graph.Graph;
-import edu.cmu.tetrad.graph.GraphUtils;
-import edu.cmu.tetrad.graph.Node;
+import edu.cmu.tetrad.graph.*;
 import edu.cmu.tetrad.performance.PerformanceTests;
 import edu.cmu.tetrad.search.*;
 import edu.pitt.csb.BioInf_Paper.CPSS;
@@ -48,7 +47,6 @@ import java.util.List;
  * The purpose of this class is to create a smooth interface to run several causal discovery algorithms suitable for mixed discrete and continuous data
  * This class has been compiled into a .jar file for efficient use
  * TODO allow input of true graph in order to estimate typical orientation and adjacency problems
- * TODO Edit sif to work with PAGs
  * TODO Allow for bootstrapping of the entire causal process
  * TODO Allow choice of independence test
  */
@@ -300,6 +298,7 @@ public class runAlgorithms {
             //Load specified dataset from the file
             d = MixedUtils.loadDataSet2(dataFile,maxNumDiscrete);
             System.out.println("Loaded dataset: " + d + "\n Dataset is mixed? " + d.isMixed());
+
 
             //Exit program if no algorithm is specfiied
             if(alg.equals("None")&&!runMGM &&!runSteps)
@@ -653,22 +652,28 @@ public class runAlgorithms {
     }
     public static void printSif(Graph g, PrintStream out)
     {
-        for(Edge e:g.getEdges())
-        {
-            if(e.isDirected())
-            {
-                if(g.isParentOf(g.getNode(e.getNode1().getName()),g.getNode(e.getNode2().getName())))
-                {
-                    out.println(e.getNode1().getName() + "\tdir\t" + e.getNode2().getName());
+        for(Edge e:g.getEdges()) {
+            Endpoint ep1 = e.getEndpoint1();
+            Endpoint ep2 = e.getEndpoint2();
+            if (ep1 == Endpoint.TAIL) {
+                if (ep2 == Endpoint.TAIL) {
+                    out.println(e.getNode1() + "\tundir\t" + e.getNode2());
+                } else if (ep2 == Endpoint.ARROW) {
+                    out.println(e.getNode1() + "\tdir\t" + e.getNode2());
                 }
+
+            } else if (ep1 == Endpoint.CIRCLE) {
+                if (ep2 == Endpoint.CIRCLE)
+                    out.println(e.getNode1() + "\tcc\t" + e.getNode2());
+                else if (ep2 == Endpoint.ARROW)
+                    out.println(e.getNode1() + "\tca\t" + e.getNode2());
+            } else {
+                if (ep2 == Endpoint.TAIL)
+                    out.println(e.getNode2() + "\tdir\t" + e.getNode1());
+                else if(ep2==Endpoint.CIRCLE)
+                    out.println(e.getNode2() + "\tca\t" + e.getNode1());
                 else
-                {
-                    out.println(e.getNode2().getName() + "\tdir\t" + e.getNode2().getName());
-                }
-            }
-            else
-            {
-                out.println(e.getNode1() + "\tundir\t" + e.getNode2());
+                    out.println(e.getNode1() + "\tbidir\t" + e.getNode2());
             }
         }
         out.flush();
