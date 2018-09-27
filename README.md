@@ -8,7 +8,7 @@ Included in here are a suite of java files for running causal discovery methods 
 
 Here is a pictoral description of my thesis:
 
-!(https://github.com/vineet1992/tetrad-vineet/blob/master/Thesis%20Workflow.png)
+! [Alt Text] (https://github.com/vineet1992/tetrad-vineet/blob/master/Thesis%20Workflow.png)
 
 In order to run these methods you will need to have Java installed on your machine, please see these instructions for doing so: https://www.informationweek.com/desktop/how-to-install-java-runtime-environment-in-windows/d/d-id/1099686
 
