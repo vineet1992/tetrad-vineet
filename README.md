@@ -38,10 +38,16 @@ For Mac OS, you usually don't need to do anything Step 2
 
 Next be absolutely sure that your .jar file, your datasets, and all files that will be used by your .jar file are in the same folder on you computer. 
 
-Then, navigate to this directory on your windows command prompt or mac terminal by using the command "cd" 
+Then, navigate to the directory with your files on your windows command prompt or mac terminal by using the command "cd" 
 Example: cd C:/Users/vineet/Documents/Directory_With_My_Files
 
+### 4. Run the jar
 
+Run the jar according to the instructions in that particular release. Note that the format will always be java -jar jarFileName.jar
+
+Also, depending upon which method you are using you may need to use the other scripts in other languages to preprocess input files.
+
+Thanks for visiting! Have fun!
 
 
 
