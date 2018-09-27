@@ -47,7 +47,7 @@ public class SearchWrappers {
 
         public Graph search(DataSet ds) {
             //System.out.print("Running PCS...");
-            IndTestMultinomialAJ indTest = new IndTestMultinomialAJ(ds, searchParams[0]);
+            IndTestMultinomialAJ indTest = new IndTestMultinomialAJ(ds, searchParams[0],true);
             PcStable pcs = new PcStable(indTest);
             if(initialGraph!=null)
                 pcs.setInitialGraph(initialGraph);
@@ -67,7 +67,7 @@ public class SearchWrappers {
 
         public Graph search(DataSet ds) {
             //System.out.print("Running Pc-Max...");
-            IndTestMultinomialAJ indTest = new IndTestMultinomialAJ(ds, searchParams[0]);
+            IndTestMultinomialAJ indTest = new IndTestMultinomialAJ(ds, searchParams[0],true);
             PcMax pcs = new PcMax(indTest);
             if(initialGraph!=null)
                 pcs.setInitialGraph(initialGraph);
@@ -85,7 +85,7 @@ public class SearchWrappers {
         public PcStableWrapper copy(){return new PcStableWrapper(searchParams);}
 
         public Graph search(DataSet ds) {
-            IndTestMultinomialAJ indTest = new IndTestMultinomialAJ(ds, searchParams[0]);
+            IndTestMultinomialAJ indTest = new IndTestMultinomialAJ(ds, searchParams[0],true);
             CpcStable pcs = new CpcStable(indTest);
             if(initialGraph!=null)
                 pcs.setInitialGraph(initialGraph);
@@ -104,7 +104,7 @@ public class SearchWrappers {
             double [] lambda = {searchParams[0],searchParams[1],searchParams[2]};
             MGM m = new MGM(ds,lambda);
             Graph g = m.search();
-            IndependenceTest i = new IndTestMultinomialAJ(ds,searchParams[3]);
+            IndependenceTest i = new IndTestMultinomialAJ(ds,searchParams[3],true);
             FciMaxP f = new FciMaxP(i);
                     f.setInitialGraph(g);
                     Graph g2 =  f.search();
@@ -126,7 +126,7 @@ public class SearchWrappers {
             double [] lambda = {searchParams[0],searchParams[1],searchParams[2]};
             MGM m = new MGM(ds,lambda);
             Graph g = m.search();
-            IndependenceTest i =  new IndTestMultinomialAJ(ds,searchParams[3]);
+            IndependenceTest i =  new IndTestMultinomialAJ(ds,searchParams[3],true);
             Fci f = new Fci(i);
             f.setInitialGraph(g);
             for(String x:f.whyOrient.keySet())
@@ -146,7 +146,7 @@ public class SearchWrappers {
     {
         //System.out.print("Running FCI...");
         orientations = new HashMap<String,String>();
-        IndependenceTest i =  new IndTestMultinomialAJ(ds,searchParams[0]);
+        IndependenceTest i =  new IndTestMultinomialAJ(ds,searchParams[0],true);
         Fci f = new Fci(i);
         if(initialGraph!=null)
             f.setInitialGraph(initialGraph);
@@ -175,7 +175,7 @@ public class SearchWrappers {
         public Graph search(DataSet ds) {
             //System.out.print("Running FCI-MAX...");
             orientations = new HashMap<String, String>();
-            IndependenceTest i = new IndTestMultinomialAJ(ds, searchParams[0]);
+            IndependenceTest i = new IndTestMultinomialAJ(ds, searchParams[0],true);
             FciMaxP f = new FciMaxP(i);
             if(initialGraph!=null)
                 f.setInitialGraph(initialGraph);

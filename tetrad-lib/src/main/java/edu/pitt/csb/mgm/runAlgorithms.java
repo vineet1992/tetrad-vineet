@@ -50,6 +50,7 @@ import java.util.List;
  * TODO allow input of true graph in order to estimate typical orientation and adjacency problems
  * TODO Edit sif to work with PAGs
  * TODO Allow for bootstrapping of the entire causal process
+ * TODO Allow choice of independence test
  */
 public class runAlgorithms {
     private static Graph trueGraph = null; //TODO
