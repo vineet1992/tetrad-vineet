@@ -87,7 +87,7 @@ public class SepsetsMaxScore implements SepsetProducer {
         List<Node> adjk = graph.getAdjacentNodes(k);
         adji.remove(k);
         adjk.remove(i);
-//SAME THING AS BELOW PARALLELIZE THIS TOO
+
         for (int d = 0; d <= Math.min((depth == -1 ? 1000 : depth), adji.size()); d++) {
             ChoiceGenerator gen = new ChoiceGenerator(adji.size(), d);
             int[] choice;
@@ -104,9 +104,9 @@ public class SepsetsMaxScore implements SepsetProducer {
                 }
             }
         }
-    //Look through adjacencies of k and get max p value WE CAN PARALLELIZE THIS
+
         for (int d = 0; d <= Math.min((depth == -1 ? 1000 : depth), adjk.size()); d++) {
-            ChoiceGenerator gen = new ChoiceGenerator(adjk.size(), d); //generates [1 0 1] denoting choose 1 and 3 (d is current depth)
+            ChoiceGenerator gen = new ChoiceGenerator(adjk.size(), d);
             int[] choice;
 
             while ((choice = gen.next()) != null) {

@@ -236,7 +236,7 @@ public class CompareMethods {
                             {
                                 if(b!=0)
                                     continue A;
-                                IndependenceTest cg = new IndTestConditionalGaussianLrt(data,alphas[a]);
+                                IndependenceTest cg = new IndTestConditionalGaussianLRT(data,alphas[a]);
                                 PcStable cp = new PcStable(cg);
                                 est = cp.search();
                             }

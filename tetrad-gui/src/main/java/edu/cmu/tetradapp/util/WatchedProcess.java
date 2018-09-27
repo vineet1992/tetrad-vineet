@@ -18,16 +18,14 @@
 // along with this program; if not, write to the Free Software               //
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA //
 ///////////////////////////////////////////////////////////////////////////////
-
 package edu.cmu.tetradapp.util;
 
 import edu.cmu.tetrad.util.JOptionUtils;
 import edu.cmu.tetrad.util.TaskManager;
-
-import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import javax.swing.*;
 
 /**
  * Runs a process, popping up a dialog with a stop button if the time to
@@ -39,9 +37,9 @@ import java.awt.event.ActionListener;
 public abstract class WatchedProcess {
 
     /**
-     * The thread that the watched process dialog runs in. This thread can
-     * be stopped (using wonderful yet deprecated stop( ) method, giving the
-     * user control over any process that's running in it.
+     * The thread that the watched process dialog runs in. This thread can be
+     * stopped (using wonderful yet deprecated stop( ) method, giving the user
+     * control over any process that's running in it.
      */
     private Thread thread;
 
@@ -74,8 +72,8 @@ public abstract class WatchedProcess {
      * that. SO...if you set this to false, make sure you set it to true before
      * you're done working!
      * <p/>
-     * It must be set to true for posted versions. There's  unit test that
-     * checks for that.
+     * It must be set to true for posted versions. There's unit test that checks
+     * for that.
      */
     private static boolean SHOW_DIALOG = true;
 
@@ -84,12 +82,11 @@ public abstract class WatchedProcess {
      */
     private Component centeringComp;
 
-    private boolean isCanceled = false;
-
     /**
      * Constructs a new watched process.
-     * @param owner The ancestor window in front of which the stop dialog
-     * is being displayed.
+     *
+     * @param owner The ancestor window in front of which the stop dialog is
+     * being displayed.
      */
     public WatchedProcess(Window owner) {
         this(owner, JOptionUtils.centeringComp());
@@ -97,10 +94,11 @@ public abstract class WatchedProcess {
 
     /**
      * Constructs a new watched process.
-     * @param owner The ancestor window in front of which the stop dialog
-     * is being displayed.
+     *
+     * @param owner The ancestor window in front of which the stop dialog is
+     * being displayed.
      */
-    public WatchedProcess(Window owner, Component centeringComp) {
+    private WatchedProcess(Window owner, Component centeringComp) {
         if (owner == null) {
             throw new NullPointerException();
         }
@@ -111,9 +109,7 @@ public abstract class WatchedProcess {
 
     }
 
-
     //=============================PUBLIC METHODS========================//
-
     /**
      * To watch a process, override this method, as follows:
      * <pre>
@@ -128,7 +124,7 @@ public abstract class WatchedProcess {
      */
     public abstract void watch();
 
-    public String getErrorMessage() {
+    private String getErrorMessage() {
         return errorMessage;
     }
 
@@ -136,19 +132,19 @@ public abstract class WatchedProcess {
         this.errorMessage = errorMessage;
     }
 
-    public JDialog getStopDialog() {
+    private JDialog getStopDialog() {
         return stopDialog;
     }
 
-    public void setStopDialog(JDialog stopDialog) {
+    private void setStopDialog(JDialog stopDialog) {
         this.stopDialog = stopDialog;
     }
 
-    public Window getOwner() {
+    private Window getOwner() {
         return owner;
     }
 
-    public boolean isShowDialog() {
+    private boolean isShowDialog() {
         return SHOW_DIALOG;
     }
 
@@ -161,14 +157,12 @@ public abstract class WatchedProcess {
     }
 
     //================================PRIVATE METHODS====================//
-
     private void watchProcess() {
         Runnable runnable = new Runnable() {
             public void run() {
                 try {
                     watch();
-                }
-                catch (Exception e) {
+                } catch (Exception e) {
                     e.printStackTrace();
                     String message = e.getMessage();
 
@@ -177,6 +171,7 @@ public abstract class WatchedProcess {
                     }
 
                     setErrorMessage(message);
+                    throw e;
                 }
             }
         };
@@ -191,15 +186,13 @@ public abstract class WatchedProcess {
                 public void run() {
                     try {
                         sleep(delay);
-                    }
-                    catch (InterruptedException e) {
+                    } catch (InterruptedException e) {
                         return;
                     }
 
                     if (getErrorMessage() != null) {
                         JOptionPane.showMessageDialog(
-                                centeringComp,
-                                "Stopped with error:\n" + getErrorMessage());
+                                centeringComp, getErrorMessage());
                         return;
                     }
 
@@ -247,12 +240,11 @@ public abstract class WatchedProcess {
 //                    scroll.setPreferredSize(new Dimension(300, 50));
 //                    b2.add(scroll);
 //                    b.add(b2);
-
                     if (isShowDialog()) {
                         Frame ancestor = (Frame) JOptionUtils.centeringComp()
                                 .getTopLevelAncestor();
-                        JDialog dialog =
-                                new JDialog(ancestor, "Executing...", false);
+                        JDialog dialog
+                                = new JDialog(ancestor, "Executing...", false);
                         setStopDialog(dialog);
 
                         dialog.getContentPane().add(b);
@@ -261,7 +253,6 @@ public abstract class WatchedProcess {
                                 centeringComp);
 
 //                        LogUtils.getInstance().add(out, Level.FINER);
-
                         while (getThread().isAlive()) {
                             try {
                                 sleep(200);
@@ -273,8 +264,7 @@ public abstract class WatchedProcess {
                                 }
 
 //                                anomaliesTextArea.setCaretPosition(out.getLengthWritten());
-                            }
-                            catch (InterruptedException e) {
+                            } catch (InterruptedException e) {
                                 return;
                             }
                         }
@@ -286,8 +276,8 @@ public abstract class WatchedProcess {
                         if (getErrorMessage() != null) {
                             JOptionPane.showMessageDialog(
                                     centeringComp,
-                                    "Stopped with error:\n" +
-                                            getErrorMessage());
+                                    "Stopped with error:\n"
+                                    + getErrorMessage());
                         }
                     }
                 }
@@ -311,9 +301,9 @@ public abstract class WatchedProcess {
         Window[] ownedWindows = ancestor.getOwnedWindows();
 
         for (Window window : ownedWindows) {
-            if (window instanceof Dialog &&
-                    !(window == getStopDialog()) &&
-                    !(window == getOwner())) {
+            if (window instanceof Dialog
+                    && !(window == getStopDialog())
+                    && !(window == getOwner())) {
                 Dialog dialog = (Dialog) window;
                 if (dialog.isVisible()) {
                     return true;
@@ -329,11 +319,7 @@ public abstract class WatchedProcess {
      * check for this periodically and respond gracefully.
      */
     public boolean isCanceled() {
+        boolean isCanceled = false;
         return isCanceled;
     }
 }
-
-
-
-
-

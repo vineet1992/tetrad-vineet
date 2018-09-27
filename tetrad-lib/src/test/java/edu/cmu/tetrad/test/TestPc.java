@@ -134,7 +134,7 @@ public class TestPc {
         _true.addDirectedEdge(pattern.getNode("QFJ"), pattern.getNode("PUBS"));
         _true.addDirectedEdge(pattern.getNode("SEX"), pattern.getNode("PUBS"));
 
-//        System.out.println(pattern);
+        System.out.println(pattern);
 
         assertEquals(pattern, _true);
     }
@@ -188,7 +188,7 @@ public class TestPc {
 
         // Set up search.
         pc.setKnowledge(knowledge);
-//        pc.setVerbose(true);
+//        pc.setVerbose(false);
 
         // Run search
         Graph resultGraph = pc.search();
@@ -238,7 +238,7 @@ public class TestPc {
 //    @Test
     public void testPcFci() {
 
-        String[] algorithms = {"PC", "CPC", "FGS", "FCI", "GFCI", "RFCI", "CFCI"};
+        String[] algorithms = {"PC", "CPC", "FGES", "FCI", "GFCI", "RFCI", "CFCI"};
         String[] statLabels = {"AP", "TP", "BP", "NA", "NT", "NB", "E"/*, "AP/E"*/};
 
         int numMeasures = 200;
@@ -352,13 +352,13 @@ public class TestPc {
                     search = new Cpc(test);
                     break;
                 case 2:
-                    search = new Fgs(score);
+                    search = new Fges(score);
                     break;
                 case 3:
                     search = new Fci(test);
                     break;
                 case 4:
-                    search = new GFci(score);
+                    search = new GFci(test, score);
                     break;
                 case 5:
                     search = new Rfci(test);
@@ -503,7 +503,7 @@ public class TestPc {
         System.out.println(algorithms[t] + " avg num tails " + nf.format(avgNumTails));
         System.out.println(algorithms[t] + " avg num bidirected " + nf.format(avgNumBidirected));
         System.out.println(algorithms[t] + " avg elapsed " + nf.format(avgElapsed));
-//        System.out.println(algorithms[t] + " avg precision / elapsed " + nf2.format(avgRatioPrecisionToElapsed));
+//        System.out.println(algorithm[t] + " avg precision / elapsed " + nf2.format(avgRatioPrecisionToElapsed));
 
         return ret;
     }
@@ -615,7 +615,7 @@ public class TestPc {
 //    @Test
     public void testPcRegression() {
 
-        String[] algorithms = {"PC", "CPC", "FGS", "FCI", "GFCI", "RFCI", "CFCI", "Regression"};
+        String[] algorithms = {"PC", "CPC", "FGES", "FCI", "GFCI", "RFCI", "CFCI", "Regression"};
         String[] statLabels = {"AP", "AR"};
 
         int numMeasures = 10;
@@ -736,7 +736,7 @@ public class TestPc {
                     out = search.search();
                     break;
                 case 2:
-                    search = new Fgs(score);
+                    search = new Fges(score);
                     out = search.search();
                     break;
                 case 3:
@@ -744,7 +744,7 @@ public class TestPc {
                     out = search.search();
                     break;
                 case 4:
-                    search = new GFci(score);
+                    search = new GFci(test, score);
                     out = search.search();
                     break;
                 case 5:

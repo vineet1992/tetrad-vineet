@@ -24,6 +24,7 @@ package edu.cmu.tetradapp.model;
 import edu.cmu.tetrad.data.*;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.Node;
+import edu.cmu.tetrad.util.Parameters;
 import edu.cmu.tetrad.util.TetradSerializableUtils;
 
 import java.util.ArrayList;
@@ -57,18 +58,16 @@ public class RestrictToGraphNodes extends DataWrapper {
      *
      * @see TetradSerializableUtils
      */
-    public static DataWrapper serializableInstance() {
-        DataWrapper wrapper =
-                new DataWrapper(DataUtils.continuousSerializableInstance());
-        return new CorrMatrixConverter(wrapper);
+    public static PcRunner serializableInstance() {
+        return PcRunner.serializableInstance();
     }
 
-    public DataModel restrictToGraphNodes(DataModel dataModel, Graph graph) {
+    private DataModel restrictToGraphNodes(DataModel dataModel, Graph graph) {
 
         if (dataModel instanceof DataSet) {
             DataSet data = (DataSet) dataModel;
 
-            List<Node> dataNodes = new ArrayList<Node>();
+            List<Node> dataNodes = new ArrayList<>();
             List<Node> graphNodes = graph.getNodes();
 
             for (Node graphNode : graphNodes) {
@@ -84,7 +83,7 @@ public class RestrictToGraphNodes extends DataWrapper {
             return dataSubset;
         } else if (dataModel instanceof ICovarianceMatrix) {
             ICovarianceMatrix cov = (ICovarianceMatrix) dataModel;
-            List<String> dataNames = new ArrayList<String>();
+            List<String> dataNames = new ArrayList<>();
             List<Node> graphNodes = graph.getNodes();
 
             for (Node graphNode : graphNodes) {

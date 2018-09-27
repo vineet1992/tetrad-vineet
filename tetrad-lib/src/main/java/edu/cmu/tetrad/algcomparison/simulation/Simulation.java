@@ -1,37 +1,43 @@
 package edu.cmu.tetrad.algcomparison.simulation;
 
-import edu.cmu.tetrad.data.DataSet;
+import edu.cmu.tetrad.algcomparison.utils.HasParameters;
+import edu.cmu.tetrad.data.DataModel;
+import edu.cmu.tetrad.util.Parameters;
 import edu.cmu.tetrad.data.DataType;
 import edu.cmu.tetrad.graph.Graph;
+import edu.cmu.tetrad.util.TetradSerializable;
 
 import java.util.List;
 
 /**
  * The interface that simulations must implement.
+ *
  * @author jdramsey
  */
-public interface Simulation {
+public interface Simulation extends HasParameters, TetradSerializable {
+    static final long serialVersionUID = 23L;
 
     /**
      * Creates a data set and simulates data.
      */
-    void simulate(Parameters parameters);
+    void createData(Parameters parameters) throws Exception;
 
     /**
      * @return The number of data sets to simulate.
      */
-    int getNumDataSets();
+    int getNumDataModels();
 
     /**
      * @return That graph.
+     * @param index The index of the desired true graph.
      */
-    Graph getTrueGraph();
+    Graph getTrueGraph(int index);
 
     /**
      * @param index The index of the desired simulated data set.
      * @return That data set.
      */
-    DataSet getDataSet(int index);
+    DataModel getDataModel(int index);
 
     /**
      * @return Returns the type of the data, continuous, discrete or mixed.

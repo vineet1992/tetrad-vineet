@@ -56,7 +56,7 @@ class SemGraphToolbar extends JPanel implements PropertyChangeListener {
     /**
      * The panel that the buttons are in.
      */
-    private Box buttonsPanel = Box.createVerticalBox();
+    private final Box buttonsPanel = Box.createVerticalBox();
 
     // The buttons in the toolbar.
     private JToggleButton move, addObserved, addLatent, addDirectedEdge, addBidirectedEdge;
@@ -161,7 +161,14 @@ class SemGraphToolbar extends JPanel implements PropertyChangeListener {
      */
     private void setWorkbenchMode(int mode) {
         workbench.setWorkbenchMode(mode);
-        setCursor(workbench.getCursor());
+
+        if (mode == GraphWorkbench.ADD_NODE) {
+            setCursor(workbench.getCursor());
+        } else if (mode == GraphWorkbench.ADD_EDGE) {
+            setCursor(workbench.getCursor());
+        } else {
+            setCursor(new Cursor(Cursor.HAND_CURSOR));
+        }
     }
 
     /**

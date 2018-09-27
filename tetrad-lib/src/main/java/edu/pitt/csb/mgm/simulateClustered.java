@@ -1,13 +1,13 @@
 package edu.pitt.csb.mgm;
 
 import edu.cmu.tetrad.algcomparison.score.SemBicScore;
-import edu.cmu.tetrad.algcomparison.simulation.ContinuousLinearGaussianSemSimulation;
+import edu.cmu.tetrad.algcomparison.simulation.MixedLeeHastieSimulation;
 import edu.cmu.tetrad.algcomparison.simulation.Parameters;
 import edu.cmu.tetrad.data.CovarianceMatrix;
 import edu.cmu.tetrad.data.ICovarianceMatrix;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.performance.PerformanceTests;
-import edu.cmu.tetrad.search.Fgs2;
+import edu.cmu.tetrad.search.Fges;
 import edu.cmu.tetrad.search.IndTestFisherZ;
 import edu.cmu.tetrad.search.PcStable;
 
@@ -37,8 +37,8 @@ for(int i = 0; i < maxVars; i +=10) {
 
         Parameters p = new Parameters();
         p.setValue("numMeasures",maxVars);
-        ContinuousLinearGaussianSemSimulation c = new ContinuousLinearGaussianSemSimulation();
-        c.setruns(i);
+        p.setValue("numRuns",numRuns);
+        MixedLeeHastieSimulation c = new MixedLeeHastieSimulation();
         c.simulate(p);
 
 // Get average endpoint misclassification matrices for increasing number of determinisitic variables
@@ -46,7 +46,7 @@ for(int i = 0; i < maxVars; i +=10) {
 
 
         PcStable p2 = new PcStable(new IndTestFisherZ(c.getDataSet(0), .05));
-        edu.cmu.tetrad.search.Fgs2 f = new Fgs2(new edu.cmu.tetrad.search.SemBicScore2(new CovarianceMatrix(c.getDataSet(0))));
+        edu.cmu.tetrad.search.Fges f = new Fges(new edu.cmu.tetrad.search.SemBicScore(new CovarianceMatrix(c.getDataSet(0))));
         Graph est = p2.search();
         Graph est2 = f.search();
         int[][] counts = PerformanceTests.endpointMisclassification2(p2.getNodes(), est, c.getTrueGraph());

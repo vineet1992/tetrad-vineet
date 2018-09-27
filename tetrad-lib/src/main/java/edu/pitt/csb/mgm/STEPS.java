@@ -21,6 +21,7 @@ import java.util.Arrays;
 import java.util.Collections;
 
 import static edu.pitt.csb.stability.StabilityUtils.StabilitySearchPar;
+import static edu.pitt.csb.stability.StabilityUtils.getSubSize;
 
 /**
  * Created by vinee_000 on 10/5/2016.
@@ -49,9 +50,8 @@ public class STEPS {
         gamma = g;
         lambda = lam;
         d = dat;
-        b = (int)Math.floor( 10*Math.sqrt(dat.getNumRows()));
-        if (b >= d.getNumRows())
-            b = d.getNumRows()/2;
+        this.b = getSubSize(dat.getNumRows());
+
 
 
     }
@@ -68,9 +68,8 @@ public class STEPS {
         gamma = g;
         lambda = lam;
         d = dat;
-        b = (int)Math.floor( 10*Math.sqrt(dat.getNumRows()));
-        if (b >= d.getNumRows())
-            b = d.getNumRows()/2;
+        this.b = getSubSize(dat.getNumRows());
+
         this.subs = subsamples;
 
 
@@ -82,9 +81,8 @@ public class STEPS {
         gamma = g;
         lambda = lam;
         d = dat;
-        b = (int)Math.floor( 10*Math.sqrt(dat.getNumRows()));
-        if (b >= d.getNumRows())
-            b = d.getNumRows()/2;
+        this.b = getSubSize(dat.getNumRows());
+
 
 
     }

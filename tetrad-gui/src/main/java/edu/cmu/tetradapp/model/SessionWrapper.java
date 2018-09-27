@@ -47,7 +47,7 @@ import java.util.List;
  * @see edu.cmu.tetrad.session.Session
  * @see edu.cmu.tetrad.graph.Graph
  */
-public class SessionWrapper implements Graph, SessionWrapperIndirectRef {
+public class SessionWrapper extends EdgeListGraph implements SessionWrapperIndirectRef {
     static final long serialVersionUID = 23L;
 
     /**
@@ -62,14 +62,14 @@ public class SessionWrapper implements Graph, SessionWrapperIndirectRef {
      *
      * @serial Cannot be null.
      */
-    private Set<Node> sessionNodeWrappers = new HashSet<Node>();
+    private final Set<Node> sessionNodeWrappers = new HashSet<>();
 
     /**
      * The set of SessionEdges.
      *
      * @serial Cannot be null.
      */
-    private Set<Edge> sessionEdges = new HashSet<Edge>();
+    private final Set<Edge> sessionEdges = new HashSet<>();
 
     /**
      * The property change support.
@@ -82,6 +82,8 @@ public class SessionWrapper implements Graph, SessionWrapperIndirectRef {
      */
     private transient SessionHandler sessionHandler;
     private boolean highlighted = false;
+    private boolean pag;
+    private boolean pattern;
 
     //==========================CONSTRUCTORS=======================//
 
@@ -180,10 +182,10 @@ public class SessionWrapper implements Graph, SessionWrapperIndirectRef {
         // Extract the SessionNodes from the SessionNodeWrappers
         // and pass the list of them to the Session.  Choose a unique
         // name for each of the session wrappers.
-        List<SessionNode> sessionNodes = new ArrayList<SessionNode>();
+        List<SessionNode> sessionNodes = new ArrayList<>();
         List<SessionNodeWrapper> sessionNodeWrappers =
-                new ArrayList<SessionNodeWrapper>();
-        List<Edge> sessionEdges = new ArrayList<Edge>();
+                new ArrayList<>();
+        List<Edge> sessionEdges = new ArrayList<>();
 
         Point oldUpperLeft = EditorUtils.getTopLeftPoint(sessionElements);
         int deltaX = upperLeft.x - oldUpperLeft.x;
@@ -241,7 +243,7 @@ public class SessionWrapper implements Graph, SessionWrapperIndirectRef {
      * Indirect reference to session handler to avoid saving out listeners
      * during serialization.
      */
-    SessionHandler getSessionHandler() {
+    private SessionHandler getSessionHandler() {
         if (this.sessionHandler == null) {
             this.sessionHandler = new SessionHandler();
         }
@@ -260,7 +262,7 @@ public class SessionWrapper implements Graph, SessionWrapperIndirectRef {
      * @param deltaY              the shift in y.
      */
     private void adjustNameAndPosition(SessionNodeWrapper wrapper,
-            List sessionNodeWrappers, int deltaX, int deltaY) {
+                                       List sessionNodeWrappers, int deltaX, int deltaY) {
         String originalName = wrapper.getSessionName();
         String base = extractBase(originalName);
         String uniqueName = nextUniqueName(base, sessionNodeWrappers);
@@ -354,7 +356,7 @@ public class SessionWrapper implements Graph, SessionWrapperIndirectRef {
      * the edges in the list is guaranteed.
      */
     public Set<Edge> getEdges() {
-        return new HashSet<Edge>(sessionEdges);
+        return new HashSet<>(sessionEdges);
     }
 
     public Edge getEdge(Node node1, Node node2) {
@@ -362,7 +364,7 @@ public class SessionWrapper implements Graph, SessionWrapperIndirectRef {
     }
 
     public Edge getDirectedEdge(Node node1, Node node2) {
-        return null;                
+        return null;
     }
 
     /**
@@ -387,7 +389,7 @@ public class SessionWrapper implements Graph, SessionWrapperIndirectRef {
      * ordering of the edges in the list is guaranteed.
      */
     public List<Edge> getEdges(Node node) {
-        List<Edge> edgeList = new LinkedList<Edge>();
+        List<Edge> edgeList = new LinkedList<>();
 
         for (Edge edge : sessionEdges) {
             if ((edge.getNode1() == node) || (edge.getNode2() == node)) {
@@ -438,7 +440,7 @@ public class SessionWrapper implements Graph, SessionWrapperIndirectRef {
      */
     public int getNumEdges(Node node) {
 
-        Set<Edge> edgeSet = new HashSet<Edge>();
+        Set<Edge> edgeSet = new HashSet<>();
 
         for (Edge edge : sessionEdges) {
             if ((edge.getNode1() == node) || (edge.getNode2() == node)) {
@@ -450,30 +452,7 @@ public class SessionWrapper implements Graph, SessionWrapperIndirectRef {
     }
 
     public List<Node> getNodes() {
-        return new ArrayList<Node>(sessionNodeWrappers);
-    }
-
-    /**
-     * @return the list of graph constraints for this graph.
-     */
-    public List<GraphConstraint> getGraphConstraints() {
-        return new LinkedList<GraphConstraint>();
-    }
-
-    /**
-     * @return true iff graph constraints will be checked for future graph
-     * modifications.
-     */
-    public boolean isGraphConstraintsChecked() {
-        return false;
-    }
-
-    /**
-     * Set whether graph constraints will be checked for future graph
-     * modifications.
-     */
-    public void setGraphConstraintsChecked(boolean checked) {
-        throw new UnsupportedOperationException();
+        return new ArrayList<>(sessionNodeWrappers);
     }
 
     /**
@@ -636,15 +615,15 @@ public class SessionWrapper implements Graph, SessionWrapperIndirectRef {
     }
 
     public Set<Triple> getAmbiguousTriples() {
-        throw new UnsupportedOperationException();
+        return new HashSet<>();
     }
 
     public Set<Triple> getUnderLines() {
-        throw new UnsupportedOperationException();
+        return new HashSet<>();
     }
 
     public Set<Triple> getDottedUnderlines() {
-        throw new UnsupportedOperationException();
+        return new HashSet<>();
     }
 
     /**
@@ -703,7 +682,7 @@ public class SessionWrapper implements Graph, SessionWrapperIndirectRef {
 
 
     public void setDottedUnderLineTriples(Set<Triple> triples) {
-        throw new UnsupportedOperationException();                
+        throw new UnsupportedOperationException();
     }
 
     public List<Node> getCausalOrdering() {
@@ -715,10 +694,6 @@ public class SessionWrapper implements Graph, SessionWrapperIndirectRef {
     }
 
     public boolean existsInducingPath(Node node1, Node node2) {
-        throw new UnsupportedOperationException();
-    }
-
-    public boolean addGraphConstraint(GraphConstraint gc) {
         throw new UnsupportedOperationException();
     }
 
@@ -765,6 +740,36 @@ public class SessionWrapper implements Graph, SessionWrapperIndirectRef {
         return this.propertyChangeSupport;
     }
 
+    @Override
+    public List<String> getTriplesClassificationTypes() {
+        return null;
+    }
+
+    @Override
+    public List<List<Triple>> getTriplesLists(Node node) {
+        return null;
+    }
+
+    @Override
+    public boolean isPag() {
+        return pag;
+    }
+
+    @Override
+    public void setPag(boolean pag) {
+        this.pag = pag;
+    }
+
+    @Override
+    public boolean isPattern() {
+        return pattern;
+    }
+
+    @Override
+    public void setPattern(boolean pattern) {
+        this.pattern = pattern;
+    }
+
     /**
      * Handles <code>SessionEvent</code>s. Hides the handling of these from the
      * API.
@@ -798,310 +803,320 @@ public class SessionWrapper implements Graph, SessionWrapperIndirectRef {
     public List<Edge> getEdges(Node node1, Node node2) {
         throw new UnsupportedOperationException();
     }
-
-    // Unused methods from Graph
-
-    /**
-     * Adds a directed edge --&gt; to the graph.
-     */
-    public boolean addDirectedEdge(Node node1, Node node2) {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * Adds an undirected edge --- to the graph.
-     */
-    public boolean addUndirectedEdge(Node node1, Node node2) {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * Adds an nondirected edges o-o to the graph.
-     */
-    public boolean addNondirectedEdge(Node node1, Node node2) {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * Adds a bidirected edges &lt;-&gt; to the graph.
-     */
-    public boolean addBidirectedEdge(Node node1, Node node2) {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * Adds a partially oriented edge o-&gt; to the graph.
-     */
-    public boolean addPartiallyOrientedEdge(Node node1, Node node2) {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * @return true iff there is a directed cycle in the graph.
-     */
-    public boolean existsDirectedCycle() {
-        throw new UnsupportedOperationException();
-    }
-
-    public boolean isDirectedFromTo(Node node1, Node node2) {
-        throw new UnsupportedOperationException();
-    }
-
-    public boolean isUndirectedFromTo(Node node1, Node node2) {
-        throw new UnsupportedOperationException();
-    }
-
-    public boolean defVisible(Edge edge) {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * @return true iff there is a directed path from node1 to node2 in the
-     * graph.
-     */
-    public boolean existsDirectedPathFromTo(Node node1, Node node2) {
-        throw new UnsupportedOperationException();
-    }
-
-    public boolean existsUndirectedPathFromTo(Node node1, Node node2) {
-        throw new UnsupportedOperationException();
-    }
-
-    public boolean existsSemiDirectedPathFromTo(Node node1, Set nodes2) {
-        throw new UnsupportedOperationException();
-    }
-
-    public boolean existsSemiDirectedPathFromTo(Node node1, Node node2) {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * @return true iff a trek exists between two nodes in the graph.  A trek
-     * exists if there is a directed path between the two nodes or else, for
-     * some third node in the graph, there is a path to each of the two nodes in
-     * question.
-     */
-    public boolean existsTrek(Node node1, Node node2) {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * @return the list of ancestors for the given nodes.
-     */
-    public List<Node> getAncestors(List nodes) {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * @return the Collection of children for a node.
-     */
-    public List<Node> getChildren(Node node) {
-        throw new UnsupportedOperationException();
-    }
-
-    public int getConnectivity() {
-        throw new UnsupportedOperationException();
-    }
-
-    public List<Node> getDescendants(List nodes) {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * @return a matrix of endpoints for the nodes in this graph, with nodes in
-     * the same order as getNodes().
-     */
-    public Endpoint[][] getEndpointMatrix() {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * @return the list of nodes adjacent to the given node.
-     */
-    public List<Node> getAdjacentNodes(Node node) {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * @return the number of arrow endpoint adjacent to an edge.
-     */
-    public int getIndegree(Node node) {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * @return the number of null endpoints adjacent to an edge.
-     */
-    public int getOutdegree(Node node) {
-        throw new UnsupportedOperationException();
-    }
-
+//
+//    // Unused methods from Graph
+//
+//    /**
+//     * Adds a directed edge --&gt; to the graph.
+//     */
+//    public boolean addDirectedEdge(Node node1, Node node2) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    /**
+//     * Adds an undirected edge --- to the graph.
+//     */
+//    public boolean addUndirectedEdge(Node node1, Node node2) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    /**
+//     * Adds an nondirected edges o-o to the graph.
+//     */
+//    public boolean addNondirectedEdge(Node node1, Node node2) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    /**
+//     * Adds a bidirected edges &lt;-&gt; to the graph.
+//     */
+//    public boolean addBidirectedEdge(Node node1, Node node2) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    /**
+//     * Adds a partially oriented edge o-&gt; to the graph.
+//     */
+//    public boolean addPartiallyOrientedEdge(Node node1, Node node2) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    /**
+//     * @return true iff there is a directed cycle in the graph.
+//     */
+//    public boolean existsDirectedCycle() {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    public boolean isDirectedFromTo(Node node1, Node node2) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    public boolean isUndirectedFromTo(Node node1, Node node2) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    public boolean defVisible(Edge edge) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    /**
+//     * @return true iff there is a directed path from node1 to node2 in the
+//     * graph.
+//     */
+//    public boolean existsDirectedPathFromTo(Node node1, Node node2) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    public boolean existsUndirectedPathFromTo(Node node1, Node node2) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    public boolean existsSemiDirectedPathFromTo(Node node1, Set nodes2) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    public boolean existsSemiDirectedPathFromTo(Node node1, Node node2) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    /**
+//     * @return true iff a trek exists between two nodes in the graph.  A trek
+//     * exists if there is a directed path between the two nodes or else, for
+//     * some third node in the graph, there is a path to each of the two nodes in
+//     * question.
+//     */
+//    public boolean existsTrek(Node node1, Node node2) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    /**
+//     * @return the list of ancestors for the given nodes.
+//     */
+//    public List<Node> getAncestors(List nodes) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    /**
+//     * @return the Collection of children for a node.
+//     */
+//    public List<Node> getChildren(Node node) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    public int getConnectivity() {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    public List<Node> getDescendants(List nodes) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    /**
+//     * @return a matrix of endpoints for the nodes in this graph, with nodes in
+//     * the same order as getNodes().
+//     */
+//    public Endpoint[][] getEndpointMatrix() {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    /**
+//     * @return the list of nodes adjacent to the given node.
+//     */
+//    public List<Node> getAdjacentNodes(Node node) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    /**
+//     * @return the number of arrow endpoint adjacent to an edge.
+//     */
+//    public int getIndegree(Node node) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    @Override
+//    public int getDegree(Node node) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    /**
+//     * @return the number of null endpoints adjacent to an edge.
+//     */
+//    public int getOutdegree(Node node) {
+//        throw new UnsupportedOperationException();
+//    }
+//
     /**
      * @return the list of parents for a node.
      */
     public List<Node> getParents(Node node) {
-        throw new UnsupportedOperationException();
+        return new ArrayList<Node>(((SessionNode) node).getParents());
     }
-
-    /**
-     * Determines whether one node is an ancestor of another.
-     */
-    public boolean isAncestorOf(Node node1, Node node2) {
-        throw new UnsupportedOperationException();
-    }
-
-    public boolean possibleAncestor(Node node1, Node node2) {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * @return true iff node1 is adjacent to node2 in the graph.
-     */
-    public boolean isAdjacentTo(Node node1, Node node2) {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * @return true iff node1 is a child of node2 in the graph.
-     */
-    public boolean isChildOf(Node node1, Node node2) {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * @return true iff node1 is a (non-proper) descendant of node2.
-     */
-    public boolean isDescendentOf(Node node1, Node node2) {
-        throw new UnsupportedOperationException();
-    }
-
-    public boolean defNonDescendent(Node node1, Node node2) {
-        throw new UnsupportedOperationException();
-    }
-
-    public boolean isDefNoncollider(Node node1, Node node2, Node node3) {
-        throw new UnsupportedOperationException();
-    }
-
-    public boolean isDefCollider(Node node1, Node node2, Node node3) {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * Determines whether one node is d-separated from another. According to
-     * Spirtes, Richardson &amp; Meek, two nodes are d- connected given some
-     * conditioning set Z if there is an acyclic undirected path U between them,
-     * such that every collider on U is an ancestor of some element in Z and
-     * every non-collider on U is not in Z.  Two elements are d-separated just
-     * in case they are not d-separated.  A collider is a node which two edges
-     * hold in common for which the endpoints leading into the node are both
-     * arrow endpoints.
-     */
-    public boolean isDConnectedTo(Node node1, Node node2, List z) {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * Determines whether one node is d-separated from another. According to
-     * Spirtes, Richardson &amp; Meek, two nodes are d- connected given some
-     * conditioning set Z if there is an acyclic undirected path U between them,
-     * such that every collider on U is an ancestor of some element in Z and
-     * every non-collider on U is not in Z.  Two elements are d-separated just
-     * in case they are not d-separated.  A collider is a node which two edges
-     * hold in common for which the endpoints leading into the node are both
-     * arrow endpoints.
-     */
-    public boolean isDSeparatedFrom(Node node1, Node node2, List z) {
-        throw new UnsupportedOperationException();
-    }
-
-    public boolean possDConnectedTo(Node node1, Node node2, List z) {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * @return true iff the given node is exogenous in the graph.
-     */
-    public boolean isExogenous(Node node) {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * Determines whether one node is a parent of another.
-     */
-    public boolean isParentOf(Node node1, Node node2) {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * Determines whether one node is a proper ancestor of another.
-     */
-    public boolean isProperAncestorOf(Node node1, Node node2) {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * Determines whether one node is a proper decendent of another.
-     */
-    public boolean isProperDescendentOf(Node node1, Node node2) {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * Nodes adjacent to the given node with the given proximal endpoint.
-     */
-    public List<Node> getNodesInTo(Node node, Endpoint n) {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * Nodes adjacent to the given node with the given distal endpoint.
-     */
-    public List<Node> getNodesOutTo(Node node, Endpoint n) {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * Removes all edges from the graph and fully connects it using #-# edges,
-     * where # is the given endpoint.
-     */
-    public void fullyConnect(Endpoint endpoint) {
-        throw new UnsupportedOperationException();
-    }
-
-    public void reorientAllWith(Endpoint endpoint) {
-        throw new UnsupportedOperationException();
-    }
-
-    public void setHighlighted(Edge edge, boolean highlighted) {
-        this.highlighted = highlighted;
-    }
-
-    public boolean isHighlighted(Edge edge) {
-        return highlighted;
-    }
-
-    public boolean isParameterizable(Node node) {
-        return false;
-    }
-
-    public boolean isTimeLagModel() {
-        return false;
-    }
-
-    public TimeLagGraph getTimeLagGraph() {
-        return null;
-    }
-
-    @Override
-    public void removeTriplesNotInGraph() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public List<Node> getSepset(Node n1, Node n2) {
-        throw new UnsupportedOperationException();
-    }
+//
+//    /**
+//     * Determines whether one node is an ancestor of another.
+//     */
+//    public boolean isAncestorOf(Node node1, Node node2) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    public boolean possibleAncestor(Node node1, Node node2) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    /**
+//     * @return true iff node1 is adjacent to node2 in the graph.
+//     */
+//    public boolean isAdjacentTo(Node node1, Node node2) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    /**
+//     * @return true iff node1 is a child of node2 in the graph.
+//     */
+//    public boolean isChildOf(Node node1, Node node2) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    /**
+//     * @return true iff node1 is a (non-proper) descendant of node2.
+//     */
+//    public boolean isDescendentOf(Node node1, Node node2) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    public boolean defNonDescendent(Node node1, Node node2) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    public boolean isDefNoncollider(Node node1, Node node2, Node node3) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    public boolean isDefCollider(Node node1, Node node2, Node node3) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    /**
+//     * Determines whether one node is d-separated from another. According to
+//     * Spirtes, Richardson &amp; Meek, two nodes are d- connected given some
+//     * conditioning set Z if there is an acyclic undirected path U between them,
+//     * such that every collider on U is an ancestor of some element in Z and
+//     * every non-collider on U is not in Z.  Two elements are d-separated just
+//     * in case they are not d-separated.  A collider is a node which two edges
+//     * hold in common for which the endpoints leading into the node are both
+//     * arrow endpoints.
+//     */
+//    public boolean isDConnectedTo(Node node1, Node node2, List z) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    /**
+//     * Determines whether one node is d-separated from another. According to
+//     * Spirtes, Richardson &amp; Meek, two nodes are d- connected given some
+//     * conditioning set Z if there is an acyclic undirected path U between them,
+//     * such that every collider on U is an ancestor of some element in Z and
+//     * every non-collider on U is not in Z.  Two elements are d-separated just
+//     * in case they are not d-separated.  A collider is a node which two edges
+//     * hold in common for which the endpoints leading into the node are both
+//     * arrow endpoints.
+//     */
+//    public boolean isDSeparatedFrom(Node node1, Node node2, List z) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    public boolean possDConnectedTo(Node node1, Node node2, List z) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    /**
+//     * @return true iff the given node is exogenous in the graph.
+//     */
+//    public boolean isExogenous(Node node) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    /**
+//     * Determines whether one node is a parent of another.
+//     */
+//    public boolean isParentOf(Node node1, Node node2) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    /**
+//     * Determines whether one node is a proper ancestor of another.
+//     */
+//    public boolean isProperAncestorOf(Node node1, Node node2) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    /**
+//     * Determines whether one node is a proper decendent of another.
+//     */
+//    public boolean isProperDescendentOf(Node node1, Node node2) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    /**
+//     * Nodes adjacent to the given node with the given proximal endpoint.
+//     */
+//    public List<Node> getNodesInTo(Node node, Endpoint n) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    /**
+//     * Nodes adjacent to the given node with the given distal endpoint.
+//     */
+//    public List<Node> getNodesOutTo(Node node, Endpoint n) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    /**
+//     * Removes all edges from the graph and fully connects it using #-# edges,
+//     * where # is the given endpoint.
+//     */
+//    public void fullyConnect(Endpoint endpoint) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    public void reorientAllWith(Endpoint endpoint) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    public void setHighlighted(Edge edge, boolean highlighted) {
+//        this.highlighted = highlighted;
+//    }
+//
+//    public boolean isHighlighted(Edge edge) {
+//        return highlighted;
+//    }
+//
+//    public boolean isParameterizable(Node node) {
+//        return false;
+//    }
+//
+//    public boolean isTimeLagModel() {
+//        return false;
+//    }
+//
+//    public TimeLagGraph getTimeLagGraph() {
+//        return null;
+//    }
+//
+//    @Override
+//    public void removeTriplesNotInGraph() {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    @Override
+//    public List<Node> getSepset(Node n1, Node n2) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    @Override
+//    public void setNodes(List<Node> nodes) {
+//        throw new UnsupportedOperationException("Sorry, you cannot replace the variables for a time lag graph.");
+//    }
 
     public boolean isSessionChanged() {
         return this.session.isSessionChanged();

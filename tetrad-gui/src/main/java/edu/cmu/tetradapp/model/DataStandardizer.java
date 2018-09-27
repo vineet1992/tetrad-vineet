@@ -23,6 +23,7 @@ package edu.cmu.tetradapp.model;
 
 import edu.cmu.tetrad.data.*;
 import edu.cmu.tetrad.graph.Node;
+import edu.cmu.tetrad.util.Parameters;
 import edu.cmu.tetrad.util.TetradMatrix;
 import edu.cmu.tetrad.util.TetradSerializableUtils;
 
@@ -38,7 +39,7 @@ public class DataStandardizer extends DataWrapper {
 
     //=============================CONSTRUCTORS==============================//
 
-    public DataStandardizer(DataWrapper wrapper) {
+    public DataStandardizer(DataWrapper wrapper, Parameters params) {
         DataModelList inList = wrapper.getDataModelList();
         DataModelList outList = new DataModelList();
 
@@ -72,10 +73,8 @@ public class DataStandardizer extends DataWrapper {
      *
      * @see TetradSerializableUtils
      */
-    public static DataWrapper serializableInstance() {
-        DataWrapper wrapper =
-                new DataWrapper(DataUtils.continuousSerializableInstance());
-        return new DataStandardizer(wrapper);
+    public static PcRunner serializableInstance() {
+        return PcRunner.serializableInstance();
     }
 
 }

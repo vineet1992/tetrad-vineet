@@ -1,32 +1,29 @@
 package edu.cmu.tetrad.algcomparison.score;
 
-import edu.cmu.tetrad.algcomparison.simulation.Parameters;
+import edu.cmu.tetrad.data.DataModel;
+import edu.cmu.tetrad.data.DataUtils;
+import edu.cmu.tetrad.util.Parameters;
 import edu.cmu.tetrad.data.CovarianceMatrixOnTheFly;
-import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.data.DataType;
 import edu.cmu.tetrad.search.Score;
 
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Wrapper for Fisher Z test.
+ *
  * @author jdramsey
  */
 public class SemBicScore implements ScoreWrapper {
-    private DataSet dataSet = null;
-    private Score score = null;
+    static final long serialVersionUID = 23L;
 
     @Override
-    public Score getScore(DataSet dataSet, Parameters parameters) {
-        if (dataSet != this.dataSet) {
-            this.dataSet = dataSet;
-            edu.cmu.tetrad.search.SemBicScore semBicScore
-                    = new edu.cmu.tetrad.search.SemBicScore(new CovarianceMatrixOnTheFly(dataSet));
-            semBicScore.setPenaltyDiscount(parameters.getDouble("penaltyDiscount"));
-            this.score = semBicScore;
-        }
-        return score;
+    public Score getScore(DataModel dataSet, Parameters parameters) {
+        edu.cmu.tetrad.search.SemBicScore semBicScore
+                = new edu.cmu.tetrad.search.SemBicScore(DataUtils.getCovMatrix(dataSet));
+        semBicScore.setPenaltyDiscount(parameters.getDouble("penaltyDiscount"));
+        return semBicScore;
     }
 
     @Override
@@ -41,7 +38,9 @@ public class SemBicScore implements ScoreWrapper {
 
     @Override
     public List<String> getParameters() {
-        return Collections.singletonList("penaltyDiscount");
+        List<String> parameters = new ArrayList<>();
+        parameters.add("penaltyDiscount");
+        return parameters;
     }
 
 }

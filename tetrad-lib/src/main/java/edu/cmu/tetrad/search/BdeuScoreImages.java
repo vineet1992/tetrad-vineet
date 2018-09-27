@@ -34,7 +34,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Implements the continuous BIC score for FGS.
+ * Implements the continuous BIC score for FGES.
  *
  * @author Joseph Ramsey
  */
@@ -74,7 +74,7 @@ public class BdeuScoreImages implements IBDeuScore {
                 DataSet dataSet = (DataSet) model;
 
                 if (!dataSet.isDiscrete()) {
-                    throw new IllegalArgumentException("Datasets must be continuous.");
+                    throw new IllegalArgumentException("Datasets must be discrete.");
                 }
 
                 scores.add(new BDeuScore(dataSet));
@@ -191,16 +191,6 @@ public class BdeuScoreImages implements IBDeuScore {
     }
 
     @Override
-    public double getParameter1() {
-        return 0;
-    }
-
-    @Override
-    public void setParameter1(double alpha) {
-
-    }
-
-    @Override
     public int getSampleSize() {
         return scores.get(0).getSampleSize();
     }
@@ -278,8 +268,13 @@ public class BdeuScoreImages implements IBDeuScore {
     }
 
     @Override
-    public int getMaxIndegree() {
+    public int getMaxDegree() {
         return 1000;
+    }
+
+    @Override
+    public boolean determines(List<Node> z, Node y) {
+        return false;
     }
 }
 

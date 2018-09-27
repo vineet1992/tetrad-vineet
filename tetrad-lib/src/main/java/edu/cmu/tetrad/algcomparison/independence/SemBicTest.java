@@ -1,34 +1,33 @@
 package edu.cmu.tetrad.algcomparison.independence;
 
-import edu.cmu.tetrad.algcomparison.simulation.Parameters;
-import edu.cmu.tetrad.data.DataModel;
-import edu.cmu.tetrad.data.DataSet;
-import edu.cmu.tetrad.data.DataType;
-import edu.cmu.tetrad.search.IndTestScore;
-import edu.cmu.tetrad.search.IndependenceTest;
-import edu.cmu.tetrad.search.SemBicScoreImages;
+import edu.cmu.tetrad.data.*;
+import edu.cmu.tetrad.search.*;
+import edu.cmu.tetrad.util.Parameters;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 /**
  * Wrapper for Fisher Z test.
+ *
  * @author jdramsey
  */
-public class SemBicTest implements IndTestWrapper {
-    private DataSet dataSet = null;
-    private edu.cmu.tetrad.search.IndependenceTest test = null;
+public class SemBicTest implements IndependenceWrapper {
+    static final long serialVersionUID = 23L;
 
     @Override
-    public IndependenceTest getTest(DataSet dataSet, Parameters parameters) {
-        if (dataSet != this.dataSet) {
-            this.dataSet = dataSet;
-            List<DataModel> dataModels = new ArrayList<>();
-            dataModels.add(dataSet);
-            return new IndTestScore(new SemBicScoreImages(dataModels), parameters.getDouble("alpha"));
+    public IndependenceTest getTest(DataModel dataSet, Parameters parameters) {
+        SemBicScore score = null;
+
+        if (dataSet instanceof ICovarianceMatrix) {
+            score = new SemBicScore((ICovarianceMatrix) dataSet);
+            score.setPenaltyDiscount(parameters.getDouble("penaltyDiscount"));
+        } else {
+            score = new SemBicScore(new CovarianceMatrix((DataSet) dataSet));
+            score.setPenaltyDiscount(parameters.getDouble("penaltyDiscount"));
+
         }
-        return test;
+
+        return new IndTestScore(score, dataSet);
     }
 
     @Override
@@ -43,7 +42,8 @@ public class SemBicTest implements IndTestWrapper {
 
     @Override
     public List<String> getParameters() {
-        return Collections.singletonList("alpha");
+        List<String> params = new ArrayList<>();
+        params.add("penaltyDiscount");
+        return params;
     }
-
 }

@@ -88,12 +88,11 @@ public class TestFgs {
         SemBicScore score = new SemBicScore(cov);
         score.setPenaltyDiscount(penaltyDiscount);
 
-        Fgs fgs = new Fgs(score);
+        Fges fgs = new Fges(score);
         fgs.setVerbose(false);
         fgs.setNumPatternsToStore(0);
         fgs.setOut(out);
-        fgs.setHeuristicSpeedup(true);
-        fgs.setDepth(1);
+        fgs.setFaithfulnessAssumed(true);
         fgs.setCycleBound(5);
 
         Graph estPattern = fgs.search();
@@ -155,10 +154,10 @@ public class TestFgs {
         score.setSamplePrior(samplePrior);
         score.setStructurePrior(structurePrior);
 
-        Fgs ges = new Fgs(score);
+        Fges ges = new Fges(score);
         ges.setVerbose(false);
         ges.setNumPatternsToStore(0);
-        ges.setHeuristicSpeedup(false);
+        ges.setFaithfulnessAssumed(false);
 
         Graph estPattern = ges.search();
 
@@ -190,7 +189,7 @@ public class TestFgs {
     @Test
     public void testExplore3() {
         Graph graph = GraphConverter.convert("A-->B,A-->C,B-->D,C-->D");
-        Fgs fgs = new Fgs(new GraphScore(graph));
+        Fges fgs = new Fges(new GraphScore(graph));
         Graph pattern = fgs.search();
         assertEquals(SearchGraphUtils.patternForDag(graph), pattern);
     }
@@ -198,7 +197,7 @@ public class TestFgs {
     @Test
     public void testExplore4() {
         Graph graph = GraphConverter.convert("A-->B,A-->C,A-->D,B-->E,C-->E,D-->E");
-        Fgs fgs = new Fgs(new GraphScore(graph));
+        Fges fgs = new Fges(new GraphScore(graph));
         Graph pattern = fgs.search();
         assertEquals(SearchGraphUtils.patternForDag(graph), pattern);
     }
@@ -206,15 +205,15 @@ public class TestFgs {
     @Test
     public void testExplore5() {
         Graph graph = GraphConverter.convert("A-->B,A-->C,A-->D,A->E,B-->F,C-->F,D-->F,E-->F");
-        Fgs fgs = new Fgs(new GraphScore(graph));
-        fgs.setHeuristicSpeedup(false);
+        Fges fgs = new Fges(new GraphScore(graph));
+        fgs.setFaithfulnessAssumed(false);
         Graph pattern = fgs.search();
         assertEquals(SearchGraphUtils.patternForDag(graph), pattern);
     }
 
 
     @Test
-    public void testFromGraphSimpleFgs() {
+    public void testFromGraphSimpleFges() {
 
         // This may fail if faithfulness is assumed but should pass if not.
 
@@ -235,7 +234,7 @@ public class TestFgs {
         g.addDirectedEdge(x4, x3);
 
         Graph pattern1 = new Pc(new IndTestDSep(g)).search();
-        Fgs2 fgs = new Fgs2(new GraphScore(g));
+        Fges fgs = new Fges(new GraphScore(g));
         fgs.setFaithfulnessAssumed(true);
         Graph pattern2 = fgs.search();
 
@@ -246,7 +245,7 @@ public class TestFgs {
     }
 
     @Test
-    public void testFromGraphSimpleFgsMb() {
+    public void testFromGraphSimpleFgesMb() {
 
         // This may fail if faithfulness is assumed but should pass if not.
 
@@ -267,7 +266,7 @@ public class TestFgs {
         g.addDirectedEdge(x4, x3);
 
         Graph pattern1 = new Pc(new IndTestDSep(g)).search();
-        FgsMb2 fgs = new FgsMb2(new GraphScore(g));
+        FgesMb fgs = new FgesMb(new GraphScore(g));
 //        fgs.setHeuristicSpeedup(false);
         Graph pattern2 = fgs.search(x1);
 
@@ -278,7 +277,7 @@ public class TestFgs {
     }
 
     @Test
-    public void testFgsMbFromGraph() {
+    public void testFgesMbFromGraph() {
         int numNodes = 20;
         int numIterations = 10;
 
@@ -287,7 +286,7 @@ public class TestFgs {
             Graph dag = GraphUtils.randomDag(numNodes, 0, numNodes, 10, 10, 10, false);
             GraphScore fgsScore = new GraphScore(dag);
 
-            Fgs2 fgs = new Fgs2(fgsScore);
+            Fges fgs = new Fges(fgsScore);
             Graph pattern1 = fgs.search();
 
             Node x1 = fgsScore.getVariable("X1");
@@ -303,7 +302,7 @@ public class TestFgs {
 
             Graph mb1 = pattern1.subgraph(new ArrayList<>(mb));
 
-            FgsMb2 fgsMb = new FgsMb2(fgsScore);
+            FgesMb fgsMb = new FgesMb(fgsScore);
             Graph mb2 = fgsMb.search(x1);
 
             assertEquals(mb1, mb2);
@@ -425,7 +424,7 @@ public class TestFgs {
 
         SemBicScore score = new SemBicScore(dataSet);
         score.setPenaltyDiscount(1);
-        Fgs fgs = new Fgs(score);
+        Fges fgs = new Fges(score);
         fgs.setKnowledge(knowledge);
 
         Graph pattern = fgs.search();
@@ -467,7 +466,7 @@ public class TestFgs {
         Graph graph = GraphConverter.convert(inputGraph);
 
         // Set up search.
-        Fgs fgs = new Fgs(new GraphScore(graph));
+        Fges fgs = new Fges(new GraphScore(graph));
 
         // Run search
         Graph resultGraph = fgs.search();
@@ -499,7 +498,7 @@ public class TestFgs {
         Graph input = GraphConverter.convert(inputGraph);
 
         // Set up search.
-        Fgs fgs = new Fgs(new GraphScore(input));
+        Fges fgs = new Fges(new GraphScore(input));
 
         // Set up search.
         fgs.setKnowledge(knowledge);
@@ -560,7 +559,7 @@ public class TestFgs {
         for (int i = 0; i < numIterations; i++) {
 //            System.out.println("Iteration " + (i + 1));
             Graph dag = GraphUtils.randomDag(numNodes, 0, numNodes, 10, 10, 10, false);
-            Fgs2 fgs = new Fgs2(new GraphScore(dag));
+            Fges fgs = new Fges(new GraphScore(dag));
             fgs.setFaithfulnessAssumed(true);
             Graph pattern1 = fgs.search();
             Graph pattern2 = new Pc(new IndTestDSep(dag)).search();
@@ -597,7 +596,7 @@ public class TestFgs {
 
         SemBicScore score = new SemBicScore(new CovarianceMatrixOnTheFly(data));
         score.setPenaltyDiscount(4);
-        Fgs fgs = new Fgs(score);
+        Fges fgs = new Fges(score);
 
         long start = System.currentTimeMillis();
 
@@ -642,13 +641,13 @@ public class TestFgs {
 
             long start = System.currentTimeMillis();
 
-//            Graph pattern = searchSemFgs(Dk, penalty);
-//            Graph pattern = searchBdeuFgs(Dk, k);
-//            Graph pattern = searchMixedFgs(Dk, penalty);
+//            Graph pattern = searchSemFges(Dk, penalty);
+//            Graph pattern = searchBdeuFges(Dk, k);
+//            Graph pattern = searchMixedFges(Dk, penalty);
 //            Graph pattern = searchMixedPc(Dk, 0.001);
 //            Graph pattern = searchMixedPcs(Dk, 0.001);
 //            Graph pattern = searchMixedCpc(Dk, 0.001);
-//            Graph pattern = searchMGMFgs(Dk, penalty);
+//            Graph pattern = searchMGMFges(Dk, penalty);
             Graph pattern = searchMGMPcs(Dk);
 //            Graph pattern = searchMGMCpc(Dk);
 
@@ -760,9 +759,9 @@ public class TestFgs {
 
                 long start = System.currentTimeMillis();
 
-//            Graph pattern = searchSemFgs(Dk);
-//            Graph pattern = searchBdeuFgs(Dk, k);
-                Graph pattern = searchMixedFgs(Dk, penalty);
+//            Graph pattern = searchSemFges(Dk);
+//            Graph pattern = searchBdeuFges(Dk, k);
+                Graph pattern = searchMixedFges(Dk, penalty);
 
                 long stop = System.currentTimeMillis();
 
@@ -786,15 +785,15 @@ public class TestFgs {
         }
     }
 
-    private Graph searchSemFgs(DataSet Dk, double penalty) {
+    private Graph searchSemFges(DataSet Dk, double penalty) {
         Dk = DataUtils.convertNumericalDiscreteToContinuous(Dk);
         SemBicScore score = new SemBicScore(new CovarianceMatrixOnTheFly(Dk));
         score.setPenaltyDiscount(penalty);
-        Fgs fgs = new Fgs(score);
+        Fges fgs = new Fges(score);
         return fgs.search();
     }
 
-    private Graph searchBdeuFgs(DataSet Dk, int k) {
+    private Graph searchBdeuFges(DataSet Dk, int k) {
         Discretizer discretizer = new Discretizer(Dk);
         List<Node> nodes = Dk.getVariables();
 
@@ -809,14 +808,14 @@ public class TestFgs {
         BDeuScore score = new BDeuScore(Dk);
         score.setSamplePrior(1.0);
         score.setStructurePrior(1.0);
-        Fgs fgs = new Fgs(score);
+        Fges fgs = new Fges(score);
         return fgs.search();
     }
 
-    private Graph searchMixedFgs(DataSet dk, double penalty) {
+    private Graph searchMixedFges(DataSet dk, double penalty) {
         MixedBicScore score = new MixedBicScore(dk);
         score.setPenaltyDiscount(penalty);
-        Fgs fgs = new Fgs(score);
+        Fges fgs = new Fges(score);
         return fgs.search();
     }
 
@@ -841,14 +840,14 @@ public class TestFgs {
         return pc.search();
     }
 
-    public Graph searchMGMFgs(DataSet ds, double penalty) {
+    public Graph searchMGMFges(DataSet ds, double penalty) {
         MGM m = new MGM(ds, new double[]{0.1, 0.1, 0.1});
         //m.setVerbose(this.verbose);
         Graph gm = m.search();
         DataSet dataSet = MixedUtils.makeContinuousData(ds);
-        SemBicScore2 score = new SemBicScore2(new CovarianceMatrixOnTheFly(dataSet));
+        SemBicScore score = new SemBicScore(new CovarianceMatrixOnTheFly(dataSet));
         score.setPenaltyDiscount(penalty);
-        Fgs fg = new Fgs(score);
+        Fges fg = new Fges(score);
         fg.setBoundGraph(gm);
         fg.setVerbose(false);
         return fg.search();
@@ -912,7 +911,7 @@ public class TestFgs {
 
 //    @Test
     public void testBestAlgorithms() {
-        String[] algorithms = {"SemFGS", "BDeuFGS", "MixedFGS", "PC", "PCS", "CPC", "MGMFgs", "MGMPcs"};
+        String[] algorithms = {"SemFGS", "BDeuFGS", "MixedFGS", "PC", "PCS", "CPC", "MGMFges", "MGMPcs"};
         String[] statLabels = {"AP", "AR", "OP", "OR", "SUM", "McAdj", "McOr", "F1Adj", "F1Or", "E"};
 
         int numMeasures = 30;
@@ -1016,13 +1015,13 @@ public class TestFgs {
 
             switch (t) {
                 case 0:
-                    out = searchSemFgs(data, penalty);
+                    out = searchSemFges(data, penalty);
                     break;
                 case 1:
-                    out = searchBdeuFgs(data, numCategories);
+                    out = searchBdeuFges(data, numCategories);
                     break;
                 case 2:
-                    out = searchMixedFgs(data, penalty);
+                    out = searchMixedFges(data, penalty);
                     break;
                 case 3:
                     out = searchMixedPc(data, 0.001);
@@ -1034,7 +1033,7 @@ public class TestFgs {
                     out = searchMixedCpc(data, 0.001);
                     break;
                 case 6:
-                    out = searchMGMFgs(data, penalty);
+                    out = searchMGMFges(data, penalty);
                     break;
                 case 7:
                     out = searchMGMPcs(data);
@@ -1394,7 +1393,7 @@ public class TestFgs {
     }
 
     public static void main(String...args) {
-        new TestFgs().testBestAlgorithms();
+        new TestFges().testBestAlgorithms();
     }
 }
 

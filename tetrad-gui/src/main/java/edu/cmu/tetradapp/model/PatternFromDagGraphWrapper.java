@@ -25,16 +25,18 @@ import edu.cmu.tetrad.graph.Dag;
 import edu.cmu.tetrad.graph.EdgeListGraph;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.search.SearchGraphUtils;
+import edu.cmu.tetrad.session.DoNotAddOldModel;
+import edu.cmu.tetrad.util.Parameters;
 import edu.cmu.tetrad.util.TetradLogger;
 
 /**
  * @author Tyler Gibson
  */
-public class PatternFromDagGraphWrapper extends GraphWrapper {
+public class PatternFromDagGraphWrapper extends GraphWrapper implements DoNotAddOldModel {
     static final long serialVersionUID = 23L;
 
     
-    public PatternFromDagGraphWrapper(GraphSource source) {
+    public PatternFromDagGraphWrapper(GraphSource source, Parameters parameters) {
         this(source.getGraph());
     }
 
@@ -49,7 +51,7 @@ public class PatternFromDagGraphWrapper extends GraphWrapper {
             throw new IllegalArgumentException("The source graph is not a DAG.");
         }
 
-        Graph pattern = getPattern(new Dag(graph));
+        Graph pattern = getPattern(new EdgeListGraph(graph));
         setGraph(pattern);
 
         TetradLogger.getInstance().log("info", "\nGenerating pattern from DAG.");
@@ -63,8 +65,8 @@ public class PatternFromDagGraphWrapper extends GraphWrapper {
     //======================== Private Method ======================//
 
 
-    private static Graph getPattern(Dag dag) {
-        return SearchGraphUtils.patternFromDag(dag);
+    private static Graph getPattern(Graph graph) {
+        return SearchGraphUtils.patternFromDag(graph);
     }
 
     @Override

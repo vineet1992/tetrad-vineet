@@ -224,9 +224,7 @@ public class StabilityUtils {
     {
         if(b<0)
         {
-            b = (int)Math.floor( 10*Math.sqrt(data.getNumRows()));
-            if (b > data.getNumRows())
-                b = data.getNumRows()/2;
+            b = getSubSize(data.getNumRows());
         }
         final int numVars = data.getNumColumns();
         final double [][][] thetaMat = new double[4][numVars][numVars];
@@ -339,6 +337,7 @@ public class StabilityUtils {
         final DoubleMatrix2D thetaMat = DoubleFactory2D.dense.make(numVars, numVars, 0.0);
 
         int[][] samp = subSampleNoReplacement(data.getNumRows(), b, N);
+        int attempts = 5000;
         boolean done = false;
         while(!done)
         {
@@ -349,6 +348,12 @@ public class StabilityUtils {
                     done = false;
             }
             samp = subSampleNoReplacement(data.getNumRows(), b, N);
+            attempts--;
+            if(attempts==0)
+            {
+                System.err.println("Unable to find a subsampled dataset of size " + b + " where there are at least one category of every discrete variable");
+                System.exit(-1);
+            }
         }
 
         final int [][] samps = samp;
@@ -774,9 +779,8 @@ public class StabilityUtils {
 
     public static int[][] subSampleNoReplacement(int sampSize, int numSub){
 
-        int subSize =(int) (10*Math.sqrt(sampSize));
-        if(subSize>sampSize)
-            subSize = sampSize/2;
+        int subSize = getSubSize(sampSize);
+
         if (subSize < 1) {
             throw new IllegalArgumentException("Sample size must be > 0.");
         }
@@ -881,6 +885,15 @@ public static int [][] generateSubsamples(int N, int sampleSize)
     return result;
 }
 
+public static int getSubSize(int sampleSize)
+{
+    int b = (int)Math.floor( 10*Math.sqrt(sampleSize));
+    if (b >= sampleSize)
+        b = 3*sampleSize/4;
+
+    return b;
+}
+
 
     //some tests...
     public static void main(String[] args){
@@ -906,5 +919,6 @@ public static int [][] generateSubsamples(int N, int sampleSize)
         System.out.println(xi);
         System.out.println(xi2);
     }
+
 }
 

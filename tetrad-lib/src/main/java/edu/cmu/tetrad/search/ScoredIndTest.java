@@ -134,12 +134,8 @@ public class ScoredIndTest implements Score {
         return 0;
     }
 
-    public double getParameter1() {
-        return test.getAlpha();
-    }
-
-    public void setParameter1(double alpha) {
-        test.setAlpha(alpha);
+    public boolean getAlternativePenalty() {
+        return false;
     }
 
     @Override
@@ -154,8 +150,13 @@ public class ScoredIndTest implements Score {
     }
 
     @Override
-    public int getMaxIndegree() {
+    public int getMaxDegree() {
         return 1000;
+    }
+
+    @Override
+    public boolean determines(List<Node> z, Node y) {
+        return false;
     }
 
 }

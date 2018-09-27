@@ -1,6 +1,6 @@
 package edu.pitt.csb.mgm;
 
-import edu.cmu.tetrad.algcomparison.simulation.ContinuousLinearGaussianSemSimulation;
+import edu.cmu.tetrad.algcomparison.simulation.MixedLeeHastieSimulation;
 import edu.cmu.tetrad.algcomparison.simulation.Parameters;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.GraphUtils;
@@ -18,8 +18,9 @@ public class toyTestDeterministic {
         Graph g = GraphUtils.loadGraphTxt(new File("toy_example.txt"));
         Parameters p = new Parameters();
         p.setValue("sampleSize",200);
-        ContinuousLinearGaussianSemSimulation c = new ContinuousLinearGaussianSemSimulation();
-        c.simulate(p,g);
+        MixedLeeHastieSimulation c = new MixedLeeHastieSimulation();
+        c.setTrueGraph(g);
+        c.simulate(p);
         PcStable p2 = new PcStable(new IndTestMultinomialAJ(c.getDataSet(0), .05));
         Graph est = p2.search();
         System.out.println(est);

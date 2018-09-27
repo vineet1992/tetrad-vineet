@@ -51,7 +51,7 @@ public class SepsetsMaxPValuePossDsep implements SepsetProducer {
      */
     public List<Node> getSepset(Node i, Node k) {
         List<Node> sepset = getMaxSepset(i, k);
-        if (getPValue() > getIndependenceTest().getAlpha()) {
+        if (getScore() > getIndependenceTest().getAlpha()) {
             return sepset;
         } else {
             return null;
@@ -69,28 +69,26 @@ public class SepsetsMaxPValuePossDsep implements SepsetProducer {
     }
 
     private List<Node> getMaxSepset(Node i, Node k) {
-        double _p = independenceTest.getAlpha();
+        double _p = 0.0;
         List<Node> _v = null;
 
-       if (extraSepsets != null) {
-           final List<Node> possibleDsep = extraSepsets.get(i, k);
-            if (possibleDsep != null) {
-                independenceTest.isIndependent(i, k, possibleDsep);
-                double p = independenceTest.getPValue();
-
-                if (p > _p) {
-
-                    _p = p;
-                    _v = possibleDsep;
-                    return _v;
-                }
-            }
-        }
+//        if (extraSepsets != null) {
+//            final List<Node> possibleDsep = extraSepsets.get(i, k);
+//            if (possibleDsep != null) {
+//                independenceTest.isIndependent(i, k, possibleDsep);
+//                double p = independenceTest.getScore();
+//
+//                if (p > _p) {
+//                    _p = p;
+//                    _v = possibleDsep;
+//                }
+//            }
+//        }
 
 //        List<Node> adji = graph.getAdjacentNodes(i);
 //        List<Node> adjk = graph.getAdjacentNodes(k);
-        List<Node> adji = new ArrayList<Node>(possibleDsep(i, k, graph, maxPathLength));
-        List<Node> adjk = new ArrayList<Node>(possibleDsep(k, i, graph, maxPathLength));
+        List<Node> adji = new ArrayList<>(possibleDsep(i, k, graph, maxPathLength));
+        List<Node> adjk = new ArrayList<>(possibleDsep(k, i, graph, maxPathLength));
         adji.remove(k);
         adjk.remove(i);
 
@@ -129,11 +127,7 @@ public class SepsetsMaxPValuePossDsep implements SepsetProducer {
                 }
             }
         }
-        if(extraSepsets!=null)
-        {
-            extraSepsets.set(i,k,_v);
-            extraSepsets.setPValue(i,k,_p);
-        }
+
         this.p = _p;
         return _v;
     }
@@ -232,8 +226,8 @@ public class SepsetsMaxPValuePossDsep implements SepsetProducer {
     }
 
     public static boolean existsSemidirectedPath(Node from, Node to, Graph G) {
-        Queue<Node> Q = new LinkedList<Node>();
-        Set<Node> V = new HashSet<Node>();
+        Queue<Node> Q = new LinkedList<>();
+        Set<Node> V = new HashSet<>();
         Q.offer(from);
         V.add(from);
 

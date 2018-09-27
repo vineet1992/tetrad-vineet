@@ -34,7 +34,7 @@ import java.util.*;
 import static java.lang.Math.sqrt;
 
 /**
- * Implements the continuous BIC score for FGS.
+ * Implements the continuous BIC score for FGES.
  *
  * @author Joseph Ramsey
  */
@@ -53,7 +53,7 @@ public class MixedBicScore implements Score {
     private double penaltyDiscount = 2.0;
 
     // True if linear dependencies should return NaN for the score, and hence be
-    // ignored by FGS
+    // ignored by FGES
     private boolean ignoreLinearDependent = false;
 
     // The printstream output should be sent to.
@@ -173,13 +173,11 @@ public class MixedBicScore implements Score {
         return variables;
     }
 
-    @Override
-    public double getParameter1() {
-        return penaltyDiscount;
+    public boolean getAlternativePenalty() {
+        return false;
     }
 
-    @Override
-    public void setParameter1(double alpha) {
+    public void setAlternativePenalty(double alpha) {
         this.penaltyDiscount = alpha;
     }
 
@@ -204,8 +202,13 @@ public class MixedBicScore implements Score {
     }
 
     @Override
-    public int getMaxIndegree() {
+    public int getMaxDegree() {
         return (int) Math.ceil(Math.log(sampleSize));
+    }
+
+    @Override
+    public boolean determines(List<Node> z, Node y) {
+        return false;
     }
 
     public ICovarianceMatrix getCovariances() {

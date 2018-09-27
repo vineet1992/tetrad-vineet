@@ -21,113 +21,147 @@
 
 package edu.cmu.tetrad.algcomparison;
 
-import edu.cmu.tetrad.algcomparison.algorithms.Algorithm;
-import edu.cmu.tetrad.algcomparison.algorithms.Algorithms;
-import edu.cmu.tetrad.algcomparison.simulation.*;
-import edu.cmu.tetrad.algcomparison.statistic.ElapsedTimeStat;
+import edu.cmu.tetrad.algcomparison.algorithm.Algorithm;
+import edu.cmu.tetrad.algcomparison.algorithm.Algorithms;
+import edu.cmu.tetrad.algcomparison.algorithm.MultiDataSetAlgorithm;
+import edu.cmu.tetrad.algcomparison.independence.FisherZ;
+import edu.cmu.tetrad.algcomparison.independence.IndependenceWrapper;
+import edu.cmu.tetrad.algcomparison.score.BdeuScore;
+import edu.cmu.tetrad.algcomparison.score.ScoreWrapper;
+import edu.cmu.tetrad.algcomparison.simulation.LoadDataAndGraphs;
+import edu.cmu.tetrad.algcomparison.simulation.Simulation;
+import edu.cmu.tetrad.algcomparison.simulation.Simulations;
+import edu.cmu.tetrad.algcomparison.statistic.ElapsedTime;
+import edu.cmu.tetrad.algcomparison.statistic.ParameterColumn;
 import edu.cmu.tetrad.algcomparison.statistic.Statistic;
 import edu.cmu.tetrad.algcomparison.statistic.Statistics;
-import edu.cmu.tetrad.algcomparison.statistic.utilities.SimulationPath;
+import edu.cmu.tetrad.algcomparison.statistic.utils.SimulationPath;
+import edu.cmu.tetrad.algcomparison.utils.HasKnowledge;
+import edu.cmu.tetrad.algcomparison.utils.HasParameterValues;
+import edu.cmu.tetrad.algcomparison.utils.HasParameters;
+import edu.cmu.tetrad.algcomparison.utils.TakesInitialGraph;
 import edu.cmu.tetrad.data.*;
 import edu.cmu.tetrad.graph.*;
-import edu.cmu.tetrad.util.CombinationGenerator;
-import edu.cmu.tetrad.util.StatUtils;
-import edu.cmu.tetrad.util.TextTable;
+import edu.cmu.tetrad.search.DagToPag2;
+import edu.cmu.tetrad.search.SearchGraphUtils;
+import edu.cmu.tetrad.util.*;
+import org.reflections.Reflections;
 
 import java.io.*;
+import java.lang.reflect.Constructor;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.*;
+import java.util.concurrent.RecursiveTask;
 
 /**
  * Script to do a comparison of a list of algorithms using a list of statistics and a list
  * of parameters and their values.
  *
  * @author jdramsey
+ * @author Daniel Malinsky
  */
 public class Comparison {
     private boolean[] graphTypeUsed;
     private PrintStream out;
     private boolean tabDelimitedTables = false;
     private boolean saveGraphs = false;
+    private boolean copyData = false;
+    private boolean showSimulationIndices = false;
+    private boolean showAlgorithmIndices = false;
+    private boolean showUtilities = false;
+    private boolean sortByUtility = false;
+    private String filePath = null;
+    private boolean parallelized = true;
+    private boolean savePatterns = false;
+    private boolean savePags = false;
 
     /**
      * Compares algorithms.
      *
-     * @param filePath    Path to the directory where files have been saved.
-     * @param outFile     Path to the file where the output should be printed.
-     * @param algorithms  The list of algorithms to be compared.
-     * @param statistics  The list of statistics on which to compare the algorithms, and their utility weights.
-     * @param parameters  The list of parameters and their values.
+     * @param filePath   Path to the directory where files have been saved.
+     * @param filePath   Path to the file where the output should be printed.
+     * @param algorithms The list of algorithms to be compared.
+     * @param statistics The list of statistics on which to compare the algorithm, and their utility weights.
+     * @param parameters The list of parameters and their values.
      */
-    public void compareAlgorithms(String filePath, String outFile, Algorithms algorithms,
-                                  Statistics statistics, Parameters parameters) {
+    public void compareFromFiles(String filePath, Algorithms algorithms,
+                                 Statistics statistics, Parameters parameters) {
+        this.filePath = filePath;
+
         Simulations simulations = new Simulations();
 
-        File file = new File(filePath);
+        File file = new File(filePath, "save");
         File[] dirs = file.listFiles();
 
-        for (File dir : dirs) {
-            simulations.add(new LoadContinuousDataAndGraphs(dir.getAbsolutePath()));
+        if (dirs == null) {
+            throw new NullPointerException("No files in " + file.getAbsolutePath());
         }
 
-        compareAlgorithms(outFile, simulations, algorithms, statistics, parameters);
+        for (File dir : dirs) {
+            simulations.add(new LoadDataAndGraphs(dir.getAbsolutePath()));
+        }
+
+        compareFromSimulations(filePath, simulations, algorithms, statistics, parameters);
     }
 
     /**
      * Compares algorithms.
      *
-     * @param outFile     Path to the file where the output should be printed.
-     * @param simulations The list of simulation that is used to generate graphs and data for the comparison.
+     * @param filePath    Path to the file where the output should be printed.
+     * @param simulations The list of simulationWrapper that is used to generate graphs and data for the comparison.
      * @param algorithms  The list of algorithms to be compared.
-     * @param statistics  The list of statistics on which to compare the algorithms, and their utility weights.
-     * @param parameters  The list of parameters and their values.
+     * @param statistics  The list of statistics on which to compare the algorithm, and their utility weights.
      */
-    public void compareAlgorithms(String outFile, Simulations simulations, Algorithms algorithms,
-                                  Statistics statistics, Parameters parameters) {
-        Simulations _simulations = new Simulations();
+    public void compareFromSimulations(String filePath, Simulations simulations, Algorithms algorithms,
+                                       Statistics statistics, Parameters parameters) {
+        this.filePath = filePath;
 
-        for (Simulation simulation : simulations.getSimulations()) {
-            List<SimulationWrapper> wrappers = getSimulationWrappers(simulation, parameters);
-
-            for (SimulationWrapper wrapper : wrappers) {
-                for (String param : wrapper.getOverriddenParameters().keySet()) {
-                    parameters.put(param, wrapper.getValue(param));
-                    wrapper.setValue(param, wrapper.getValue(param));
-                }
-
-                wrapper.simulate(parameters);
-                _simulations.add(wrapper);
-            }
-        }
-
+        // Create output file.
         try {
-            File comparison = new File(outFile);
-            this.out = new PrintStream(new FileOutputStream(comparison));
+            File dir = new File(filePath);
+            dir.mkdirs();
+            File file = new File(dir, "Comparison.txt");
+            this.out = new PrintStream(new FileOutputStream(file));
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
 
         out.println(new Date());
 
-        // Only consider the algorithms for the given data type. Mixed data types can go either way.
-        // MGM algorithms won't run on continuous data or discrete data.
+        // Set up simulations--create data and graphs, read in parameters. The parameters
+        // are set in the parameters object.
+        List<SimulationWrapper> simulationWrappers = new ArrayList<>();
+
+        int numRuns = parameters.getInt("numRuns");
+
+        for (Simulation simulation : simulations.getSimulations()) {
+            List<SimulationWrapper> wrappers = getSimulationWrappers(simulation, parameters);
+
+            for (SimulationWrapper wrapper : wrappers) {
+                wrapper.createData(wrapper.getSimulationSpecificParameters());
+                simulationWrappers.add(wrapper);
+            }
+        }
+
+        // Set up the algorithms.
         List<AlgorithmWrapper> algorithmWrappers = new ArrayList<>();
 
         for (Algorithm algorithm : algorithms.getAlgorithms()) {
-            List<String> algParameters = algorithm.getParameters();
             List<Integer> _dims = new ArrayList<>();
             List<String> varyingParameters = new ArrayList<>();
 
-            for (String parameter : algParameters) {
-                if (parameters.getNumValues(parameter) > 1) {
-                    _dims.add(parameters.getNumValues(parameter));
-                    varyingParameters.add(parameter);
+            final List<String> parameters1 = algorithm.getParameters();
+
+            for (String name : parameters1) {
+                if (parameters.getNumValues(name) > 1) {
+                    _dims.add(parameters.getNumValues(name));
+                    varyingParameters.add(name);
                 }
             }
 
             if (varyingParameters.isEmpty()) {
-                algorithmWrappers.add(new AlgorithmWrapper(algorithm));
+                algorithmWrappers.add(new AlgorithmWrapper(algorithm, parameters));
             } else {
 
                 int[] dims = new int[_dims.size()];
@@ -137,13 +171,13 @@ public class Comparison {
                 int[] choice;
 
                 while ((choice = gen.next()) != null) {
-                    AlgorithmWrapper wrapper = new AlgorithmWrapper(algorithm);
+                    AlgorithmWrapper wrapper = new AlgorithmWrapper(algorithm, parameters);
 
                     for (int h = 0; h < dims.length; h++) {
-                        String p = varyingParameters.get(h);
-                        Number[] values = parameters.getValues(p);
-                        Number value = values[choice[h]];
-                        wrapper.setValue(p, value);
+                        String parameter = varyingParameters.get(h);
+                        Object[] values = parameters.getValues(parameter);
+                        Object value = values[choice[h]];
+                        wrapper.setValue(parameter, value);
                     }
 
                     algorithmWrappers.add(wrapper);
@@ -151,32 +185,31 @@ public class Comparison {
             }
         }
 
+        // Create the algorithm-simulation wrappers for every combination of algorithm and
+        // simulation.
         List<AlgorithmSimulationWrapper> algorithmSimulationWrappers = new ArrayList<>();
 
-        for (Simulation simulation : _simulations.getSimulations()) {
+        for (SimulationWrapper simulationWrapper : simulationWrappers) {
             for (AlgorithmWrapper algorithmWrapper : algorithmWrappers) {
-                System.out.println(algorithmWrapper.getDataType() + " " + algorithmWrapper.getAlgorithm());
-                System.out.println(simulation.getDataType());
-                if (algorithmWrapper.getDataType() == simulation.getDataType()
-                        || algorithmWrapper.getDataType() == DataType.Mixed) {
-
-                    AlgorithmSimulationWrapper wrapper = new AlgorithmSimulationWrapper(
-                            algorithmWrapper, simulation);
-
-                    for (String param : algorithmWrapper.getOverriddenParameters()) {
-                        wrapper.setValue(param, algorithmWrapper.getValue(param));
-                    }
-
-                    algorithmSimulationWrappers.add(wrapper);
+                DataType algDataType = algorithmWrapper.getDataType();
+                DataType simDataType = simulationWrapper.getDataType();
+                if (!(algDataType == DataType.Mixed || (algDataType == simDataType))) {
+                    System.out.println("Type mismatch: " + algorithmWrapper.getDescription()
+                            + " / " + simulationWrapper.getDescription());
                 }
+
+                algorithmSimulationWrappers.add(new AlgorithmSimulationWrapper(
+                        algorithmWrapper, simulationWrapper));
             }
         }
 
-        double[][][][] allStats = calcStats(algorithmSimulationWrappers, statistics, parameters);
 
-        if (allStats != null)
+        // Run all of the algorithms and compile statistics.
+        double[][][][] allStats = calcStats(algorithmSimulationWrappers, algorithmWrappers, simulationWrappers,
+                statistics, numRuns);
 
-        {
+        // Print out the preliminary information for statistics types, etc.
+        if (allStats != null) {
             out.println();
             out.println("Statistics:");
             out.println();
@@ -191,16 +224,13 @@ public class Comparison {
         out.println(parameters);
         out.println();
 
-        if (allStats != null)
-
-        {
+        if (allStats != null) {
             int numTables = allStats.length;
-            int numAlgorithms = algorithms.getAlgorithms().size();
             int numStats = allStats[0][0].length - 1;
 
             double[][][] statTables = calcStatTables(allStats, Mode.Average, numTables, algorithmSimulationWrappers,
-                    numStats);
-            double[] utilities = calcUtilities(statistics, algorithmSimulationWrappers, numStats, statTables[0]);
+                    numStats, statistics);
+            double[] utilities = calcUtilities(statistics, algorithmSimulationWrappers, statTables[0]);
 
             // Add utilities to table as the last column.
             for (int u = 0; u < numTables; u++) {
@@ -211,7 +241,7 @@ public class Comparison {
 
             int[] newOrder;
 
-            if (statistics.isSortByUtility()) {
+            if (isSortByUtility()) {
                 newOrder = sort(algorithmSimulationWrappers, utilities);
             } else {
                 newOrder = new int[algorithmSimulationWrappers.size()];
@@ -223,19 +253,17 @@ public class Comparison {
             out.println("Simulation:");
             out.println();
 
-            if (_simulations.getSimulations().size() == 1) {
-                out.println(_simulations.getSimulations().get(0).getDescription());
+            if (simulationWrappers.size() == 1) {
+                out.println(simulationWrappers.get(0).getDescription());
             } else {
                 int i = 0;
 
-                for (Simulation simulation : _simulations.getSimulations()) {
+                for (SimulationWrapper simulation : simulationWrappers) {
                     out.println("Simulation " + (++i) + ":");
                     out.println(simulation.getDescription());
 
-                    if (simulation instanceof SimulationWrapper) {
-                        for (String param : ((SimulationWrapper) simulation).getOverriddenParameters().keySet()) {
-                            out.println(param + " = " + ((SimulationWrapper) simulation).getValue(param));
-                        }
+                    for (String param : simulation.getParameters()) {
+                        out.println(param + " = " + simulation.getValue(param));
                     }
 
                     out.println();
@@ -245,115 +273,158 @@ public class Comparison {
             out.println("Algorithms:");
             out.println();
 
-            int s = 0;
+            for (int t = 0; t < algorithmSimulationWrappers.size(); t++) {
+                AlgorithmSimulationWrapper wrapper = algorithmSimulationWrappers.get(t);
 
-            for (AlgorithmSimulationWrapper wrapper : algorithmSimulationWrappers) {
-                if (wrapper.getSimulation() == _simulations.getSimulations().get(0)) {
-                    out.println((s + 1) + ". " + wrapper.getDescription());
-                    s++;
+                if (wrapper.getSimulationWrapper() == simulationWrappers.get(0)) {
+                    out.println((t + 1) + ". " + wrapper.getAlgorithmWrapper().getDescription());
                 }
             }
 
             out.println();
-            out.println("Weighting of statistics:\n");
-            out.println("W = ");
+            out.println("Weighting of statistics:");
+            out.println();
+            out.println("U = ");
 
             for (Statistic stat : statistics.getStatistics()) {
                 String statName = stat.getAbbreviation();
                 double weight = statistics.getWeight(stat);
                 if (weight != 0.0) {
-                    out.println("    " + weight + " * Utility(" + statName + ")");
+                    out.println("    " + weight + " * f(" + statName + ")");
                 }
             }
 
             out.println();
+            out.println("Note that f for each statistic is a function that maps the statistic to the ");
+            out.println("interval [0, 1], with higher being better.");
+            out.println();
 
+            out.println();
 
             // Add utilities to table as the last column.
-
             for (int u = 0; u < numTables; u++) {
-                for (int t = 0; t < numAlgorithms; t++) {
+                for (int t = 0; t < algorithmSimulationWrappers.size(); t++) {
                     statTables[u][t][numStats] = utilities[t];
                 }
             }
 
-            printStats(statTables, statistics, Mode.Average, newOrder, algorithmWrappers, algorithmSimulationWrappers,
-                    _simulations, utilities);
+            // Print all of the tables.
+            printStats(statTables, statistics, Mode.Average, newOrder, algorithmSimulationWrappers,
+                    algorithmWrappers, simulationWrappers, utilities, parameters);
 
             statTables = calcStatTables(allStats, Mode.StandardDeviation, numTables,
-                    algorithmSimulationWrappers, numStats);
+                    algorithmSimulationWrappers, numStats, statistics);
 
-            printStats(statTables, statistics, Mode.StandardDeviation, newOrder, algorithmWrappers,
-                    algorithmSimulationWrappers,
-                    _simulations, utilities);
+            printStats(statTables, statistics, Mode.StandardDeviation, newOrder, algorithmSimulationWrappers, algorithmWrappers,
+                    simulationWrappers, utilities, parameters);
 
             statTables = calcStatTables(allStats, Mode.WorstCase, numTables, algorithmSimulationWrappers,
-                    numStats);
+                    numStats, statistics);
 
             // Add utilities to table as the last column.
             for (int u = 0; u < numTables; u++) {
-                for (int t1 = 0; t1 < numAlgorithms; t1++) {
-                    statTables[u][t1][numStats] = utilities[t1];
+                for (int t = 0; t < algorithmSimulationWrappers.size(); t++) {
+                    statTables[u][t][numStats] = utilities[t];
                 }
             }
 
-            printStats(statTables, statistics, Mode.WorstCase, newOrder, algorithmWrappers,
-                    algorithmSimulationWrappers,
-                    _simulations, utilities);
+            printStats(statTables, statistics, Mode.WorstCase, newOrder, algorithmSimulationWrappers, algorithmWrappers,
+                    simulationWrappers, utilities, parameters);
         }
 
         out.close();
     }
 
     /**
-     * Saves simulation data.
+     * Saves simulationWrapper data.
      *
-     * @param path       The path to the directory where the simulation data should be saved.
+     * @param path       The path to the directory where the simulationWrapper data should be saved.
      * @param simulation The simulate used to generate the graphs and data.
-     * @param parameters The parameters to be used in the simulation.
+     * @param parameters The parameters to be used in the simulationWrapper.
      */
-    public void saveDataSetAndGraphs(String path, Simulation simulation, Parameters parameters) {
+    public void saveToFiles(String path, Simulation simulation, Parameters parameters) {
         List<SimulationWrapper> simulationWrappers = getSimulationWrappers(simulation, parameters);
+
+        File dir0 = new File(path);
+        File dir;
+        int i = 0;
+
+        dir = new File(dir0, "save");
+//
+//        do {
+//            dir = new File(dir0, "Simulation" + (++i));
+//        } while (dir.exists());
+
+//        if (dir.exists()) {
+//            JOptionPane.showMessageDialog(JOptionUtils.centeringComp(),
+//                    "A file already exists named 'Simulation' in directory '" + dir0.getPath() + "'; \n" +
+//                            "please remove it first or move it out of the way.");
+//        }
+
+        deleteFilesThenDirectory(dir);
 
         try {
             int index = 0;
 
             for (SimulationWrapper simulationWrapper : simulationWrappers) {
-                for (String param : simulationWrapper.getOverriddenParameters().keySet()) {
-                    parameters.setValue(param, simulationWrapper.getValue(param));
+                for (String param : simulationWrapper.getParameters()) {
+                    parameters.set(param, simulationWrapper.getValue(param));
                 }
 
-                simulationWrapper.simulate(parameters);
+                simulationWrapper.createData(simulationWrapper.getSimulationSpecificParameters());
                 index++;
 
-                File dir = new File(path);
-                dir.mkdirs();
-                dir.delete();
-                dir.mkdirs();
-
                 File subdir = new File(dir, "" + index);
-                subdir.mkdir();
+                subdir.mkdirs();
 
                 File dir1 = new File(subdir, "graph");
                 File dir2 = new File(subdir, "data");
+
                 dir1.mkdirs();
                 dir2.mkdirs();
 
-                File file2 = new File(dir1, "graph.txt");
-                GraphUtils.saveGraph(simulationWrapper.getTrueGraph(), file2, false);
+                File dir3 = null;
 
-                for (int i = 0; i < simulationWrapper.getNumDataSets(); i++) {
-                    File file = new File(dir2, "data." + (i + 1) + ".txt");
+                if (isSavePatterns()) {
+                    dir3 = new File(subdir, "patterns");
+                    dir3.mkdirs();
+                }
+
+                File dir4 = null;
+
+                if (isSavePags()) {
+                    dir4 = new File(subdir, "pags");
+                    dir4.mkdirs();
+                }
+
+
+                for (int j = 0; j < simulationWrapper.getNumDataModels(); j++) {
+                    File file2 = new File(dir1, "graph." + (j + 1) + ".txt");
+                    Graph graph = simulationWrapper.getTrueGraph(j);
+
+                    GraphUtils.saveGraph(graph, file2, false);
+
+                    File file = new File(dir2, "data." + (j + 1) + ".txt");
                     Writer out = new FileWriter(file);
-                    DataSet dataSet = simulationWrapper.getDataSet(i);
-                    DataWriter.writeRectangularData(dataSet, out, '\t');
+                    DataModel dataModel = (DataModel) simulationWrapper.getDataModel(j);
+                    DataWriter.writeRectangularData((DataSet) dataModel, out, '\t');
                     out.close();
+
+                    if (isSavePatterns()) {
+                        File file3 = new File(dir3, "pattern." + (j + 1) + ".txt");
+                        GraphUtils.saveGraph(SearchGraphUtils.patternForDag(graph), file3, false);
+                    }
+
+                    if (isSavePags()) {
+                        File file4 = new File(dir4, "pag." + (j + 1) + ".txt");
+                        GraphUtils.saveGraph(new DagToPag2(graph).convert(), file4, false);
+                    }
                 }
 
                 PrintStream out = new PrintStream(new FileOutputStream(new File(subdir, "parameters.txt")));
                 out.println(simulationWrapper.getDescription());
-                out.println();
-                out.println(parameters);
+//                out.println();
+                out.println(simulationWrapper.getSimulationSpecificParameters());
                 out.close();
             }
         } catch (IOException e) {
@@ -361,21 +432,280 @@ public class Comparison {
         }
     }
 
+    private void deleteFilesThenDirectory(File dir) {
+        if (dir == null) return;
+
+        String[] entries = dir.list();
+
+        if (entries == null) return;
+
+        for (String s : entries) {
+            File currentFile = new File(dir.getPath(), s);
+
+            if (currentFile.isDirectory()) {
+                deleteFilesThenDirectory(currentFile);
+            } else {
+                currentFile.delete();
+            }
+        }
+
+        dir.delete();
+    }
+
+    /**
+     *
+     */
+    public void configuration(String path) {
+        try {
+            new File(path).mkdirs();
+
+            PrintStream out = new PrintStream(new FileOutputStream(new File(path, "Configuration.txt")));
+
+            Parameters allParams = new Parameters();
+
+            List<Class> algorithms = new ArrayList<>();
+            List<Class> statistics = new ArrayList<>();
+            List<Class> independenceWrappers = new ArrayList<>();
+            List<Class> scoreWrappers = new ArrayList<>();
+            List<Class> simulations = new ArrayList<>();
+
+            algorithms.addAll(getClasses(Algorithm.class));
+
+            statistics.addAll(getClasses(Statistic.class));
+
+            independenceWrappers.addAll(getClasses(IndependenceWrapper.class));
+
+            scoreWrappers.addAll(getClasses(ScoreWrapper.class));
+
+            simulations.addAll(getClasses(Simulation.class));
+
+            out.println("Available Algorithms:");
+            out.println();
+            out.println("Algorithms that take an independence test (using an example independence test):");
+            out.println();
+
+            for (Class clazz : new ArrayList<>(algorithms)) {
+                if (Experimental.class.isAssignableFrom(clazz)) {
+                    continue;
+                }
+
+                Constructor[] constructors = clazz.getConstructors();
+
+                for (Constructor constructor : constructors) {
+                    if (constructor.getParameterTypes().length == 1
+                            && constructor.getParameterTypes()[0] == IndependenceWrapper.class) {
+                        Algorithm algorithm = (Algorithm) constructor.newInstance(
+                                FisherZ.class.newInstance());
+                        out.println(clazz.getSimpleName() + ": " + algorithm.getDescription());
+                        if (HasParameters.class.isAssignableFrom(clazz)) {
+                            printParameters(algorithm, out, allParams);
+                        }
+                        if (TakesInitialGraph.class.isAssignableFrom(clazz)) {
+                            out.println("\t" + clazz.getSimpleName() + " can take an initial graph from some other algorithm as input");
+                        }
+                    }
+                }
+            }
+
+            out.println();
+            out.println("Algorithms that take a score (using an example score):");
+            out.println();
+
+            for (Class clazz : new ArrayList<>(algorithms)) {
+                if (Experimental.class.isAssignableFrom(clazz)) {
+                    continue;
+                }
+
+                Constructor[] constructors = clazz.getConstructors();
+
+                for (Constructor constructor : constructors) {
+                    if (constructor.getParameterTypes().length == 1
+                            && constructor.getParameterTypes()[0] == ScoreWrapper.class) {
+                        Algorithm algorithm = (Algorithm) constructor.newInstance(
+                                BdeuScore.class.newInstance());
+                        out.println(clazz.getSimpleName() + ": " + algorithm.getDescription());
+                        if (HasParameters.class.isAssignableFrom(clazz)) {
+                            printParameters(algorithm, out, allParams);
+                        }
+                    }
+
+
+                }
+            }
+
+            out.println();
+            out.println("Algorithms with blank constructor:");
+            out.println();
+
+            for (Class clazz : new ArrayList<>(algorithms)) {
+                if (Experimental.class.isAssignableFrom(clazz)) {
+                    continue;
+                }
+
+                Constructor[] constructors = clazz.getConstructors();
+
+                for (Constructor constructor : constructors) {
+                    if (constructor.getParameterTypes().length == 0) {
+                        Algorithm algorithm = (Algorithm) constructor.newInstance();
+                        out.println(clazz.getSimpleName() + ": " + algorithm.getDescription());
+                        if (HasParameters.class.isAssignableFrom(clazz)) {
+                            printParameters(algorithm, out, allParams);
+                        }
+                    }
+                }
+            }
+
+
+            out.println();
+            out.println("Available Statistics:");
+            out.println();
+
+            for (Class clazz : statistics) {
+                if (Experimental.class.isAssignableFrom(clazz)) {
+                    continue;
+                }
+
+                Constructor[] constructors = clazz.getConstructors();
+
+                for (Constructor constructor : constructors) {
+                    if (constructor.getParameterTypes().length == 0) {
+                        Statistic statistic = (Statistic) constructor.newInstance();
+                        out.println(clazz.getSimpleName() + ": " + statistic.getDescription());
+                    }
+                }
+            }
+
+            out.println();
+            out.println("Available Independence Tests:");
+            out.println();
+
+            for (Class clazz : independenceWrappers) {
+                if (Experimental.class.isAssignableFrom(clazz)) {
+                    continue;
+                }
+
+                Constructor[] constructors = clazz.getConstructors();
+
+                for (Constructor constructor : constructors) {
+                    if (constructor.getParameterTypes().length == 0) {
+                        IndependenceWrapper independence = (IndependenceWrapper) constructor.newInstance();
+                        out.println(clazz.getSimpleName() + ": " + independence.getDescription());
+                        if (HasParameters.class.isAssignableFrom(clazz)) {
+                            printParameters(independence, out, allParams);
+                        }
+                    }
+                }
+            }
+
+            out.println();
+            out.println("Available Scores:");
+            out.println();
+
+            for (Class clazz : scoreWrappers) {
+                if (Experimental.class.isAssignableFrom(clazz)) {
+                    continue;
+                }
+
+                Constructor[] constructors = clazz.getConstructors();
+
+                for (Constructor constructor : constructors) {
+                    if (constructor.getParameterTypes().length == 0) {
+                        ScoreWrapper score = (ScoreWrapper) constructor.newInstance();
+                        out.println(clazz.getSimpleName() + ": " + score.getDescription());
+                        if (HasParameters.class.isAssignableFrom(clazz)) {
+                            printParameters(score, out, allParams);
+                        }
+                    }
+                }
+            }
+
+            out.println();
+            out.println("Available Simulations:");
+            out.println();
+
+            for (Class clazz : simulations) {
+                if (Experimental.class.isAssignableFrom(clazz)) {
+                    continue;
+                }
+
+                Constructor[] constructors = clazz.getConstructors();
+
+                for (Constructor constructor : constructors) {
+                    if (constructor.getParameterTypes().length == 0) {
+                        Simulation simulation = (Simulation) constructor.newInstance();
+                        out.println(clazz.getSimpleName() + ": " + simulation.getDescription());
+                        if (HasParameters.class.isAssignableFrom(clazz)) {
+                            printParameters(simulation, out, allParams);
+                        }
+                    }
+                }
+            }
+
+            out.println();
+
+            out.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void printParameters(HasParameters hasParameters, PrintStream out, Parameters allParams) {
+        List<String> paramDescriptions = new ArrayList<>(hasParameters.getParameters());
+        if (paramDescriptions.isEmpty()) return;
+        out.print("\tParameters: ");
+
+        for (int i = 0; i < paramDescriptions.size(); i++) {
+            out.print(paramDescriptions.get(i));
+            out.print(" = ");
+            Object[] values = allParams.getValues(paramDescriptions.get(i));
+            if (values == null || values.length == 0) {
+                out.print("no default");
+
+                if (i < paramDescriptions.size() - 1) {
+                    out.print("; ");
+                    if ((i + 1) % 4 == 0) out.print("\n\t\t");
+                }
+
+                continue;
+            }
+
+            for (int j = 0; j < values.length; j++) {
+                out.print(values[j]);
+                if (j < values.length - 1) out.print(",");
+            }
+
+            if (i < paramDescriptions.size() - 1) {
+                out.print("; ");
+                if ((i + 1) % 4 == 0) out.print("\n\t\t");
+            }
+        }
+
+        out.println();
+    }
+
+    private List<Class> getClasses(Class type) {
+        Reflections reflections = new Reflections();
+        Set<Class> allClasses = reflections.getSubTypesOf(type);
+        return new ArrayList<>(allClasses);
+    }
+
     private List<SimulationWrapper> getSimulationWrappers(Simulation simulation, Parameters parameters) {
         List<SimulationWrapper> simulationWrappers = new ArrayList<>();
 
         List<Integer> _dims = new ArrayList<>();
-        List<String> varyingParameters = new ArrayList<>();
+        List<String> varyingParams = new ArrayList<>();
 
-        for (String parameter : simulation.getParameters()) {
-            if (parameters.getNumValues(parameter) > 1) {
-                _dims.add(parameters.getNumValues(parameter));
-                varyingParameters.add(parameter);
+        final List<String> parameters1 = simulation.getParameters();
+        for (String param : parameters1) {
+            final int numValues = parameters.getNumValues(param);
+            if (numValues > 1) {
+                _dims.add(numValues);
+                varyingParams.add(param);
             }
         }
 
-        if (varyingParameters.isEmpty()) {
-            simulationWrappers.add(new SimulationWrapper(simulation));
+        if (varyingParams.isEmpty()) {
+            simulationWrappers.add(new SimulationWrapper(simulation, parameters));
         } else {
 
             int[] dims = new int[_dims.size()];
@@ -385,153 +715,352 @@ public class Comparison {
             int[] choice;
 
             while ((choice = gen.next()) != null) {
-                SimulationWrapper wrapper = new SimulationWrapper(simulation);
+                SimulationWrapper wrapper = new SimulationWrapper(simulation, parameters);
 
                 for (int h = 0; h < dims.length; h++) {
-                    String p = varyingParameters.get(h);
-                    Number[] values = parameters.getValues(p);
-                    Number value = values[choice[h]];
-                    wrapper.setValue(p, value);
+                    String param = varyingParams.get(h);
+                    Object[] values = parameters.getValues(param);
+                    Object value = values[choice[h]];
+                    wrapper.setValue(param, value);
                 }
 
                 simulationWrappers.add(wrapper);
             }
         }
+
         return simulationWrappers;
     }
 
-
-    private double[][][][] calcStats(List<AlgorithmSimulationWrapper> algorithmSimulationWrappers, Statistics statistics,
-                                     Parameters parameters) {
+    private double[][][][] calcStats(final List<AlgorithmSimulationWrapper> algorithmSimulationWrappers,
+                                     List<AlgorithmWrapper> algorithmWrappers, List<SimulationWrapper> simulationWrappers,
+                                     Statistics statistics, int numRuns) {
         int numGraphTypes = 4;
 
         graphTypeUsed = new boolean[4];
-        int numRuns = parameters.getInt("numRuns");
 
-        double[][][][] allStats = new double[4][algorithmSimulationWrappers.size() * statistics.size()][statistics.size() + 1][numRuns];
+        double[][][][] allStats = new double[4][algorithmSimulationWrappers.size()][statistics.size() + 1][numRuns];
 
-        boolean didAnalysis = false;
+        List<AlgorithmTask> tasks = new ArrayList<>();
+        int index = 0;
 
-        for (int i = 0; i < numRuns; i++) {
-            System.out.println();
-            System.out.println("Run " + (i + 1));
-            System.out.println();
-
-            for (int t = 0; t < algorithmSimulationWrappers.size(); t++) {
-                Simulation simulation = algorithmSimulationWrappers.get(t).getSimulation();
-                DataSet data = simulation.getDataSet(i);
-                Graph trueGraph = simulation.getTrueGraph();
-
-                boolean isMixed = data.isMixed();
-
-                System.out.println((t + 1) + ". " + algorithmSimulationWrappers.get(t).getDescription()
-                        + " simulation: " + simulation.getDescription());
-
-                long start = System.currentTimeMillis();
-                Graph out;
-
-                try {
-                    DataSet copy = data.copy();
-
-                    for (String p : algorithmSimulationWrappers.get(t).getOverriddenParameters()) {
-                        parameters.setValue(p, algorithmSimulationWrappers.get(t).getValue(p));
-                    }
-
-                    parameters.setOverriddenParameters(algorithmSimulationWrappers.get(t).getOverriddenParametersMap());
-
-                    out = algorithmSimulationWrappers.get(t).search(copy, parameters);
-                } catch (Exception e) {
-                    System.out.println("Could not run " + algorithmSimulationWrappers.get(t).getDescription());
-                    e.printStackTrace();
-                    continue;
-                }
-
-                if (trueGraph == null && simulation instanceof SimulationPath) {
-                    printGraph(((SimulationPath) simulation).getPath(), out, i, algorithmSimulationWrappers.get(t), parameters);
-                } else {
-                    printGraph(null, out, i, algorithmSimulationWrappers.get(t), parameters);
-                }
-
-                long stop = System.currentTimeMillis();
-
-                long elapsed = stop - start;
-
-                if (trueGraph != null) {
-                    out = GraphUtils.replaceNodes(out, trueGraph.getNodes());
-                }
-
-                Graph[] est = new Graph[numGraphTypes];
-
-                Graph comparisonGraph = trueGraph == null ? null : algorithmSimulationWrappers.get(t).getComparisonGraph(trueGraph);
-
-                est[0] = out;
-                graphTypeUsed[0] = true;
-
-                if (isMixed) {
-                    est[1] = getSubgraph(out, true, true, data);
-                    est[2] = getSubgraph(out, true, false, data);
-                    est[3] = getSubgraph(out, false, false, data);
-
-                    graphTypeUsed[1] = true;
-                    graphTypeUsed[2] = true;
-                    graphTypeUsed[3] = true;
-                }
-
-                Graph[] truth = new Graph[numGraphTypes];
-
-                truth[0] = comparisonGraph;
-
-                if (isMixed && comparisonGraph != null) {
-                    truth[1] = getSubgraph(comparisonGraph, true, true, data);
-                    truth[2] = getSubgraph(comparisonGraph, true, false, data);
-                    truth[3] = getSubgraph(comparisonGraph, false, false, data);
-                }
-
-                if (comparisonGraph != null) {
-                    for (int u = 0; u < numGraphTypes; u++) {
-                        if (!graphTypeUsed[u]) continue;
-
-                        int j = -1;
-
-                        for (Statistic _stat : statistics.getStatistics()) {
-                            j++;
-
-                            double stat;
-
-                            if (_stat instanceof ElapsedTimeStat) {
-                                stat = elapsed / 1000.0;
-                            } else {
-                                stat = _stat.getValue(truth[u], est[u]);
-                            }
-
-                            if (!Double.isNaN(stat)) {
-                                allStats[u][t][j][i] = stat;
-                            }
-                        }
-
-                        didAnalysis = true;
-                    }
-                }
+        for (int algSimIndex = 0; algSimIndex < algorithmSimulationWrappers.size(); algSimIndex++) {
+            for (int runIndex = 0; runIndex < numRuns; runIndex++) {
+                AlgorithmSimulationWrapper algorithmSimulationWrapper = algorithmSimulationWrappers.get(algSimIndex);
+                Run run = new Run(algSimIndex, runIndex, index++, algorithmSimulationWrapper);
+                AlgorithmTask task = new AlgorithmTask(algorithmSimulationWrappers,
+                        algorithmWrappers, simulationWrappers,
+                        statistics, numGraphTypes, allStats, run);
+                task.compute();
+//                tasks.add(task);
             }
         }
 
-        return didAnalysis ? allStats : null;
+//        if (!isParallelized()) {
+//            for (AlgorithmTask task : tasks) {
+//                task.compute();
+//            }
+//        } else {
+//            class Task extends RecursiveTask<Boolean> {
+//                List<AlgorithmTask> tasks;
+//
+//                public Task(List<AlgorithmTask> tasks) {
+//                    this.tasks = tasks;
+//                }
+//
+//                @Override
+//                protected Boolean compute() {
+//                    Queue<AlgorithmTask> tasks = new ArrayDeque<>();
+//
+//                    for (AlgorithmTask task : this.tasks) {
+//                        tasks.add(task);
+//                        task.fork();
+//
+//                        for (AlgorithmTask _task : new ArrayList<>(tasks)) {
+//                            if (_task.isDone()) {
+//                                _task.join();
+//                                tasks.remove(_task);
+//                            }
+//                        }
+//
+//                        while (tasks.size() > Runtime.getRuntime().availableProcessors()) {
+//                            AlgorithmTask _task = tasks.poll();
+//                            _task.join();
+//                        }
+//                    }
+//
+//                    for (AlgorithmTask task : tasks) {
+//                        task.join();
+//                    }
+//
+//                    return true;
+//                }
+//            }
+
+//            Task task = new Task(tasks);
+//
+//            ForkJoinPoolInstance.getInstance().getPool().invoke(task);
+//        }
+
+        return allStats;
     }
 
-    private void printGraph(String path, Graph graph, int i, Algorithm algorithm, Parameters parameters) {
+    public boolean isShowSimulationIndices() {
+        return showSimulationIndices;
+    }
+
+    public void setShowSimulationIndices(boolean showSimulationIndices) {
+        this.showSimulationIndices = showSimulationIndices;
+    }
+
+
+    public boolean isShowAlgorithmIndices() {
+        return showAlgorithmIndices;
+    }
+
+    public void setShowAlgorithmIndices(boolean showAlgorithmIndices) {
+        this.showAlgorithmIndices = showAlgorithmIndices;
+    }
+
+
+    /**
+     * @return True iff a column of utilities marked "W" should be shown
+     * in the output.
+     */
+    public boolean isShowUtilities() {
+        return showUtilities;
+    }
+
+    /**
+     * @param showUtilities True iff a column of utilities marked "W" should be
+     *                      shown in the output.
+     */
+    public void setShowUtilities(boolean showUtilities) {
+        this.showUtilities = showUtilities;
+    }
+
+
+    /**
+     * @return True iff the output should be sorted by utility.
+     */
+    public boolean isSortByUtility() {
+        return sortByUtility;
+    }
+
+    /**
+     * @param sortByUtility true iff the output should be sorted by utility.
+     */
+    public void setSortByUtility(boolean sortByUtility) {
+        this.sortByUtility = sortByUtility;
+    }
+
+    public boolean isParallelized() {
+        return parallelized;
+    }
+
+    public void setParallelized(boolean parallelized) {
+        this.parallelized = parallelized;
+    }
+
+    /**
+     * @return True if patterns should be saved out.
+     */
+    public boolean isSavePatterns() {
+        return savePatterns;
+    }
+
+    /**
+     * @param savePatterns True if patterns should be saved out.
+     */
+    public void setSavePatterns(boolean savePatterns) {
+        this.savePatterns = savePatterns;
+    }
+
+    /**
+     * @return True if patterns should be saved out.
+     */
+    public boolean isSavePags() {
+        return savePags;
+    }
+
+    /**
+     * @param savePags True if patterns should be saved out.
+     */
+    public void setSavePags(boolean savePags) {
+        this.savePags = savePags;
+    }
+
+    private class AlgorithmTask extends RecursiveTask<Boolean> {
+        private List<AlgorithmSimulationWrapper> algorithmSimulationWrappers;
+        private List<AlgorithmWrapper> algorithmWrappers;
+        private List<SimulationWrapper> simulationWrappers;
+        private Statistics statistics;
+        private int numGraphTypes;
+        private double[][][][] allStats;
+        private final Run run;
+
+        public AlgorithmTask(List<AlgorithmSimulationWrapper> algorithmSimulationWrappers,
+                             List<AlgorithmWrapper> algorithmWrappers, List<SimulationWrapper> simulationWrappers,
+                             Statistics statistics, int numGraphTypes, double[][][][] allStats, Run run) {
+            this.algorithmSimulationWrappers = algorithmSimulationWrappers;
+            this.simulationWrappers = simulationWrappers;
+            this.algorithmWrappers = algorithmWrappers;
+            this.statistics = statistics;
+            this.numGraphTypes = numGraphTypes;
+            this.allStats = allStats;
+            this.run = run;
+        }
+
+        @Override
+        protected Boolean compute() {
+            doRun(algorithmSimulationWrappers, algorithmWrappers,
+                    simulationWrappers, statistics, numGraphTypes, allStats, run);
+            return true;
+        }
+    }
+
+    private void doRun(List<AlgorithmSimulationWrapper> algorithmSimulationWrappers,
+                       List<AlgorithmWrapper> algorithmWrappers, List<SimulationWrapper> simulationWrappers,
+                       Statistics statistics,
+                       int numGraphTypes, double[][][][] allStats, Run run) {
+        System.out.println();
+        System.out.println("Run " + (run.getRunIndex() + 1));
+        System.out.println();
+
+        AlgorithmSimulationWrapper algorithmSimulationWrapper = algorithmSimulationWrappers.get(run.getAlgSimIndex());
+        AlgorithmWrapper algorithmWrapper = algorithmSimulationWrapper.getAlgorithmWrapper();
+        SimulationWrapper simulationWrapper = algorithmSimulationWrapper.getSimulationWrapper();
+        DataModel data = simulationWrapper.getDataModel(run.getRunIndex());
+        Graph trueGraph = simulationWrapper.getTrueGraph(run.getRunIndex());
+
+        System.out.println((run.getAlgSimIndex() + 1) + ". " + algorithmWrapper.getDescription()
+                + " simulationWrapper: " + simulationWrapper.getDescription());
+
+        long start = System.currentTimeMillis();
+        Graph out;
+
+        try {
+            Algorithm algorithm = algorithmWrapper.getAlgorithm();
+            Simulation simulation = simulationWrapper.getSimulation();
+
+            if (algorithm instanceof HasKnowledge && simulation instanceof HasKnowledge) {
+                ((HasKnowledge) algorithm).setKnowledge(((HasKnowledge) simulation).getKnowledge());
+            }
+
+            if (algorithm instanceof MultiDataSetAlgorithm) {
+                List<Integer> indices = new ArrayList<>();
+                int numDataModels = simulationWrapper.getSimulation().getNumDataModels();
+                for (int i = 0; i < numDataModels; i++) indices.add(i);
+                Collections.shuffle(indices);
+
+                List<DataModel> dataModels = new ArrayList<>();
+                int randomSelectionSize = algorithmWrapper.getAlgorithmSpecificParameters().getInt(
+                        "randomSelectionSize");
+                for (int i = 0; i < Math.min(numDataModels, randomSelectionSize); i++) {
+                    dataModels.add(simulationWrapper.getSimulation().getDataModel(indices.get(i)));
+                }
+
+                Parameters _params = algorithmWrapper.getAlgorithmSpecificParameters();
+                out = ((MultiDataSetAlgorithm) algorithm).search(dataModels, _params);
+            } else {
+                DataModel DataModel = copyData ? data.copy() : data;
+                Parameters _params = algorithmWrapper.getAlgorithmSpecificParameters();
+                out = algorithm.search(DataModel, _params);
+            }
+        } catch (Exception e) {
+            System.out.println("Could not run " + algorithmWrapper.getDescription());
+            e.printStackTrace();
+            return;
+        }
+
+        String path = null;
+
+        if (simulationWrapper.getSimulation() instanceof SimulationPath) {
+            path = ((SimulationPath) simulationWrapper.getSimulation()).getPath();
+        }
+
+        int simIndex = simulationWrappers.indexOf(simulationWrapper) + 1;
+        int algIndex = algorithmWrappers.indexOf(algorithmWrapper) + 1;
+
+        printGraph(path, out, run.getRunIndex(), simIndex, algIndex, algorithmWrapper);
+
+        long stop = System.currentTimeMillis();
+
+        long elapsed = stop - start;
+
+        if (trueGraph != null) {
+            out = GraphUtils.replaceNodes(out, trueGraph.getNodes());
+        }
+
+        Graph[] est = new Graph[numGraphTypes];
+
+        Graph comparisonGraph = trueGraph == null ? null : algorithmSimulationWrapper.getComparisonGraph(trueGraph);
+
+        est[0] = out;
+        graphTypeUsed[0] = true;
+
+        if (data.isMixed()) {
+            est[1] = getSubgraph(out, true, true, data);
+            est[2] = getSubgraph(out, true, false, data);
+            est[3] = getSubgraph(out, false, false, data);
+
+            graphTypeUsed[1] = true;
+            graphTypeUsed[2] = true;
+            graphTypeUsed[3] = true;
+        }
+
+        Graph[] truth = new Graph[numGraphTypes];
+
+        truth[0] = comparisonGraph;
+
+        if (data.isMixed() && comparisonGraph != null) {
+            truth[1] = getSubgraph(comparisonGraph, true, true, data);
+            truth[2] = getSubgraph(comparisonGraph, true, false, data);
+            truth[3] = getSubgraph(comparisonGraph, false, false, data);
+        }
+
+        if (comparisonGraph != null) {
+            for (int u = 0; u < numGraphTypes; u++) {
+                if (!graphTypeUsed[u]) continue;
+
+                int statIndex = -1;
+
+                for (Statistic _stat : statistics.getStatistics()) {
+                    statIndex++;
+
+                    if (_stat instanceof ParameterColumn) continue;
+
+                    double stat;
+
+                    if (_stat instanceof ElapsedTime) {
+                        stat = elapsed / 1000.0;
+                    } else {
+                        stat = _stat.getValue(truth[u], est[u]);
+                    }
+
+                    allStats[u][run.getAlgSimIndex()][statIndex][run.getRunIndex()] = stat;
+                }
+            }
+        }
+    }
+
+    private void printGraph(String path, Graph graph, int i, int simIndex, int algIndex,
+                            AlgorithmWrapper algorithmWrapper) {
         if (!saveGraphs) {
             return;
         }
 
         try {
-            String description = algorithm.getDescription();
             File file;
 
+            File dir = new File(filePath, "output_graphs");
+            dir.mkdirs();
+
             if (path != null) {
-                File _path = new File(path);
-                file = new File("comparison/" + _path.getName() + "." + description + ".graph" + "." + (i + 1) + ".txt");
+                file = new File(dir, path + "." + simIndex + "." + algIndex + ".graph" + "."
+                        + (i + 1) + ".txt");
             } else {
-                file = new File("comparison/" + description + ".graph" + "." + (i + 1) + ".txt");
+                file = new File(dir,  simIndex + "." + algIndex + ".graph" + "."
+                        + (i + 1) + ".txt");
             }
 
             PrintStream out = new PrintStream(file);
@@ -571,6 +1100,20 @@ public class Comparison {
         return saveGraphs;
     }
 
+    /**
+     * @return True if data should be copied before analyzing it.
+     */
+    public boolean isCopyData() {
+        return copyData;
+    }
+
+    /**
+     * @param copyData True if data should be copied before analyzing it.
+     */
+    public void setCopyData(boolean copyData) {
+        this.copyData = copyData;
+    }
+
     private enum Mode {
         Average, StandardDeviation, WorstCase
     }
@@ -598,13 +1141,48 @@ public class Comparison {
     }
 
     private double[][][] calcStatTables(double[][][][] allStats, Mode mode, int numTables,
-                                        List<AlgorithmSimulationWrapper> wrappers, int numStats) {
+                                        List<AlgorithmSimulationWrapper> wrappers, int numStats, Statistics statistics) {
         double[][][] statTables = new double[numTables][wrappers.size()][numStats + 1];
 
         for (int u = 0; u < numTables; u++) {
             for (int i = 0; i < wrappers.size(); i++) {
                 for (int j = 0; j < numStats; j++) {
-                    if (mode == Mode.Average) {
+                    if (statistics.getStatistics().get(j) instanceof ParameterColumn) {
+                        String statName = statistics.getStatistics().get(j).getAbbreviation();
+                        SimulationWrapper simulationWrapper = wrappers.get(i).getSimulationWrapper();
+                        AlgorithmWrapper algorithmWrapper = wrappers.get(i).getAlgorithmWrapper();
+                        double stat = Double.NaN;
+
+                        List<String> parameterNames = simulationWrapper.getParameters();
+                        Parameters parameters = simulationWrapper.getSimulationSpecificParameters();
+
+                        for (String name : parameterNames) {
+                            if (name.equals(statName)) {
+                                stat = parameters.getDouble(name);
+                                break;
+                            }
+                        }
+
+                        if (Double.isNaN(stat)) {
+                            List<String> _parameterNames = algorithmWrapper.getParameters();
+                            Parameters _parameters = algorithmWrapper.parameters;
+
+                            for (String name : _parameterNames) {
+                                if (name.equals(statName)) {
+                                    try {
+                                        stat = _parameters.getDouble(name);
+                                    } catch (Exception e) {
+                                        boolean b = _parameters.getBoolean(name);
+                                        stat = b ? Double.POSITIVE_INFINITY : Double.NEGATIVE_INFINITY;
+                                    }
+
+                                    break;
+                                }
+                            }
+                        }
+
+                        statTables[u][i][j] = stat;
+                    } else if (mode == Mode.Average) {
                         statTables[u][i][j] = StatUtils.mean(allStats[u][i][j]);
                     } else if (mode == Mode.WorstCase) {
                         statTables[u][i][j] = StatUtils.min(allStats[u][i][j]);
@@ -621,9 +1199,10 @@ public class Comparison {
     }
 
     private void printStats(double[][][] statTables, Statistics statistics, Mode mode, int[] newOrder,
-                            List<AlgorithmWrapper> algorithmWrappers,
                             List<AlgorithmSimulationWrapper> algorithmSimulationWrappers,
-                            Simulations simulations, double[] utilities) {
+                            List<AlgorithmWrapper> algorithmWrappers,
+                            List<SimulationWrapper> simulationWrappers, double[] utilities,
+                            Parameters parameters) {
 
         if (mode == Mode.Average) {
             out.println("AVERAGE STATISTICS");
@@ -636,30 +1215,26 @@ public class Comparison {
         }
 
         int numTables = statTables.length;
-        int numAlgorithms = statTables[0].length;
         int numStats = statistics.size();
 
-
         NumberFormat nf = new DecimalFormat("0.00");
+        NumberFormat smallNf = new DecimalFormat("0.00E0");
 
         out.println();
-
-        boolean showSimulationIndices = simulations.getSimulations().size() > 1;
-        boolean showAlgorithmIndices = algorithmWrappers.size() > 1;
 
         for (int u = 0; u < numTables; u++) {
             if (!graphTypeUsed[u]) continue;
 
-            int rows = numAlgorithms + 1;
-            int cols = (showSimulationIndices ? 1 : 0) + (showAlgorithmIndices ? 1 : 0) + numStats
-                    + (statistics.isShowUtilities() ? 1 : 0);
+            int rows = algorithmSimulationWrappers.size() + 1;
+            int cols = (isShowSimulationIndices() ? 1 : 0) + (isShowAlgorithmIndices() ? 1 : 0) + numStats
+                    + (isShowUtilities() ? 1 : 0);
 
             TextTable table = new TextTable(rows, cols);
             table.setTabDelimited(isTabDelimitedTables());
 
             int initialColumn = 0;
 
-            if (showAlgorithmIndices) {
+            if (isShowAlgorithmIndices()) {
                 table.setToken(0, initialColumn, "Alg");
 
                 for (int t = 0; t < algorithmSimulationWrappers.size(); t++) {
@@ -670,13 +1245,13 @@ public class Comparison {
                 initialColumn++;
             }
 
-            if (showSimulationIndices) {
+            if (isShowSimulationIndices()) {
                 table.setToken(0, initialColumn, "Sim");
 
                 for (int t = 0; t < algorithmSimulationWrappers.size(); t++) {
-                    Simulation simulation = algorithmSimulationWrappers.get(newOrder[t]).getSimulation();
-                    List<Simulation> _simulations = simulations.getSimulations();
-                    table.setToken(t + 1, initialColumn, "" + (_simulations.indexOf(simulation) + 1));
+                    Simulation simulation = algorithmSimulationWrappers.get(newOrder[t]).
+                            getSimulationWrapper();
+                    table.setToken(t + 1, initialColumn, "" + (simulationWrappers.indexOf(simulation) + 1));
                 }
 
                 initialColumn++;
@@ -687,19 +1262,54 @@ public class Comparison {
                 table.setToken(0, initialColumn + statIndex, statLabel);
             }
 
-            if (statistics.isShowUtilities()) {
-                table.setToken(0, initialColumn + numStats, "W");
+            if (isShowUtilities()) {
+                table.setToken(0, initialColumn + numStats, "U");
             }
 
-            for (int t = 0; t < numAlgorithms; t++) {
+            for (int t = 0; t < algorithmSimulationWrappers.size(); t++) {
                 for (int statIndex = 0; statIndex < numStats; statIndex++) {
+                    Statistic statistic = statistics.getStatistics().get(statIndex);
+                    final AlgorithmWrapper algorithmWrapper = algorithmSimulationWrappers.get(newOrder[t]).getAlgorithmWrapper();
+                    final SimulationWrapper simulationWrapper = algorithmSimulationWrappers.get(newOrder[t]).getSimulationWrapper();
+
+                    Algorithm algorithm = algorithmWrapper.getAlgorithm();
+                    Simulation simulation = simulationWrapper.getSimulation();
+
+                    if (algorithm instanceof HasParameterValues) {
+                        parameters.putAll(((HasParameterValues) algorithm).getParameterValues());
+                    }
+
+                    if (simulation instanceof HasParameterValues) {
+                        parameters.putAll(((HasParameterValues) simulation).getParameterValues());
+                    }
+
+                    final String abbreviation = statistic.getAbbreviation();
+
+                    Object[] o = parameters.getValues(abbreviation);
+
+                    if (o.length == 1 && o[0] instanceof String) {
+                        table.setToken(t + 1, initialColumn + statIndex, (String) o[0]);
+                        continue;
+                    }
+
                     double stat = statTables[u][newOrder[t]][statIndex];
-                    table.setToken(t + 1, initialColumn + statIndex, nf.format(Math.abs(stat)));
+
+                    if (stat == Double.POSITIVE_INFINITY) {
+                        table.setToken(t + 1, initialColumn + statIndex, "Yes");
+                    } else if (stat == Double.NEGATIVE_INFINITY) {
+                        table.setToken(t + 1, initialColumn + statIndex, "No");
+                    } else if (Double.isNaN(stat)) {
+                        table.setToken(t + 1, initialColumn + statIndex, "*");
+                    } else {
+                        table.setToken(t + 1, initialColumn + statIndex,
+                                Math.abs(stat) < Math.pow(10, -smallNf.getMaximumFractionDigits()) && stat != 0 ? smallNf.format(stat) : nf.format(stat));
+                    }
                 }
 
-                table.setToken(t + 1, initialColumn + numStats, nf.format(utilities[newOrder[t]]));
+                if (isShowUtilities()) {
+                    table.setToken(t + 1, initialColumn + numStats, nf.format(utilities[newOrder[t]]));
+                }
             }
-
 
             out.println(getHeader(u));
             out.println();
@@ -707,32 +1317,12 @@ public class Comparison {
         }
     }
 
-    private double[] calcUtilities(Statistics statistics, List<AlgorithmSimulationWrapper> wrappers, int numStats,
+    private double[] calcUtilities(Statistics statistics, List<AlgorithmSimulationWrapper> wrappers,
                                    double[][] stats) {
-        List<List<Double>> all = new ArrayList<>();
-
-        for (int m = 0; m < numStats; m++) {
-            ArrayList<Double> list = new ArrayList<>();
-
-            try {
-                for (int t = 0; t < wrappers.size(); t++) {
-                    double _stat = stats[t][m];
-
-                    if (!list.contains(_stat)) {
-                        list.add(_stat);
-                    }
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-
-            Collections.sort(list);
-
-            all.add(list);
-        }
 
         // Calculate utilities for the first table.
         double[] utilities = new double[wrappers.size()];
+
         for (int t = 0; t < wrappers.size(); t++) {
             double sum = 0.0;
             int j = -1;
@@ -747,16 +1337,7 @@ public class Comparison {
                 double weight = statistics.getWeight(stat);
 
                 if (weight != 0.0) {
-                    double _stat = stats[t][j];
-                    double utility;
-
-                    if (stat.getAbbreviation().equals("E") || stat.getAbbreviation().equals("SHD")) {
-                        utility = all.get(j).indexOf(_stat) / (double) all.get(j).size();
-                    } else {
-                        utility = _stat;
-                    }
-
-                    sum += weight * utility;
+                    sum += weight * stat.getNormValue(stats[t][j]);
                     count++;
                 }
             }
@@ -767,30 +1348,37 @@ public class Comparison {
         return utilities;
     }
 
-    private int[] sort(final List<AlgorithmSimulationWrapper> algorithms, final double[] utilities) {
+    private int[] sort(final List<AlgorithmSimulationWrapper> algorithmSimulationWrappers, final double[] utilities) {
         List<Integer> order = new ArrayList<>();
-        for (int i = 0; i < algorithms.size(); i++) order.add(i);
+        for (int t = 0; t < algorithmSimulationWrappers.size(); t++) order.add(t);
+
+        final double[] _utilities = Arrays.copyOf(utilities, utilities.length);
+        double low = StatUtils.min(utilities);
+        for (int t = 0; t < _utilities.length; t++) {
+            low--;
+            if (Double.isNaN(_utilities[t])) _utilities[t] = low;
+        }
 
         Collections.sort(order, new Comparator<Integer>() {
             @Override
             public int compare(Integer o1, Integer o2) {
-                return -Double.compare(utilities[o1], utilities[o2]);
+                return -Double.compare(_utilities[o1], _utilities[o2]);
             }
         });
 
-        int[] newOrder = new int[algorithms.size()];
-        for (int i = 0; i < order.size(); i++) newOrder[i] = order.get(i);
+        int[] newOrder = new int[algorithmSimulationWrappers.size()];
+        for (int t = 0; t < algorithmSimulationWrappers.size(); t++) newOrder[t] = order.get(t);
 
         return newOrder;
     }
 
-    private Graph getSubgraph(Graph graph, boolean discrete1, boolean discrete2, DataSet dataSet) {
+    private Graph getSubgraph(Graph graph, boolean discrete1, boolean discrete2, DataModel DataModel) {
         if (discrete1 && discrete2) {
             Graph newGraph = new EdgeListGraph(graph.getNodes());
 
             for (Edge edge : graph.getEdges()) {
-                Node node1 = dataSet.getVariable(edge.getNode1().getName());
-                Node node2 = dataSet.getVariable(edge.getNode2().getName());
+                Node node1 = DataModel.getVariable(edge.getNode1().getName());
+                Node node2 = DataModel.getVariable(edge.getNode2().getName());
 
                 if (node1 instanceof DiscreteVariable &&
                         node2 instanceof DiscreteVariable) {
@@ -803,8 +1391,8 @@ public class Comparison {
             Graph newGraph = new EdgeListGraph(graph.getNodes());
 
             for (Edge edge : graph.getEdges()) {
-                Node node1 = dataSet.getVariable(edge.getNode1().getName());
-                Node node2 = dataSet.getVariable(edge.getNode2().getName());
+                Node node1 = DataModel.getVariable(edge.getNode1().getName());
+                Node node2 = DataModel.getVariable(edge.getNode2().getName());
 
                 if (node1 instanceof ContinuousVariable &&
                         node2 instanceof ContinuousVariable) {
@@ -817,8 +1405,8 @@ public class Comparison {
             Graph newGraph = new EdgeListGraph(graph.getNodes());
 
             for (Edge edge : graph.getEdges()) {
-                Node node1 = dataSet.getVariable(edge.getNode1().getName());
-                Node node2 = dataSet.getVariable(edge.getNode2().getName());
+                Node node1 = DataModel.getVariable(edge.getNode1().getName());
+                Node node2 = DataModel.getVariable(edge.getNode2().getName());
 
                 if (node1 instanceof DiscreteVariable &&
                         node2 instanceof ContinuousVariable) {
@@ -836,16 +1424,19 @@ public class Comparison {
     }
 
     private class AlgorithmWrapper implements Algorithm {
+        static final long serialVersionUID = 23L;
         private Algorithm algorithm;
-        private Map<String, Number> overriddenParameters = new LinkedHashMap<>();
+        private Parameters parameters;
+        private List<String> overriddenParameters = new ArrayList<>();
 
-        public AlgorithmWrapper(Algorithm algorithm) {
+        public AlgorithmWrapper(Algorithm algorithm, Parameters parameters) {
             this.algorithm = algorithm;
+            this.parameters = new Parameters(parameters);
         }
 
         @Override
-        public Graph search(DataSet dataSet, Parameters parameters) {
-            return algorithm.search(dataSet, parameters);
+        public Graph search(DataModel DataModel, Parameters parameters) {
+            return algorithm.search(DataModel, this.parameters);
         }
 
         @Override
@@ -859,8 +1450,8 @@ public class Comparison {
             description.append(algorithm.getDescription());
 
             if (overriddenParameters.size() > 0) {
-                for (String parameter : overriddenParameters.keySet()) {
-                    description.append(", " + parameter + " = " + overriddenParameters.get(parameter));
+                for (String name : new ArrayList<>(overriddenParameters)) {
+                    description.append(", ").append(name).append(" = ").append(parameters.get(name));
                 }
             }
 
@@ -877,36 +1468,40 @@ public class Comparison {
             return algorithm.getParameters();
         }
 
-        public List<String> getOverriddenParameters() {
-            return new ArrayList<>(overriddenParameters.keySet());
-        }
+        public void setValue(String name, Object value) {
+            if (!(value instanceof Number || value instanceof Boolean)) {
+                throw new IllegalArgumentException();
+            }
 
-        public void setValue(String parameter, Number value) {
-            this.overriddenParameters.put(parameter, value);
-        }
-
-        public Number getValue(String parameter) {
-            return overriddenParameters.get(parameter);
+            parameters.set(name, value);
+            this.overriddenParameters.add(name);
         }
 
         public Algorithm getAlgorithm() {
             return algorithm;
         }
+
+        public Parameters getAlgorithmSpecificParameters() {
+            return this.parameters;
+        }
     }
 
     private class AlgorithmSimulationWrapper implements Algorithm {
-        private Map<String, Number> overriddenParameters = new LinkedHashMap<>();
-        private Simulation simulation;
+        static final long serialVersionUID = 23L;
+        private SimulationWrapper simulationWrapper;
         private AlgorithmWrapper algorithmWrapper;
+        List<String> parameters = new ArrayList<>();
 
-        public AlgorithmSimulationWrapper(AlgorithmWrapper algorithm, Simulation simulation) {
+        public AlgorithmSimulationWrapper(AlgorithmWrapper algorithm, SimulationWrapper simulation) {
             this.algorithmWrapper = algorithm;
-            this.simulation = simulation;
+            this.simulationWrapper = simulation;
+            parameters.addAll(algorithmWrapper.getParameters());
+            parameters.addAll(simulationWrapper.getParameters());
         }
 
         @Override
-        public Graph search(DataSet dataSet, Parameters parameters) {
-            return algorithmWrapper.search(dataSet, parameters);
+        public Graph search(DataModel DataModel, Parameters parameters) {
+            return algorithmWrapper.getAlgorithm().search(DataModel, parameters);
         }
 
         @Override
@@ -916,9 +1511,7 @@ public class Comparison {
 
         @Override
         public String getDescription() {
-            StringBuilder description = new StringBuilder();
-            description.append(algorithmWrapper.getDescription());
-            return description.toString();
+            throw new IllegalArgumentException();
         }
 
         @Override
@@ -928,27 +1521,13 @@ public class Comparison {
 
         @Override
         public List<String> getParameters() {
-            return algorithmWrapper.getParameters();
+            List<String> params = new ArrayList<>(simulationWrapper.getParameters());
+            params.addAll(algorithmWrapper.getParameters());
+            return params;
         }
 
-        public List<String> getOverriddenParameters() {
-            return new ArrayList<>(overriddenParameters.keySet());
-        }
-
-        public void setValue(String parameter, Number value) {
-            this.overriddenParameters.put(parameter, value);
-        }
-
-        public Number getValue(String parameter) {
-            return overriddenParameters.get(parameter);
-        }
-
-        public Map<String, Number> getOverriddenParametersMap() {
-            return overriddenParameters;
-        }
-
-        public Simulation getSimulation() {
-            return simulation;
+        public SimulationWrapper getSimulationWrapper() {
+            return simulationWrapper;
         }
 
         public AlgorithmWrapper getAlgorithmWrapper() {
@@ -957,31 +1536,49 @@ public class Comparison {
     }
 
     private class SimulationWrapper implements Simulation {
+        static final long serialVersionUID = 23L;
         private Simulation simulation;
-        private Map<String, Number> overriddenParameters = new LinkedHashMap<>();
+        private List<Graph> graphs;
+        private List<DataModel> dataModels;
+        private Parameters parameters;
 
-        public SimulationWrapper(Simulation simulation) {
+        public SimulationWrapper(Simulation simulation, Parameters parameters) {
             this.simulation = simulation;
+
+            // There is no harm in allowing the simulation code to add parameters here; they can
+            // be displayed in the output table if desired. jdramsey 20170118
+            this.parameters = new Parameters(parameters);
         }
 
         @Override
-        public void simulate(Parameters parameters) {
-            simulation.simulate(parameters);
+        public void createData(Parameters parameters) {
+            try {
+                simulation.createData(parameters);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            this.graphs = new ArrayList<>();
+            this.dataModels = new ArrayList<>();
+            for (int i = 0; i < simulation.getNumDataModels(); i++) {
+                this.graphs.add(simulation.getTrueGraph(i));
+                this.dataModels.add(simulation.getDataModel(i));
+            }
         }
 
         @Override
-        public int getNumDataSets() {
-            return simulation.getNumDataSets();
+        public int getNumDataModels() {
+            return dataModels.size();
         }
 
         @Override
-        public Graph getTrueGraph() {
-            return simulation.getTrueGraph();
+        public Graph getTrueGraph(int index) {
+            if (graphs.get(index) == null) return null;
+            else return new EdgeListGraph(graphs.get(index));
         }
 
         @Override
-        public DataSet getDataSet(int index) {
-            return simulation.getDataSet(index);
+        public DataModel getDataModel(int index) {
+            return dataModels.get(index);
         }
 
         @Override
@@ -999,16 +1596,64 @@ public class Comparison {
             return simulation.getParameters();
         }
 
-        public Map<String, Number> getOverriddenParameters() {
-            return overriddenParameters;
+        public void setValue(String name, Object value) {
+            if (!(value instanceof Number)) {
+                throw new IllegalArgumentException();
+            }
+
+            parameters.set(name, value);
         }
 
-        public void setValue(String parameter, Number value) {
-            this.overriddenParameters.put(parameter, value);
+        public Object getValue(String name) {
+            Object[] values = parameters.getValues(name);
+
+            if (values == null || values.length == 0) {
+                throw new NullPointerException("Expecting parameter to be defined: " + name);
+            }
+
+            return values[0];
         }
 
-        public Number getValue(String parameter) {
-            return overriddenParameters.get(parameter);
+        public Simulation getSimulation() {
+            return simulation;
+        }
+
+        public void setParameters(Parameters parameters) {
+            this.parameters = new Parameters(parameters);
+        }
+
+        public Parameters getSimulationSpecificParameters() {
+            return parameters;
+        }
+    }
+
+    private class Run {
+        private final int algSimIndex;
+        private final int runIndex;
+        private final int index;
+        private final AlgorithmSimulationWrapper wrapper;
+
+        public Run(int algSimIndex, int runIndex, int index, AlgorithmSimulationWrapper wrapper) {
+            this.runIndex = runIndex;
+            this.algSimIndex = algSimIndex;
+            this.index = index;
+            this.wrapper = wrapper;
+        }
+
+        public int getAlgSimIndex() {
+            return algSimIndex;
+        }
+
+        public int getRunIndex() {
+            return runIndex;
+        }
+
+        public int getIndex() {
+            return index;
+        }
+
+        public AlgorithmSimulationWrapper getWrapper() {
+            return wrapper;
         }
     }
 }

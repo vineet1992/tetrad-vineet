@@ -71,6 +71,31 @@ public class IndependenceFacts implements DataModel {
         return builder.toString();
     }
 
+    @Override
+    public boolean isContinuous() {
+        return false;
+    }
+
+    @Override
+    public boolean isDiscrete() {
+        return false;
+    }
+
+    @Override
+    public boolean isMixed() {
+        return false;
+    }
+
+    @Override
+    public Node getVariable(String name) {
+        return null;
+    }
+
+    @Override
+    public DataModel copy() {
+        return null;
+    }
+
     public void remove(IndependenceFact fact) {
 //        this.facts.remove(fact);
         this.unsortedFacts.remove(fact);

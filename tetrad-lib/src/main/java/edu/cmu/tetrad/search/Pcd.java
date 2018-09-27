@@ -27,6 +27,7 @@ import edu.cmu.tetrad.graph.*;
 import edu.cmu.tetrad.util.ChoiceGenerator;
 import edu.cmu.tetrad.util.TetradLogger;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -270,7 +271,6 @@ public class Pcd implements GraphSearch {
 
         SearchGraphUtils.pcOrientbk(knowledge, graph, nodes);
         SearchGraphUtils.pcdOrientC(sepsets, getIndependenceTest(), knowledge, graph);
-        SearchGraphUtils.orientCollidersUsingSepsets(this.sepsets, knowledge, graph, verbose);
 
         MeekRules rules = new MeekRules();
         rules.setAggressivelyPreventCycles(this.aggressivelyPreventCycles);
@@ -312,7 +312,7 @@ public class Pcd implements GraphSearch {
     }
 
     public Set<Edge> getAdjacencies() {
-        Set<Edge> adjacencies = new HashSet<Edge>();
+        Set<Edge> adjacencies = new HashSet<>();
         for (Edge edge : graph.getEdges()) {
             adjacencies.add(edge);
         }
@@ -324,14 +324,14 @@ public class Pcd implements GraphSearch {
         Set<Edge> nonAdjacencies = complete.getEdges();
         Graph undirected = GraphUtils.undirectedGraph(graph);
         nonAdjacencies.removeAll(undirected.getEdges());
-        return new HashSet<Edge>(nonAdjacencies);
+        return new HashSet<>(nonAdjacencies);
     }
 
     //===============================PRIVATE METHODS=======================//
 
     private void enumerateTriples() {
-        this.unshieldedColliders = new HashSet<Triple>();
-        this.unshieldedNoncolliders = new HashSet<Triple>();
+        this.unshieldedColliders = new HashSet<>();
+        this.unshieldedNoncolliders = new HashSet<>();
 
         for (Node y : graph.getNodes()) {
             List<Node> adj = graph.getAdjacentNodes(y);

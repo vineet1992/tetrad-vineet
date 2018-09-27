@@ -27,7 +27,7 @@ import edu.cmu.tetrad.data.Knowledge2;
 import edu.cmu.tetrad.graph.EdgeListGraph;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.Node;
-import edu.cmu.tetrad.search.FgsOrienter;
+import edu.cmu.tetrad.search.FgesOrienter;
 import edu.cmu.tetrad.search.GraphSearch;
 import edu.cmu.tetrad.search.IndependenceTest;
 
@@ -84,7 +84,7 @@ public class Mmhc implements GraphSearch {
     public Graph search() {
         List<Node> variables = independenceTest.getVariables();
         Mmmb mmmb = new Mmmb(independenceTest, getDepth(), true);
-        Map<Node, List<Node>> pc = new HashMap<Node, List<Node>>();
+        Map<Node, List<Node>> pc = new HashMap<>();
 
         for (Node x : variables) {
             pc.put(x, mmmb.getPc(x));
@@ -104,7 +104,7 @@ public class Mmhc implements GraphSearch {
             }
         }
 
-        FgsOrienter orienter = new FgsOrienter(data);
+        FgesOrienter orienter = new FgesOrienter(data);
         orienter.orient(graph);
         return graph;
     }

@@ -65,7 +65,7 @@ public final class Rfci implements GraphSearch {
     /**
      * The variables to search over (optional)
      */
-    private List<Node> variables = new ArrayList<Node>();
+    private List<Node> variables = new ArrayList<>();
 
     private IndependenceTest independenceTest;
 
@@ -137,7 +137,7 @@ public final class Rfci implements GraphSearch {
         this.independenceTest = independenceTest;
         this.variables.addAll(independenceTest.getVariables());
 
-        Set<Node> remVars = new HashSet<Node>();
+        Set<Node> remVars = new HashSet<>();
         for (Node node1 : this.variables) {
             boolean search = false;
             for (Node node2 : searchVars) {
@@ -216,6 +216,8 @@ public final class Rfci implements GraphSearch {
         logger.log("info", "Elapsed time adjacency search = " + (stop1 - start1) / 1000L + "s");
         logger.log("info", "Elapsed time orientation search = " + (stop2 - start2) / 1000L + "s");
 
+        graph.setPag(true);
+
         return graph;
     }
 
@@ -269,7 +271,7 @@ public final class Rfci implements GraphSearch {
     // Orient colliders
     ////////////////////////////////////////////
     private void ruleR0_RFCI(List<Node[]> rTuples) {
-        List<Node[]> lTuples = new ArrayList<Node[]>();
+        List<Node[]> lTuples = new ArrayList<>();
 
         List<Node> nodes = graph.getNodes();
 
@@ -286,7 +288,7 @@ public final class Rfci implements GraphSearch {
 
             if (nodes1 == null) continue;
 
-            List<Node> sepSet = new ArrayList<Node>(nodes1);
+            List<Node> sepSet = new ArrayList<>(nodes1);
             sepSet.remove(j);
 
             boolean independent1 = false;
@@ -420,7 +422,7 @@ public final class Rfci implements GraphSearch {
     // collect in rTupleList all unshielded tuples
     ////////////////////////////////////////////////
     private List<Node[]> getRTuples() {
-        List<Node[]> rTuples = new ArrayList<Node[]>();
+        List<Node[]> rTuples = new ArrayList<>();
         List<Node> nodes = graph.getNodes();
 
         for (Node j : nodes) {

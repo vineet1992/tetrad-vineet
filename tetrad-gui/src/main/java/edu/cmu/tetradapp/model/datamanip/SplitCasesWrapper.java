@@ -22,8 +22,10 @@
 package edu.cmu.tetradapp.model.datamanip;
 
 import edu.cmu.tetrad.data.*;
+import edu.cmu.tetrad.util.Parameters;
 import edu.cmu.tetrad.util.TetradSerializableUtils;
 import edu.cmu.tetradapp.model.DataWrapper;
+import edu.cmu.tetradapp.model.PcRunner;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -40,7 +42,7 @@ public class SplitCasesWrapper extends DataWrapper {
     /**
      * Constructs the wrapper given some data and the params.
      */
-    public SplitCasesWrapper(DataWrapper data, SplitCasesParams params) {
+    public SplitCasesWrapper(DataWrapper data, Parameters params) {
         if (data == null) {
             throw new NullPointerException("The given data must not be null");
         }
@@ -62,12 +64,8 @@ public class SplitCasesWrapper extends DataWrapper {
      *
      * @see TetradSerializableUtils
      */
-    public static DataWrapper serializableInstance() {
-        SplitCasesParams params = new SplitCasesParams();
-        params.setNumSplits(1);
-        params.setSpec(new SplitCasesSpec(1, new int[1], Collections.singletonList("1")));
-        return new SplitCasesWrapper(DataWrapper.serializableInstance(),
-                params);
+    public static PcRunner serializableInstance() {
+        return PcRunner.serializableInstance();
     }
 
     //========================= Private Methods ===================================//
@@ -76,18 +74,18 @@ public class SplitCasesWrapper extends DataWrapper {
     /**
      * @return the splitNames selected by the editor.
      */
-    public static DataModel createSplits(DataSet dataSet, SplitCasesParams params) {
-        List<Integer> indices = new ArrayList<Integer>(dataSet.getNumRows());
+    private static DataModel createSplits(DataSet dataSet, Parameters params) {
+        List<Integer> indices = new ArrayList<>(dataSet.getNumRows());
         for (int i = 0; i < dataSet.getNumRows(); i++) {
             indices.add(i);
         }
 
-        if (params.isDataShuffled()) {
+        if (params.getBoolean("dataShuffled", true)) {
             Collections.shuffle(indices);
         }
 
-        SplitCasesSpec spec = params.getSpec();
-        int numSplits = params.getNumSplits();
+        SplitCasesSpec spec = (SplitCasesSpec) params.get("splitCasesSpec", null);
+        int numSplits = params.getInt("numSplits", 3);
         int sampleSize = spec.getSampleSize();
         int[] breakpoints = spec.getBreakpoints();
         List<String> splitNames = spec.getSplitNames();

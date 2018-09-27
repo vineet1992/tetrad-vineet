@@ -22,6 +22,7 @@
 package edu.pitt.csb.stability;
 
 import edu.cmu.tetrad.data.DataSet;
+import edu.cmu.tetrad.data.IKnowledge;
 import edu.cmu.tetrad.graph.Graph;
 
 import java.util.Map;
@@ -30,6 +31,10 @@ import java.util.Map;
  * Created by ajsedgewick on 9/4/15.
  */
 public abstract class DataGraphSearch {
+    public Graph initialGraph = null;
+    public IKnowledge knowledge;
+    public void setInitialGraph(Graph g) {initialGraph = g;}
+    public void setKnowledge(IKnowledge k){knowledge = k;}
     public Map<String,String> orientations;
     public final double[] searchParams;
     public DataGraphSearch(double... params){

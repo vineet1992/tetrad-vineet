@@ -23,8 +23,9 @@ public class runSteps {
         String file = "Final_Data_Exercise.txt";
         String stabilityFile = "";
         String graphFile = "";
+        String causalFile = "";
         int ns = 20;
-        double g = 0.01;
+        double g = 0.05;
         int numLambdas = 40;
         double lambdaLow = 0.05;
         double lambdaHigh = 0.95;
@@ -97,13 +98,14 @@ public class runSteps {
                 maxCategoriesForDiscrete = Integer.parseInt(args[index+1]);
                 index+=2;
             }
+            else if(args[index].equals("-causal"))
+            {
+                causalFile = args[index+1];
+                index+=2;
+            }
         }
         DelimiterType d2 = DelimiterType.TAB;
         DataSet d = MixedUtils.loadDataSet2(directory + "/" + file,d2,maxCategoriesForDiscrete);
-        for(int i = 0; i < varsToRemove.size();i++)
-        {
-            d.removeColumn(d.getVariable(varsToRemove.get(i)));
-        }
         double [] lambda = new double[numLambdas];
         for(int i = 0; i < numLambdas;i++)
         {
@@ -127,10 +129,13 @@ public class runSteps {
         out.println(g2);
         out.flush();
         out.close();
-        IndependenceTest ii = new IndTestMultinomialAJ(d,0.05);
+        IndependenceTest ii = new IndTestMultinomialAJ(d,0.1);
         FciMaxP p = new FciMaxP(ii);
         p.setInitialGraph(g2);
-        System.out.println(p.search());
+        out = new PrintStream(causalFile);
+        out.println(p.search());
+        out.flush();
+        out.close();
         out = new PrintStream(directory + "/" + stabilityFile);
         printStability(out,d,stab);
     }

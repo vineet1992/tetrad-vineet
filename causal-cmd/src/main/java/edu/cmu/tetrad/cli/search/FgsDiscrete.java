@@ -29,7 +29,6 @@ import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.io.DataReader;
 import edu.cmu.tetrad.io.VerticalTabularDiscreteDataReader;
 import edu.cmu.tetrad.search.BDeuScore;
-import edu.cmu.tetrad.search.Fgs;
 import java.io.BufferedOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -44,6 +43,8 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
+
+import edu.cmu.tetrad.search.Fges;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
@@ -237,13 +238,13 @@ public class FgsDiscrete {
         score.setSamplePrior(samplePrior);
         score.setStructurePrior(structurePrior);
 
-        Fgs fgs = new Fgs(score);
+        Fges fgs = new Fges(score);
         fgs.setParallelism(numOfThreads);
         fgs.setVerbose(verbose);
         fgs.setNumPatternsToStore(0);
         fgs.setOut(writer);
-        fgs.setHeuristicSpeedup(heuristicSpeedup);
-        fgs.setDepth(depth);
+        fgs.setFaithfulnessAssumed(heuristicSpeedup);
+        //fgs.setDepth(depth);
         if (knowledgeFile != null) {
             fgs.setKnowledge(IKnowledgeFactory.readInKnowledge(knowledgeFile));
         }

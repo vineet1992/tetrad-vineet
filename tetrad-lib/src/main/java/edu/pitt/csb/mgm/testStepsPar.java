@@ -2,7 +2,6 @@ package edu.pitt.csb.mgm;
 
 import edu.cmu.tetrad.algcomparison.simulation.MixedLeeHastieSimulation;
 import edu.cmu.tetrad.algcomparison.simulation.Parameters;
-import edu.cmu.tetrad.algcomparison.statistic.AdjacencyPrecisionStat;
 import edu.cmu.tetrad.algcomparison.statistic.utilities.AdjacencyConfusion;
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.graph.Graph;

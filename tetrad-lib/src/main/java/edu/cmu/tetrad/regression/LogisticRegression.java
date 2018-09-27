@@ -225,8 +225,15 @@ public class LogisticRegression implements TetradSerializable {
         double ll = 1e+10;
         double llN = 0.0;
 
+        long start = System.nanoTime();
         while (Math.abs(llP - ll) > 1e-7) {   /// 1e-7
 
+            double curr = (System.nanoTime()-start)/Math.pow(10,9);
+            if(curr>5)
+            {
+                System.out.println("Log Reg taking forever");
+                return null;
+            }
             llP = ll;
             ll = 0.0;
 
@@ -300,7 +307,6 @@ public class LogisticRegression implements TetradSerializable {
                         for (int k = 0; k <= numRegressors + 1; k++) {
                             arr[j][k] = arr[j][k] - s * arr[i][k];
                         }
-
                     }
                 }
             }

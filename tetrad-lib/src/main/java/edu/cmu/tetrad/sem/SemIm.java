@@ -21,6 +21,7 @@
 
 package edu.cmu.tetrad.sem;
 
+import edu.cmu.tetrad.util.Parameters;
 import edu.cmu.tetrad.data.*;
 import edu.cmu.tetrad.graph.*;
 import edu.cmu.tetrad.regression.Regression;
@@ -97,7 +98,7 @@ public final class SemIm implements IM, ISemIm, TetradSerializable {
      * @serial Cannot be null.
      */
     private final List<Node> measuredNodes;
-    private Random rand = new Random();
+
     /**
      * The list of free freeParameters (Unmodifiable). This must be in the same
      * order as this.freeMappings.
@@ -246,7 +247,7 @@ public final class SemIm implements IM, ISemIm, TetradSerializable {
     /**
      * Parameters to help guide how values are chosen for freeParameters.
      */
-    private SemImInitializationParams initializationParams = new SemImInitializationParams();
+    private Parameters params = new Parameters();
 
 //    /**
 //     * True if positive definiteness should be checked when optimizing the
@@ -271,9 +272,22 @@ public final class SemIm implements IM, ISemIm, TetradSerializable {
 
     private Map<Node, Integer> variablesHash;
     private TetradMatrix sampleCovInv;
+    private static Collection<? extends String> parameterNames;
+
+    public static List<String> getParameterNames() {
+        List<String> parameters = new ArrayList<>();
+        parameters.add("coefLow");
+        parameters.add("coefHigh");
+        parameters.add("covLow");
+        parameters.add("covHigh");
+        parameters.add("varLow");
+        parameters.add("varHigh");
+        parameters.add("coefSymmetric");
+        parameters.add("covSymmetric");
+        return parameters;
+    }
 
     // Types of scores that yield a chi square value when minimized.
-    // The Fgsl was a typo that unfortunately I had to keep for serialization.
     public enum ScoreType {
         Fml, Fgls
     }
@@ -286,14 +300,14 @@ public final class SemIm implements IM, ISemIm, TetradSerializable {
      * Constructs a new SEM IM from a SEM PM.
      */
     public SemIm(SemPm semPm) {
-        this(semPm, null, null);
+        this(semPm, null, new Parameters());
     }
 
     /**
      * Constructs a new SEM IM from the given SEM PM, using the given params
      * object to guide the choice of parameter values.
      */
-    public SemIm(SemPm semPm, SemImInitializationParams params) {
+    public SemIm(SemPm semPm, Parameters params) {
         this(semPm, null, params);
     }
 
@@ -302,14 +316,16 @@ public final class SemIm implements IM, ISemIm, TetradSerializable {
      * params object to guide the choice of parameter values. If old values are
      * retained, they are gotten from the old SEM IM.
      */
-    public SemIm(SemPm semPm, SemIm oldSemIm, SemImInitializationParams params) {
+    public SemIm(SemPm semPm, SemIm oldSemIm, Parameters parameters) {
         if (semPm == null) {
             throw new NullPointerException("Sem PM must not be null.");
         }
 
-        if (params != null) {
-            this.setInitializationParams(params);
+        if (params == null) {
+            throw new NullPointerException();
         }
+
+        this.params = parameters;
 
         this.semPm = new SemPm(semPm);
 
@@ -342,7 +358,7 @@ public final class SemIm implements IM, ISemIm, TetradSerializable {
 
         // Note that we want to use the default params object here unless a bona fide
         // subistute has been provided.
-        if (oldSemIm != null && this.getInitializationParams().isRetainPreviousValues()) {
+        if (oldSemIm != null && this.getParams().getBoolean("retainPreviousValues", false)) {
             retainPreviousValues(oldSemIm);
         }
 
@@ -1236,7 +1252,7 @@ public final class SemIm implements IM, ISemIm, TetradSerializable {
         Graph nullModel = new SemGraph(getSemPm().getGraph());
         nullModel.removeEdges(nullModel.getEdges());
         SemPm nullPm = new SemPm(nullModel);
-        CovarianceMatrix sampleCovar = new CovarianceMatrix(sampleCovarVariables, getSampleCovar(), getSampleSize());
+        CovarianceMatrix sampleCovar = new CovarianceMatrix(getVariableNodes(), getSampleCovar(), getSampleSize());
         return new SemEstimator(sampleCovar, nullPm).estimate();
     }
 
@@ -2471,29 +2487,25 @@ public final class SemIm implements IM, ISemIm, TetradSerializable {
 
         if (parameter.isInitializedRandomly()) {
             if (parameter.getType() == ParamType.COEF) {
-                double coefLow = getInitializationParams().getCoefLow();
-                double coefHigh = getInitializationParams().getCoefHigh();
-                //final double coefLow = getInitializationParams().getCoefLow();
-                //final double coefHigh = getInitializationParams().getCoefHigh();
-
+                final double coefLow = getParams().getDouble("coefLow", .5);
+                final double coefHigh = getParams().getDouble("coefHigh", 1.5);
                 double value = new Split(coefLow, coefHigh).nextRandom();
-
-                if (getInitializationParams().isCoefSymmetric()) {
+                if (getParams().getBoolean("coefSymmetric", true)) {
                     return value;
                 } else {
                     return Math.abs(value);
                 }
             } else if (parameter.getType() == ParamType.COVAR) {
-                double covLow = getInitializationParams().getCovLow();
-                double covHigh = getInitializationParams().getCovHigh();
+                final double covLow = getParams().getDouble("covLow", 0.1);
+                final double covHigh = getParams().getDouble("covHigh", 0.2);
                 double value = new Split(covLow, covHigh).nextRandom();
-                if (getInitializationParams().isCoefSymmetric()) {
+                if (getParams().getBoolean("covSymmetric", true)) {
                     return value;
                 } else {
                     return Math.abs(value);
                 }
             } else { //if (parameter.getType() == ParamType.VAR) {
-                return RandomUtil.getInstance().nextUniform(getInitializationParams().getVarLow(), getInitializationParams().getVarHigh());
+                return RandomUtil.getInstance().nextUniform(getParams().getDouble("varLow", 1), getParams().getDouble("varHigh", 3));
             }
         } else {
             return parameter.getStartingValue();
@@ -2730,8 +2742,8 @@ public final class SemIm implements IM, ISemIm, TetradSerializable {
                     "Sample size out of range: " + sampleSize);
         }
 
-        if (getInitializationParams() == null) {
-            setInitializationParams(new SemImInitializationParams());
+        if (getParams() == null) {
+            setParams(new Parameters());
         }
 
         if (distributions == null) {
@@ -2756,13 +2768,12 @@ public final class SemIm implements IM, ISemIm, TetradSerializable {
                 / power_of_ten;
     }
 
-    public SemImInitializationParams getInitializationParams() {
-        return initializationParams;
+    public Parameters getParams() {
+        return params;
     }
 
-    public void setInitializationParams(SemImInitializationParams
-                                                 initializationParams) {
-        this.initializationParams = initializationParams;
+    public void setParams(Parameters params) {
+        this.params = params;
     }
 
     public void setFunction(Node node, ConnectionFunction function) {

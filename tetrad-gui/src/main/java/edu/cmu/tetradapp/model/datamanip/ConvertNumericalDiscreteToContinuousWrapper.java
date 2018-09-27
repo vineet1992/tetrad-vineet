@@ -22,8 +22,10 @@
 package edu.cmu.tetradapp.model.datamanip;
 
 import edu.cmu.tetrad.data.*;
+import edu.cmu.tetrad.util.Parameters;
 import edu.cmu.tetrad.util.TetradSerializableUtils;
 import edu.cmu.tetradapp.model.DataWrapper;
+import edu.cmu.tetradapp.model.PcRunner;
 
 /**
  * Add description
@@ -33,7 +35,7 @@ import edu.cmu.tetradapp.model.DataWrapper;
 public class ConvertNumericalDiscreteToContinuousWrapper extends DataWrapper {
     static final long serialVersionUID = 23L;
 
-    public ConvertNumericalDiscreteToContinuousWrapper(DataWrapper data) {
+    public ConvertNumericalDiscreteToContinuousWrapper(DataWrapper data, Parameters params) {
         if (data == null) {
             throw new NullPointerException("The given data must not be null");
         }
@@ -71,8 +73,8 @@ public class ConvertNumericalDiscreteToContinuousWrapper extends DataWrapper {
      *
      * @see TetradSerializableUtils
      */
-    public static ConvertNumericalDiscreteToContinuousWrapper serializableInstance() {
-        return new ConvertNumericalDiscreteToContinuousWrapper(DataWrapper.serializableInstance());
+    public static PcRunner serializableInstance() {
+        return PcRunner.serializableInstance();
     }
 
 

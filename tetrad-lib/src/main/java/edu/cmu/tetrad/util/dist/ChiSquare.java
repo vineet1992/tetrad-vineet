@@ -48,10 +48,8 @@ public class ChiSquare implements Distribution {
     private ChiSquare() {
         this.df = 5.0;
     }
-    public ChiSquare(int df)
-    {
-        this.df = df;
-    }
+
+    public ChiSquare(int df){this.df = df;}
     /**
      * Generates a simple exemplar of this class to test serialization.
      *

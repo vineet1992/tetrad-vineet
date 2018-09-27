@@ -68,10 +68,11 @@ public class PcLocal implements GraphSearch {
     private MeekRules meekRules;
     private boolean recordSepsets = true;
     private SepsetMap sepsetMap = new SepsetMap();
-    private SepsetsMinScore sepsetProducer;
+    private SepsetProducer sepsetProducer;
     private SemBicScore score;
     private ConcurrentMap<Node, Integer> hashIndices;
     private boolean verbose = false;
+    private Graph initialGraph;
 
     //=============================CONSTRUCTORS==========================//
 
@@ -127,11 +128,17 @@ public class PcLocal implements GraphSearch {
     public Graph search() {
         long time1 = System.currentTimeMillis();
 
-        if (graph == null) {
+        if (initialGraph != null) {
+            graph = new EdgeListGraph(initialGraph);
+            graph.reorientAllWith(Endpoint.TAIL);
+        } else if (graph == null) {
             graph = new EdgeListGraph(getIndependenceTest().getVariables());
+        } else {
+            graph = new EdgeListGraph(graph);
+            graph.reorientAllWith(Endpoint.TAIL);
         }
 
-        sepsetProducer = new SepsetsMinScore(graph, getIndependenceTest(), null, -1);
+        sepsetProducer = new SepsetsMinScore(graph, getIndependenceTest(), -1);
 
         meekRules = new MeekRules();
         meekRules.setAggressivelyPreventCycles(isAggressivelyPreventCycles());
@@ -369,7 +376,8 @@ public class PcLocal implements GraphSearch {
                 if (graph.isAdjacentTo(z, w)) continue;
                 List<Node> cond = sepset(z, w);
 
-                if (cond != null && !cond.contains(y)) {
+                if (cond != null && !cond.contains(y) && !knowledge.isForbidden(z.getName(), y.getName())
+                        && !knowledge.isForbidden(w.getName(), y.getName())) {
                     graph.setEndpoint(z, y, Endpoint.ARROW);
                     graph.setEndpoint(w, y, Endpoint.ARROW);
                 }
@@ -463,6 +471,10 @@ public class PcLocal implements GraphSearch {
 
     public void setVerbose(boolean verbose) {
         this.verbose = verbose;
+    }
+
+    public void setInitialGraph(Graph initialGraph) {
+        this.initialGraph = initialGraph;
     }
 }
 

@@ -225,27 +225,20 @@ public class PcStable implements GraphSearch {
         }
 
         graph = new EdgeListGraph(nodes);
-//        graph.fullyConnect(Endpoint.TAIL);
 
-//        IFas fas = new Fas(getIndependenceTest());
-//        IFas fas = new Fas(getIndependenceTest());
-//        IFas fas = new FasStable2(getIndependenceTest());
-//        IFas fas = new FasStable2a(getIndependenceTest());
-//        IFas fas = new FasStable2b(getIndependenceTest());
         IFas fas = new FasStableConcurrent(initialGraph, getIndependenceTest());
         fas.setKnowledge(getKnowledge());
         fas.setDepth(getDepth());
         fas.setVerbose(verbose);
-        System.out.println("Starting Adjacency Search");
+
         graph = fas.search();
-        System.out.println("Finished Adjacency search");
         sepsets = fas.getSepsets();
+
         SearchGraphUtils.pcOrientbk(knowledge, graph, nodes);
-        System.out.println("Finished Orient 1");
-        SearchGraphUtils.orientCollidersUsingSepsets(this.sepsets, knowledge, graph, initialGraph, verbose);
-        System.out.println("Finished Collider Orient");
+//        SearchGraphUtils.orientCollidersUsingSepsets(this.sepsets, knowledge, graph, initialGraph, verbose);
 //        SearchGraphUtils.orientCollidersUsingSepsets(this.sepsets, knowledge, graph, verbose);
-//        SearchGraphUtils.orientCollidersLocally(knowledge, graph, independenceTest, depth);
+//        SearchGraphUtils.orientColeelidersLocally(knowledge, graph, independenceTest, depth);
+        SearchGraphUtils.orientCollidersUsingSepsets(this.sepsets, knowledge, graph, verbose);
 
         MeekRules rules = new MeekRules();
         rules.setAggressivelyPreventCycles(this.aggressivelyPreventCycles);

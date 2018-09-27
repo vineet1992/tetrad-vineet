@@ -38,12 +38,12 @@ import java.util.prefs.Preferences;
  *
  * @author Tyler Gibson
  */
-class SetupLoggingAction extends AbstractAction {
+public class SetupLoggingAction extends AbstractAction {
 
-
+    private static final long serialVersionUID = -3792483383186114713L;
 
     public SetupLoggingAction() {
-        super("Setup...");
+        super("Logging");
     }
 
 
@@ -61,7 +61,7 @@ class SetupLoggingAction extends AbstractAction {
     /**
      * The component used to config logging.
      */
-    public static JComponent buildSetupLoggingComponent() {
+    private static JComponent buildSetupLoggingComponent() {
 
 
 

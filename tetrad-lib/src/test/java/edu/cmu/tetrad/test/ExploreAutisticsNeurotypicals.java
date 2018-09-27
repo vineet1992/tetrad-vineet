@@ -26,7 +26,7 @@ import edu.cmu.tetrad.graph.Edge;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.GraphUtils;
 import edu.cmu.tetrad.graph.Node;
-import edu.cmu.tetrad.search.Fgs;
+import edu.cmu.tetrad.search.Fges;
 import edu.cmu.tetrad.search.SemBicScore;
 import edu.cmu.tetrad.util.RandomUtil;
 import edu.cmu.tetrad.util.TetradMatrix;
@@ -45,7 +45,7 @@ public final class ExploreAutisticsNeurotypicals {
 
     public void printEdgeData() {
         String path = "/Users/jdramsey/Documents/LAB_NOTEBOOK.2012.04.20/data/Joe_108_Variable";
-//        String path = "/Users/jdramsey/Documents/LAB_NOTEBOOK.2012.04.20/data/USM_Datasets";
+//        String path = "/Users/jdramsey/Documents/LAB_NOTEBOOee.2012.04.20/data/USM_Datasets";
         List<List<DataSet>> allDatasets = loadData(path, "autistic", "typical");
         List<List<Graph>> allGraphs = runAlgorithm(path, allDatasets, 10);
         List<List<Graph>> graphs = reconcileNodes(allGraphs);
@@ -91,8 +91,8 @@ public final class ExploreAutisticsNeurotypicals {
 
                 SemBicScore score = new SemBicScore(new CovarianceMatrixOnTheFly(dataSet));
                 score.setPenaltyDiscount(penaltyDiscount);
-                Fgs search = new Fgs(score);
-                search.setVerbose(true);
+                Fges search = new Fges(score);
+                search.setVerbose(false);
                 Graph graph = search.search();
                 GraphUtils.saveGraph(graph, file, false);
                 graphs.add(GraphUtils.undirectedGraph(GraphUtils.loadGraphTxt(file)));

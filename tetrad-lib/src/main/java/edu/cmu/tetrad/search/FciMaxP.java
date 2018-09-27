@@ -206,7 +206,7 @@ this.factor = factor;
         public Graph search2 ()
         {
             ConditionalGaussianScore score0 = new ConditionalGaussianScore(independenceTest.getDataSets().get(0));
-            Fgs2 fgs = new Fgs2(score0);
+            Fges fgs = new Fges(score0);
             fgs.setKnowledge(getKnowledge());
             fgs.setVerbose(verbose);
             fgs.setNumPatternsToStore(0);
@@ -460,7 +460,7 @@ this.factor = factor;
                             double p = 0;
                             if(pdsep.get(a)!=null&&pdsep.get(c)!=null)
                             {
-                                sepset = sp.testSepset(a,c);
+                                sepset = sp.getSepset(a,c);
                                 p = sp.getPValue();
                             }
                         else {

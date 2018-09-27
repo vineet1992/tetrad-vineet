@@ -53,6 +53,8 @@ public class KnowledgeGraph implements Graph, TetradSerializableExcluded {
      * @serial
      */
     private IKnowledge knowledge;
+    private boolean pag;
+    private boolean pattern;
 
     //============================CONSTRUCTORS=============================//
 
@@ -60,8 +62,6 @@ public class KnowledgeGraph implements Graph, TetradSerializableExcluded {
      * Constructs a new directed acyclic graph (DAG).
      */
     public KnowledgeGraph(IKnowledge knowledge) {
-        setGraphConstraintsChecked(false);
-
         if (knowledge == null) {
             throw new NullPointerException();
         }
@@ -191,6 +191,11 @@ public class KnowledgeGraph implements Graph, TetradSerializableExcluded {
         return graph.getSepset(n1, n2);
     }
 
+    @Override
+    public void setNodes(List<Node> nodes) {
+        graph.setNodes(nodes);
+    }
+
     public List<String> getNodeNames() {
         return getGraph().getNodeNames();
     }
@@ -307,12 +312,12 @@ public class KnowledgeGraph implements Graph, TetradSerializableExcluded {
         } else if(_edge.getType() == KnowledgeModelEdge.FORBIDDEN_BY_GROUPS){
             if(!this.knowledge.isForbiddenByGroups(from, to)){
                 throw new IllegalArgumentException("Edge " + from + "-->" + to +
-                " is not forbidden by groups.");
+                        " is not forbidden by groups.");
             }
         } else if(_edge.getType() == KnowledgeModelEdge.REQUIRED_BY_GROUPS){
             if(!this.knowledge.isRequiredByGroups(from, to)){
                 throw new IllegalArgumentException("Edge " + from + "-->" + to +
-                " is not required by groups.");
+                        " is not required by groups.");
             }
         }
 
@@ -367,18 +372,6 @@ public class KnowledgeGraph implements Graph, TetradSerializableExcluded {
         return getGraph().getNumEdges(node);
     }
 
-    public List<GraphConstraint> getGraphConstraints() {
-        return getGraph().getGraphConstraints();
-    }
-
-    public boolean isGraphConstraintsChecked() {
-        return getGraph().isGraphConstraintsChecked();
-    }
-
-    public void setGraphConstraintsChecked(boolean checked) {
-        getGraph().setGraphConstraintsChecked(checked);
-    }
-
     public boolean removeEdge(Edge edge) {
         KnowledgeModelEdge _edge = (KnowledgeModelEdge) edge;
         KnowledgeModelNode _node1 = (KnowledgeModelNode) _edge.getNode1();
@@ -401,7 +394,7 @@ public class KnowledgeGraph implements Graph, TetradSerializableExcluded {
                     "remove edges forbidden by groups.");
         } else if(_edge.getType() == KnowledgeModelEdge.REQUIRED_BY_GROUPS){
             throw new IllegalArgumentException("Please use the Other Groups interface to " +
-            "remove edges required by groups.");
+                    "remove edges required by groups.");
         }
 
         return getGraph().removeEdge(edge);
@@ -486,6 +479,11 @@ public class KnowledgeGraph implements Graph, TetradSerializableExcluded {
         return getGraph().getIndegree(node);
     }
 
+    @Override
+    public int getDegree(Node node) {
+        return getGraph().getDegree(node);
+    }
+
     public int getOutdegree(Node node) {
         return getGraph().getOutdegree(node);
     }
@@ -515,7 +513,7 @@ public class KnowledgeGraph implements Graph, TetradSerializableExcluded {
     }
 
     public boolean isDConnectedTo(Node node1, Node node2,
-            List<Node> conditioningNodes) {
+                                  List<Node> conditioningNodes) {
         return getGraph().isDConnectedTo(node1, node2, conditioningNodes);
     }
 
@@ -551,16 +549,42 @@ public class KnowledgeGraph implements Graph, TetradSerializableExcluded {
         return getGraph().toString();
     }
 
-    public boolean addGraphConstraint(GraphConstraint gc) {
-        return getGraph().addGraphConstraint(gc);
-    }
-
     public IKnowledge getKnowledge() {
         return knowledge;
     }
 
     private Graph getGraph() {
         return graph;
+    }
+
+    @Override
+    public List<String> getTriplesClassificationTypes() {
+        return null;
+    }
+
+    @Override
+    public List<List<Triple>> getTriplesLists(Node node) {
+        return null;
+    }
+
+    @Override
+    public boolean isPag() {
+        return pag;
+    }
+
+    @Override
+    public void setPag(boolean pag) {
+        this.pag = pag;
+    }
+
+    @Override
+    public boolean isPattern() {
+        return pattern;
+    }
+
+    @Override
+    public void setPattern(boolean pattern) {
+        this.pattern = pattern;
     }
 }
 

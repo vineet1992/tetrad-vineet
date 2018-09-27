@@ -12,8 +12,10 @@ import edu.cmu.tetrad.search.Fci;
 import edu.cmu.tetrad.search.FciMaxP;
 import edu.cmu.tetrad.search.IndependenceTest;
 import edu.cmu.tetrad.util.ForkJoinPoolInstance;
+import edu.cmu.tetrad.util.StatUtils;
 import edu.pitt.csb.Priors.runPriors;
 import edu.pitt.csb.latents.LatentPrediction;
+import edu.pitt.csb.mgm.Algorithm;
 import edu.pitt.csb.mgm.IndTestMultinomialAJ;
 import edu.pitt.csb.mgm.MGM;
 import edu.pitt.csb.mgm.MixedUtils;
@@ -23,6 +25,7 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
@@ -30,17 +33,32 @@ import java.util.concurrent.RecursiveAction;
 /**
  * Created by vinee_000 on 7/12/2018.
  * Class to run Complimentary Pairs Stability Selection with causal modeling algorithms
- *
+ *  Currently how this works is for bootstrap we only add an edge to the final graph if it showed up in a particular orientation greater than bound times
+ *  For CPSS we first compute theta using average number of edges in the graph (edges are selections)
+ *  But then we use our bound the same way as Bootstrapping
+ *  TODO Make the bound match up with edge selection, and then orient by different strategies?
+ *  Use bound as an initial graph and then run algorithm as normal on full data?
+ *  Use bound to select edges and then orient according to most likely orientation?
  */
 public class Bootstrap {
     private int B; //Number of bootstrap samples
     private int p;//total number of variables
     private double bound; //percentage of bootstrap samples cutoff
-    private DataSet data;
+    private DataSet data; //Dataset
     private double [] lambda; //Array of lambda values for MGM
-    private int [][] subs;
+    private int [][] subs; //subsampled indicies
+    private String tabularOutput; //Output of edge orientation frequencies in a tabular form
+    private boolean cpss; //Should we use Complimentary pairs to create datasets?
+    private boolean subsample; //Should we use subsampling to create datasets?
+    private int b = 0; //Subsample size
 
-
+    public Bootstrap (DataSet data, double bound, int B)
+    {
+        this.data = data;
+        this.bound = bound;
+        this.B = B;
+        this.p = data.getNumColumns()*(data.getNumColumns()-1)/2;
+    }
     public Bootstrap(DataSet data, double [] lambda, double bound, int B)
     {
         this.data = data;
@@ -60,6 +78,18 @@ public class Bootstrap {
         this.B = subs.length;
     }
 
+    public String getTabularOutput() {return tabularOutput;}
+
+
+    public void setCPSS() {
+        cpss = true;
+        B = B*2;
+    }
+    public void setSubsample(int b)
+    {
+        subsample = true;
+        this.b = b;
+    }
     public static int[][] createSubs(DataSet data, int B)
     {
         return DataUtils.getBootstrapIndices(data,data.getNumRows(),B);
@@ -68,6 +98,234 @@ public class Bootstrap {
     {
         subs = createSubs(data,B);
         return subs;
+    }
+    private int [][] createSubsSubsample(DataSet data)
+    {
+        if(b==0)
+            this.b = StabilityUtils.getSubSize(data.getNumRows());
+        return StabilityUtils.subSampleNoReplacement(data.getNumRows(),b,B);
+    }
+    private int[][] createSubsCPSS(DataSet data) {
+        ArrayList<Integer>tempInds  = new ArrayList<Integer>();
+        for(int i = 0; i < data.getNumRows();i++)
+            tempInds.add(i);
+        int [][] subs = new int[B][];
+        for(int i = 0; i < B/2;i++)
+        {
+            Collections.shuffle(tempInds);
+            int[] d1 = new int[tempInds.size() / 2];
+            for (int j = 0; j < d1.length; j++) {
+                d1[j] = tempInds.get(j);
+            }
+            int size2 = tempInds.size() / 2;
+            if (tempInds.size() % 2 == 1)
+                size2 = tempInds.size() / 2 + 1;
+            int[] d2 = new int[size2];
+            for (int j = d1.length; j < tempInds.size(); j++) {
+                d2[j - d1.length] = tempInds.get(j);
+            }
+
+            subs[2*i] = d1;
+            subs[2*i+1] = d2;
+            if(runPriors.checkForVariance(data.subsetRows(d1),data)!=-1 || runPriors.checkForVariance(data.subsetRows(d2),data)!=-1)
+                --i;
+        }
+        return subs;
+    }
+
+
+    //Right now Bootstrap is done in a directed sense, whereas CPSS is done fully undirected
+    public Graph runBootstrap(final Algorithm a, final double [] params)
+    {
+        if(subs==null && !cpss && !subsample)
+            subs = createSubs(data);
+        else if(subs==null && cpss)
+            subs = createSubsCPSS(data);
+        else if(subs==null && subsample)
+            subs = createSubsSubsample(data);
+
+        final ArrayList<Graph> graphs = new ArrayList<Graph>();
+        final double [] totalEdges = new double[B];
+        final double [][][] theta = new double[8][data.getNumColumns()][data.getNumColumns()];
+        if(cpss)
+            System.out.println("Computing " + B + " Compliemntary Pairs Graphs in parallel... using " + a);
+        else if(subsample)
+            System.out.println("Computing " + B + " Subsampled Graphs in parallel... using " + a);
+        else
+            System.out.println("Computing " + B + " Bootstrap Graphs in parallel... using " + a);
+
+
+        final ForkJoinPool pool = ForkJoinPoolInstance.getInstance().getPool();
+
+        class StabilityAction extends RecursiveAction {
+            private int chunk;
+            private int from;
+            private int to;
+
+            public StabilityAction(int chunk, int from, int to) {
+                this.chunk = chunk;
+                this.from = from;
+                this.to = to;
+            }
+
+            private synchronized void addToGraphs(Graph g){graphs.add(g);}
+
+            private synchronized DataSet subset(int [] x){return data.subsetRows(x);}
+            @Override
+            protected void compute(){
+                if (to - from <= chunk) {
+                    for (int s = from; s < to; s++) {
+                        DataSet data1 = subset(subs[s]);
+                        System.out.println("Running sample " + s);
+                        DataGraphSearch gs = Algorithm.algToSearchWrapper(a,params);
+                        Graph gt = gs.search(data1);
+                        totalEdges[s] =gt.getNumEdges();
+                        addToGraphs(gt);
+                    }
+
+                    return;
+                } else {
+                    List<StabilityAction> tasks = new ArrayList<>();
+
+                    final int mid = (to + from) / 2;
+
+                    tasks.add(new StabilityAction(chunk, from, mid));
+                    tasks.add(new StabilityAction(chunk, mid, to));
+
+                    invokeAll(tasks);
+
+                    return;
+                }
+            }
+
+        }
+
+        final int chunk = 5;
+
+        pool.invoke(new StabilityAction(chunk, 0,B));
+
+        //TODO need to add directed edge counting for CPSS and undirected edge counting for bootstrap
+
+
+        for(int i = 0 ; i< graphs.size();i++)
+        {
+            Graph curr = graphs.get(i);
+            for(int j = 0; j < data.getNumColumns();j++)
+            {
+                String node1 = data.getVariable(j).getName();
+                for(int k = j+1; k < data.getNumColumns();k++)
+                {
+                    String node2 = data.getVariable(k).getName();
+                    Edge currEdge = curr.getEdge(curr.getNode(node1),curr.getNode(node2));
+                    theta[edgeToInt(currEdge)][j][k]++;
+                    //TODO Debug this
+                }
+            }
+            //Use stability utils orientation search
+            //Include a function to convert double[][][] to a an output graph based on a bound
+        }
+
+        System.out.println("Done");
+        //Partition the data B times and run MGM on each partition to get a count of each edge's appearence
+        //Based on the average number of selected variables per run, compute theta
+        //use theta, q, and the bound to get a value for tao
+        //only keep the edges with probability greater than tao
+        //Return the graph with these edges
+        if(cpss) {
+            double sum = StatUtils.sum(totalEdges);
+            this.bound = CPSS.computeTao(p/sum,this.bound);
+        }
+        Graph output = createGraph(theta,data);
+        tabularOutput = createStringOutput(output,theta,data);
+        return output;
+    }
+    private String createStringOutput(Graph g, double [][][]theta, DataSet data)
+    {
+        String out = "Var 1\tInteraction\tVar 2\t---\t-->\t<--\t<->\to->\t<-o\to-o\tNo Edge\n";
+        for(Edge e:g.getEdges())
+        {
+            int x = data.getColumn(data.getVariable(e.getNode1().getName()));
+            int y = data.getColumn(data.getVariable(e.getNode2().getName()));
+            out+=e.getNode1().getName()+"\t" + edgeString(e) + "\t" + e.getNode2().getName()+"\t";
+            for(int i = 0; i < theta.length;i++)
+            {
+                if(i==theta.length-1)
+                    out+=theta[i][x][y] +"\n";
+                else
+                    out+=theta[i][x][y] + "\t";
+            }
+        }
+        return out;
+    }
+    private String edgeString(Edge e)
+    {
+        StringBuilder buf = new StringBuilder();
+
+        Endpoint endptTypeA = e.getEndpoint1();
+        Endpoint endptTypeB = e.getEndpoint2();
+
+
+        if (endptTypeA == Endpoint.TAIL) {
+            buf.append("-");
+        } else if (endptTypeA == Endpoint.ARROW) {
+            buf.append("<");
+        } else if (endptTypeA == Endpoint.CIRCLE) {
+            buf.append("o");
+        }
+
+        buf.append("-");
+
+        if (endptTypeB == Endpoint.TAIL) {
+            buf.append("-");
+        } else if (endptTypeB == Endpoint.ARROW) {
+            buf.append(">");
+        } else if (endptTypeB == Endpoint.CIRCLE) {
+            buf.append("o");
+        }
+
+        return buf.toString();
+    }
+    private Graph createGraph(double[][][]theta,DataSet data)
+    {
+        Graph temp = new EdgeListGraphSingleConnections(data.getVariables());
+        for(int j = 0; j < data.getNumColumns();j++)
+        {
+            for(int k = j+1; k < data.getNumColumns();k++)
+            {
+                double max = 0;
+                int index = -1;
+                for(int i = 0; i < theta.length;i++)
+                {
+                    if(theta[i][j][k] > max) {
+                        max = theta[i][j][k];
+                        index = i;
+                    }
+                }
+                if(max>=bound && index!=7)
+                {
+                    temp.addEdge(createEdge(data.getVariable(j),data.getVariable(k),index));
+                }
+            }
+        }
+        return temp;
+    }
+    private Edge createEdge(Node var1, Node var2, int type)
+    {
+        Endpoint e1 = null;
+        Endpoint e2 = null;
+        if(type==0 || type==1)
+            e1 = Endpoint.TAIL;
+        else if(type==2||type==3||type==5)
+            e1 = Endpoint.ARROW;
+        else
+            e1 = Endpoint.CIRCLE;
+        if(type==0||type==2)
+            e2=Endpoint.TAIL;
+        else if(type==1||type==3||type==4)
+            e2=Endpoint.ARROW;
+        else
+            e2 = Endpoint.CIRCLE;
+         return new Edge(var1,var2,e1,e2);
     }
     public ArrayList<LatentPrediction.Pair> runBootstrap(final String algName, double alpha)
     {
@@ -225,16 +483,41 @@ public class Bootstrap {
         //Return the graph with these edges
         return finalResult;
     }
-    public double [][] addToMat(Graph g, DataSet data, double [][] edgeCounts)
-    {
-        for(Edge e:g.getEdges())
-        {
-            int x = data.getColumn(data.getVariable(e.getNode1().getName()));
-            int y = data.getColumn(data.getVariable(e.getNode2().getName()));
-            edgeCounts[x][y]++;
-            edgeCounts[y][x]++;
-        }
-        return edgeCounts;
 
+    private int edgeToInt(Edge e)
+    {
+        if(e==null)
+            return 7;//No edge
+        if(e.getEndpoint1()==Endpoint.ARROW)
+        {
+            if(e.getEndpoint2()==Endpoint.TAIL)
+            {
+                return 2;// <--
+            }
+            else if(e.getEndpoint2()==Endpoint.ARROW)
+            {
+                return 3; //<->
+            }
+            else
+            {
+                return 5; //<-o
+            }
+        }
+        else if(e.getEndpoint1()==Endpoint.TAIL)
+        {
+            if(e.getEndpoint2()==Endpoint.ARROW)
+                return 1;//-->
+            else if(e.getEndpoint2()==Endpoint.TAIL)
+                return 0; //---
+        }
+        else
+        {
+            if(e.getEndpoint2()==Endpoint.CIRCLE)
+                return 6; //o-o
+            else if(e.getEndpoint2()==Endpoint.ARROW)
+                return 4;//o->
+        }
+        return -1;
     }
+
 }

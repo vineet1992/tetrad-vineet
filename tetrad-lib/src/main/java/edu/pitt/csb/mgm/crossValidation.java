@@ -1,6 +1,6 @@
 package edu.pitt.csb.mgm;
 
-import edu.cmu.tetrad.algcomparison.simulation.ContinuousLinearGaussianSemSimulation;
+import edu.cmu.tetrad.algcomparison.simulation.MixedLeeHastieSimulation;
 import edu.cmu.tetrad.algcomparison.simulation.Parameters;
 import edu.cmu.tetrad.data.CovarianceMatrix;
 import edu.cmu.tetrad.data.DataSet;
@@ -33,7 +33,8 @@ public class crossValidation {
         int numRuns = 25;
         for(int run =0; run < numRuns; run++) {
             Parameters p = new Parameters();
-            ContinuousLinearGaussianSemSimulation c = new ContinuousLinearGaussianSemSimulation();
+            MixedLeeHastieSimulation c = new MixedLeeHastieSimulation();
+            p.setValue("percentDiscreteForMixedSimulation",0);
             c.simulate(p);
             DataSet d = c.getDataSet(0);
             double[] alpha = {.001, .005,.01,.03, .05,.08, .1, .2,.3,.4, .5};
@@ -48,7 +49,7 @@ public class crossValidation {
                 IndependenceTest i = new IndTestFisherZ(d,alpha[index]);
                 PcStable pcs = new PcStable(i);
                 pcAdj = convert(pcs.search());
-                Fgs2 f = new Fgs2(new SemBicScore(new CovarianceMatrix(d),penalty[index]));
+                Fges f = new Fges(new SemBicScore(new CovarianceMatrix(d),penalty[index]));
                 gesAdj = convert(f.search());
                 CpcStable cpcS = new CpcStable(new IndTestFisherZ(d,alpha[index]));
                 cpcAdj = convert(cpcS.search());

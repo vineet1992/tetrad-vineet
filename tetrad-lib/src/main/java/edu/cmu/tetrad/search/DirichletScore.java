@@ -301,16 +301,6 @@ public class DirichletScore implements LocalDiscreteScore, Score {
     }
 
     @Override
-    public double getParameter1() {
-        return 0;
-    }
-
-    @Override
-    public void setParameter1(double alpha) {
-
-    }
-
-    @Override
     public DataSet getDataSet() {
         throw new UnsupportedOperationException();
     }
@@ -352,8 +342,13 @@ public class DirichletScore implements LocalDiscreteScore, Score {
     }
 
     @Override
-    public int getMaxIndegree() {
+    public int getMaxDegree() {
         return 1000;
+    }
+
+    @Override
+    public boolean determines(List<Node> z, Node y) {
+        return false;
     }
 }
 

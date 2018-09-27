@@ -21,15 +21,13 @@
 
 package edu.cmu.tetrad.graph;
 
-import org.apache.commons.math3.linear.EigenDecomposition;
+//import edu.cmu.tetrad.data.IKnowledge;
+//import edu.cmu.tetrad.data.Knowledge2;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Represents a time series graph--that is, a graph with a fixed number S of lags, with edges into initial lags
@@ -50,6 +48,9 @@ public class TimeLagGraph implements Graph {
     private int maxLag = 1;
     private int numInitialLags = 1;
     private List<Node> lag0Nodes = new ArrayList<>();
+
+    private boolean pag;
+    private boolean pattern;
 
     public TimeLagGraph() {
     }
@@ -74,7 +75,6 @@ public class TimeLagGraph implements Graph {
         return new TimeLagGraph();
     }
 
-
     /**
      * Nodes may be added into the getModel time step only. That is, node.getLag() must be 0.
      */
@@ -84,7 +84,6 @@ public class TimeLagGraph implements Graph {
 
         if (id.getLag() != 0) {
             node = node.like(id.getName());
-//            throw new IllegalArgumentException("Nodes may be added into the getModel time step only.");
         }
 
         boolean added = getGraph().addNode(node);
@@ -235,8 +234,6 @@ public class TimeLagGraph implements Graph {
 
                     if (getNodeId(tail).getLag() > maxLag) {
                         getGraph().removeEdge(edge);
-//                        throw new IllegalArgumentException("This edge has lag greater than the new maxLag: " + edge +
-//                                " Please remove first.");
                     }
                 }
             }
@@ -372,6 +369,36 @@ public class TimeLagGraph implements Graph {
         return numInitialLags;
     }
 
+    @Override
+    public List<String> getTriplesClassificationTypes() {
+        return null;
+    }
+
+    @Override
+    public List<List<Triple>> getTriplesLists(Node node) {
+        return null;
+    }
+
+    @Override
+    public boolean isPag() {
+        return pag;
+    }
+
+    @Override
+    public void setPag(boolean pag) {
+        this.pag = pag;
+    }
+
+    @Override
+    public boolean isPattern() {
+        return pattern;
+    }
+
+    @Override
+    public void setPattern(boolean pattern) {
+        this.pattern = pattern;
+    }
+
     public static class NodeId {
         private String name;
         private int lag;
@@ -392,10 +419,6 @@ public class TimeLagGraph implements Graph {
 
     public String toString() {
         return getGraph().toString() + "\n" + lag0Nodes;
-    }
-
-    public boolean addGraphConstraint(GraphConstraint gc) {
-        return getGraph().addGraphConstraint(gc);
     }
 
     public boolean addDirectedEdge(Node node1, Node node2) {
@@ -484,6 +507,11 @@ public class TimeLagGraph implements Graph {
 
     public int getIndegree(Node node) {
         return getGraph().getIndegree(node);
+    }
+
+    @Override
+    public int getDegree(Node node) {
+        return getGraph().getDegree(node);
     }
 
     public int getOutdegree(Node node) {
@@ -644,6 +672,11 @@ public class TimeLagGraph implements Graph {
         return graph.getSepset(n1, n2);
     }
 
+    @Override
+    public void setNodes(List<Node> nodes) {
+        throw new IllegalArgumentException("Sorry, you cannot replace the variables for a time lag graph.");
+    }
+
     public boolean isExogenous(Node node) {
         return getGraph().isExogenous(node);
     }
@@ -733,18 +766,6 @@ public class TimeLagGraph implements Graph {
 
     public int getNumEdges(Node node) {
         return getGraph().getNumEdges(node);
-    }
-
-    public List<GraphConstraint> getGraphConstraints() {
-        return getGraph().getGraphConstraints();
-    }
-
-    public boolean isGraphConstraintsChecked() {
-        return getGraph().isGraphConstraintsChecked();
-    }
-
-    public void setGraphConstraintsChecked(boolean checked) {
-        getGraph().setGraphConstraintsChecked(checked);
     }
 
     public Graph subgraph(List<Node> nodes) {

@@ -1154,14 +1154,6 @@ public class MixedUtils {
         if (name.equals("lrt")) {
             test = new IndTestMixedRegressionLrt(data, alpha);
             //test = new IndTestMultinomialLogisticRegression(data, alpha);
-        } else if (name.equals("tlin")) {
-            test = new edu.pitt.csb.mgm.IndTestMixedMultipleTTest(data, alpha);
-            ((edu.pitt.csb.mgm.IndTestMixedMultipleTTest)test).setPreferLinear(true);
-            //test = new IndTestMultinomialLogisticRegressionWald(data, alpha, true);
-        } else if (name.equals("tlog")){
-            test = new edu.pitt.csb.mgm.IndTestMixedMultipleTTest(data, alpha);
-            ((edu.pitt.csb.mgm.IndTestMixedMultipleTTest)test).setPreferLinear(false);
-            //test = new IndTestMultinomialLogisticRegressionWald(data, alpha, false);
         } else {
 
             // This should allow the user to call any independence test found in tetrad.search or mgm

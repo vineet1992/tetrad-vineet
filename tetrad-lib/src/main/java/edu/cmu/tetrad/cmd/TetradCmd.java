@@ -505,8 +505,8 @@ public final class TetradCmd {
             runCfci();
         } else if ("ccd".equalsIgnoreCase(algorithmName)) {
             runCcd();
-        } else if ("fgs".equalsIgnoreCase(algorithmName)) {
-            runFgs();
+        } else if ("Fges".equalsIgnoreCase(algorithmName)) {
+            runFges();
         } else if ("bayes_est".equalsIgnoreCase(algorithmName)) {
             runBayesEst();
         } else if ("fofc".equalsIgnoreCase(algorithmName)) {
@@ -638,13 +638,13 @@ public final class TetradCmd {
         writeGraph(resultGraph);
     }
 
-    private void runFgs() {
+    private void runFges() {
         if (this.data == null && this.covarianceMatrix == null) {
             throw new IllegalStateException("Data did not load correctly.");
         }
 
         if (verbose) {
-            systemPrint("FGS");
+            systemPrint("Fges");
             systemPrint(getKnowledge().toString());
             systemPrint(getVariables().toString());
 
@@ -657,12 +657,12 @@ public final class TetradCmd {
             TetradLogger.getInstance().log("info", "Testing it.");
         }
 
-        Fgs fgs;
+        Fges Fges;
 
         if (useCovariance) {
-            SemBicScore fgsScore = new SemBicScore(covarianceMatrix);
-            fgsScore.setPenaltyDiscount(penaltyDiscount);
-            fgs = new Fgs(fgsScore);
+            SemBicScore FgesScore = new SemBicScore(covarianceMatrix);
+            FgesScore.setPenaltyDiscount(penaltyDiscount);
+            Fges = new Fges(FgesScore);
 
         } else {
             if (data.isDiscrete()) {
@@ -670,24 +670,24 @@ public final class TetradCmd {
                 score.setSamplePrior(samplePrior);
                 score.setStructurePrior(structurePrior);
 
-                fgs = new Fgs(score);
+                Fges = new Fges(score);
             } else if (data.isContinuous()) {
                 SemBicScore score = new SemBicScore(new CovarianceMatrixOnTheFly(data));
                 score.setPenaltyDiscount(penaltyDiscount);
-                fgs = new Fgs(score);
+                Fges = new Fges(score);
             } else {
                 throw new IllegalArgumentException();
             }
         }
 
         if (initialGraph != null) {
-            fgs.setInitialGraph(initialGraph);
+            Fges.setInitialGraph(initialGraph);
         }
 
-        fgs.setKnowledge(getKnowledge());
+        Fges.setKnowledge(getKnowledge());
 
         // Convert back to Graph..
-        Graph resultGraph = fgs.search();
+        Graph resultGraph = Fges.search();
 
         // PrintUtil outputStreamPath problem and graphs.
         outPrint("\nResult graph:");

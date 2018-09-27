@@ -22,6 +22,7 @@
 package edu.cmu.tetradapp.model;
 
 import edu.cmu.tetrad.data.*;
+import edu.cmu.tetrad.util.Parameters;
 import edu.cmu.tetrad.util.TetradSerializableUtils;
 
 /**
@@ -34,7 +35,7 @@ public class CorrMatrixConverter extends DataWrapper {
 
     //=============================CONSTRUCTORS==============================//
 
-    public CorrMatrixConverter(DataWrapper wrapper) {
+    public CorrMatrixConverter(DataWrapper wrapper, Parameters params) {
         ICovarianceMatrix covMatrix;
 
         if (wrapper.getSelectedDataModel() instanceof DataSet) {
@@ -67,10 +68,8 @@ public class CorrMatrixConverter extends DataWrapper {
      *
      * @see TetradSerializableUtils
      */
-    public static DataWrapper serializableInstance() {
-        DataWrapper wrapper =
-                new DataWrapper(DataUtils.continuousSerializableInstance());
-        return new CorrMatrixConverter(wrapper);
+    public static PcRunner serializableInstance() {
+        return PcRunner.serializableInstance();
     }
 }
 

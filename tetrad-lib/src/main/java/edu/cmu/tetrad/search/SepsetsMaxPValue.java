@@ -53,14 +53,7 @@ public class SepsetsMaxPValue implements SepsetProducer {
     public List<Node> getSepset(Node i, Node k) {
         return getMaxSepset(i, k);
     }
-    public List<Node> testSepset(Node i, Node k)
-    {
 
-        List <Node> _v = extraSepsets.get(i,k);
-        independenceTest.isIndependent(i,k,_v);
-        p = independenceTest.getPValue();
-        return _v;
-    }
     public boolean isCollider(Node i, Node j, Node k) {
         List<Node> _v = getMaxSepset(i, k);
         return _v != null && !_v.contains(j);
@@ -72,7 +65,7 @@ public class SepsetsMaxPValue implements SepsetProducer {
     }
 
     private List<Node> getMaxSepset(Node i, Node k) {
-        double _p = independenceTest.getAlpha();
+        double _p = 0.0;
         List<Node> _v = null;
 
         if (extraSepsets != null) {
@@ -85,7 +78,6 @@ public class SepsetsMaxPValue implements SepsetProducer {
                 if (p > _p) {
                     _p = p;
                     _v = sepset;
-                    return _v;
                 }
             }
         }
@@ -107,7 +99,6 @@ public class SepsetsMaxPValue implements SepsetProducer {
                     double p = getIndependenceTest().getPValue();
 
                     if (p > _p) {
-
                         _p = p;
                         _v = v;
                     }
@@ -125,18 +116,13 @@ public class SepsetsMaxPValue implements SepsetProducer {
                     double p = getIndependenceTest().getPValue();
 
                     if (p > _p) {
-
                         _p = p;
                         _v = v;
                     }
                 }
             }
         }
-        if(extraSepsets!=null) {
 
-            extraSepsets.set(i, k, _v);
-            extraSepsets.setPValue(i, k, p);
-        }
         this.p = _p;
         return _v;
     }

@@ -1,32 +1,31 @@
 package edu.cmu.tetrad.algcomparison.score;
 
-import edu.cmu.tetrad.algcomparison.simulation.Parameters;
-import edu.cmu.tetrad.data.CovarianceMatrixOnTheFly;
-import edu.cmu.tetrad.data.DataSet;
+import edu.cmu.tetrad.data.DataModel;
+import edu.cmu.tetrad.data.DataUtils;
+import edu.cmu.tetrad.util.Parameters;
 import edu.cmu.tetrad.data.DataType;
+import edu.cmu.tetrad.search.ConditionalGaussianScore;
 import edu.cmu.tetrad.search.Score;
+import edu.cmu.tetrad.util.Experimental;
 
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Wrapper for Fisher Z test.
+ *
  * @author jdramsey
  */
-public class ConditionalGaussianBicScore implements ScoreWrapper {
-    private DataSet dataSet = null;
-    private Score score = null;
+public class  ConditionalGaussianBicScore implements ScoreWrapper, Experimental {
+    static final long serialVersionUID = 23L;
 
     @Override
-    public Score getScore(DataSet dataSet, Parameters parameters) {
-        if (dataSet != this.dataSet) {
-            this.dataSet = dataSet;
-            edu.cmu.tetrad.search.SemBicScore semBicScore
-                    = new edu.cmu.tetrad.search.SemBicScore(new CovarianceMatrixOnTheFly(dataSet));
-            semBicScore.setPenaltyDiscount(parameters.getDouble("penaltyDiscount"));
-            this.score = semBicScore;
-        }
-        return score;
+    public Score getScore(DataModel dataSet, Parameters parameters) {
+        final ConditionalGaussianScore conditionalGaussianScore
+                = new ConditionalGaussianScore(DataUtils.getMixedDataSet(dataSet), parameters.getDouble("structurePrior"), parameters.getBoolean("discretize"));
+        conditionalGaussianScore.setPenaltyDiscount(parameters.getDouble("penaltyDiscount"));
+        conditionalGaussianScore.setNumCategoriesToDiscretize(parameters.getInt("numCategoriesToDiscretize"));
+        return conditionalGaussianScore;
     }
 
     @Override
@@ -41,7 +40,12 @@ public class ConditionalGaussianBicScore implements ScoreWrapper {
 
     @Override
     public List<String> getParameters() {
-        return Collections.singletonList("penaltyDiscount");
+        List<String> parameters = new ArrayList<>();
+        parameters.add("penaltyDiscount");
+        parameters.add("cgExact");
+        parameters.add("assumeMixed");
+        parameters.add("structurePrior");
+        parameters.add("discretize");
+        return parameters;
     }
-
 }

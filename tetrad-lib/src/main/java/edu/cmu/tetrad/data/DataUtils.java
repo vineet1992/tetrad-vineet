@@ -117,7 +117,7 @@ public final class DataUtils {
      * probabilities is alpha, then the first column will contain a -99 (or
      * other missing value code) in a given case with probability alpha. </p>
      * This method will be useful in generating datasets which can be used to
-     * test algorithms that handle missing data and/or latent variables. </p>
+     * test algorithm that handle missing data and/or latent variables. </p>
      * Author:  Frank Wimberly
      *
      * @param inData The data to which random missing data is to be added.
@@ -397,23 +397,24 @@ public final class DataUtils {
         return outList.get(0);
     }
 
-//    public static double[] centerData(double[] data) {
-//        double[] data2 = new double[data.length];
-//
-//        double sum = 0.0;
-//
-//        for (int i = 0; i < data2.length; i++) {
-//            sum += data[i];
-//        }
-//
-//        double mean = sum / data.length;
-//
-//        for (int i = 0; i < data.length; i++) {
-//            data2[i] = data[i] - mean;
-//        }
-//
-//        return data2;
-//    }
+    /**
+     * Centers the array in place.
+     */
+    public static void centerData(double[] data) {
+        double[] data2 = new double[data.length];
+
+        double sum = 0.0;
+
+        for (int i = 0; i < data2.length; i++) {
+            sum += data[i];
+        }
+
+        double mean = sum / data.length;
+
+        for (int i = 0; i < data.length; i++) {
+            data2[i] -= mean;
+        }
+    }
 
     public static TetradMatrix centerData(TetradMatrix data) {
         TetradMatrix data2 = data.copy();
@@ -986,14 +987,17 @@ public final class DataUtils {
 
     public static DataSet restrictToMeasured(DataSet fullDataSet) {
         List<Node> measuredVars = new ArrayList<>();
+        List<Node> latentVars = new ArrayList<>();
 
         for (Node node : fullDataSet.getVariables()) {
             if (node.getNodeType() == NodeType.MEASURED) {
                 measuredVars.add(node);
+            } else {
+                latentVars.add(node);
             }
         }
 
-        return fullDataSet.subsetColumns(measuredVars);
+        return latentVars.isEmpty() ? fullDataSet : fullDataSet.subsetColumns(measuredVars);
     }
 
     public static TetradMatrix cov2(TetradMatrix data) {
@@ -1100,6 +1104,8 @@ public final class DataUtils {
     }
 
     public static TetradMatrix cov(TetradMatrix data) {
+
+
         for (int j = 0; j < data.columns(); j++) {
             double sum = 0.0;
 
@@ -1572,7 +1578,9 @@ public final class DataUtils {
         List<DataSet> ret = new ArrayList<>();
 
         for (DataSet m : dataSets) {
-            ret.add(m.subsetColumns(vars));
+            DataSet data = m.subsetColumns(vars);
+            data.setName(m.getName() + ".reordered");
+            ret.add(data);
         }
 
         return ret;
@@ -1731,8 +1739,8 @@ public final class DataUtils {
 
             for (int i = 0; i < x.length; i++) {
                 x[i] /= std;
-             //   x[i] *= std1;
-           //     x[i] += mu1;
+                x[i] *= std1;
+                x[i] += mu1;
             }
 
             X.assignColumn(j, new TetradVector(x));
@@ -1786,6 +1794,44 @@ public final class DataUtils {
         for (int j = 0; j < keepCols.size(); j++) newCols[j] = keepCols.get(j);
 
         return dataSet.subsetColumns(newCols);
+    }
+
+    public static ICovarianceMatrix getCovMatrix(DataModel dataModel) {
+        if (dataModel == null) {
+            throw new IllegalArgumentException("Expecting either a tabular dataset or a covariance matrix.");
+        }
+
+        if (dataModel instanceof ICovarianceMatrix) {
+            return (ICovarianceMatrix) dataModel;
+        } else if (dataModel instanceof DataSet) {
+            return new CovarianceMatrixOnTheFly((DataSet) dataModel);
+        } else {
+            throw new IllegalArgumentException("Sorry, I was expecting either a tabular dataset or a covariance matrix.");
+        }
+    }
+
+    public static DataSet getDiscreteDataSet(DataModel dataSet) {
+        if (dataSet == null || !(dataSet instanceof DataSet) || !dataSet.isDiscrete()) {
+            throw new IllegalArgumentException("Sorry, I was expecting a discrete data set.");
+        }
+
+        return (DataSet) dataSet;
+    }
+
+    public static DataSet getContinuousDataSet(DataModel dataSet) {
+        if (dataSet == null || !(dataSet instanceof DataSet) || !dataSet.isContinuous()) {
+            throw new IllegalArgumentException("Sorry, I was expecting a (tabular) continuous data set.");
+        }
+
+        return (DataSet) dataSet;
+    }
+
+    public static DataSet getMixedDataSet(DataModel dataSet) {
+        if (dataSet == null || !(dataSet instanceof DataSet)) {
+            throw new IllegalArgumentException("Sorry, I was expecting a (tabular) mixed data set.");
+        }
+
+        return (DataSet) dataSet;
     }
 }
 

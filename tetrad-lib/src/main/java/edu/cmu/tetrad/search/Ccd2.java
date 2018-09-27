@@ -68,11 +68,11 @@ public final class Ccd2 implements GraphSearch {
     public Graph search() {
         Map<Triple, List<Node>> supSepsets = new HashMap<>();
 
-        Fgs fgs = new Fgs(score);
-        fgs.setVerbose(verbose);
-        fgs.setNumPatternsToStore(0);
-        fgs.setHeuristicSpeedup(false);
-        Graph graph = fgs.search();
+        Fges Fges = new Fges(score);
+        Fges.setVerbose(verbose);
+        Fges.setNumPatternsToStore(0);
+        Fges.setFaithfulnessAssumed(false);
+        Graph graph = Fges.search();
 
         SepsetsGreedy sepsets = new SepsetsGreedy(graph, test, null, -1);
         sepsets.setDepth(5);

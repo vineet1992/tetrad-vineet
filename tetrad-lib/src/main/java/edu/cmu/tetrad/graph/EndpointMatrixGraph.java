@@ -88,6 +88,9 @@ public class EndpointMatrixGraph implements Graph {
     private HashMap<Endpoint, Short> endpointsToShorts;
     private int numEdges = 0;
 
+    private boolean pag;
+    private boolean pattern;
+
     //==============================CONSTUCTORS===========================//
 
     /**
@@ -217,13 +220,6 @@ public class EndpointMatrixGraph implements Graph {
     }
 
     //===============================PUBLIC METHODS========================//
-
-    /**
-     * Throws UnsupportedOperationException.
-     */
-    public boolean addGraphConstraint(GraphConstraint gc) {
-        throw new UnsupportedOperationException();
-    }
 
     /**
      * Adds a directed edge to the graph from node A to node B.
@@ -536,6 +532,11 @@ public class EndpointMatrixGraph implements Graph {
         return getParents(node).size();
     }
 
+    @Override
+    public int getDegree(Node node) {
+        return 0;
+    }
+
     /**
      * @return the number of edges out of the given node.
      */
@@ -706,6 +707,36 @@ public class EndpointMatrixGraph implements Graph {
 
     public boolean isDSeparatedFrom(List<Node> x, List<Node> y, List<Node> z) {
         return !isDConnectedTo(x, y, z);
+    }
+
+    @Override
+    public List<String> getTriplesClassificationTypes() {
+        return null;
+    }
+
+    @Override
+    public List<List<Triple>> getTriplesLists(Node node) {
+        return null;
+    }
+
+    @Override
+    public boolean isPag() {
+        return pag;
+    }
+
+    @Override
+    public void setPag(boolean pag) {
+        this.pag = pag;
+    }
+
+    @Override
+    public boolean isPattern() {
+        return pattern;
+    }
+
+    @Override
+    public void setPattern(boolean pattern) {
+        this.pattern = pattern;
     }
 
     private static class Pair {
@@ -1380,27 +1411,6 @@ public class EndpointMatrixGraph implements Graph {
         return getEdges(node).size();
     }
 
-    /**
-     * Throws unsupported operation exception.
-     */
-    public List<GraphConstraint> getGraphConstraints() {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * Throws unsupported operation exception.
-     */
-    public boolean isGraphConstraintsChecked() {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * Throws unsupported operation exception.
-     */
-    public void setGraphConstraintsChecked(boolean checked) {
-        throw new UnsupportedOperationException();
-    }
-
     public List<Node> getNodes() {
         return new ArrayList<>(nodes);
     }
@@ -1769,6 +1779,16 @@ public class EndpointMatrixGraph implements Graph {
     @Override
     public List<Node> getSepset(Node n1, Node n2) {
         throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void setNodes(List<Node> nodes) {
+        if (nodes.size() != this.nodes.size()) {
+            throw new IllegalArgumentException("Sorry, there is a mismatch in the number of variables " +
+                    "you are trying to set.");
+        }
+
+        this.nodes = nodes;
     }
 
 

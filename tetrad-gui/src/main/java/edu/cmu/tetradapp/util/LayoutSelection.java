@@ -44,7 +44,7 @@ public class LayoutSelection implements Transferable {
     /**
      * Supported dataflavors--only one.
      */
-    private DataFlavor[] dataFlavors =
+    private final DataFlavor[] dataFlavors =
             new DataFlavor[]{new DataFlavor(LayoutSelection.class, "Layout")};
 
     /**

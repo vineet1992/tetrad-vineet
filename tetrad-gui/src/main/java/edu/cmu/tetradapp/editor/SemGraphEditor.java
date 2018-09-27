@@ -18,37 +18,41 @@
 // along with this program; if not, write to the Free Software               //
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA //
 ///////////////////////////////////////////////////////////////////////////////
-
 package edu.cmu.tetradapp.editor;
 
-import edu.cmu.tetrad.data.*;
+import edu.cmu.tetrad.data.IKnowledge;
 import edu.cmu.tetrad.graph.*;
-import edu.cmu.tetrad.graph.GraphUtils;
 import edu.cmu.tetrad.search.IndTestDSep;
 import edu.cmu.tetrad.search.IndependenceTest;
 import edu.cmu.tetrad.session.DelegatesEditing;
-import edu.cmu.tetrad.util.JOptionUtils;
-import edu.cmu.tetrad.util.PointXy;
-import edu.cmu.tetrad.util.TetradSerializable;
+import edu.cmu.tetrad.util.*;
 import edu.cmu.tetradapp.model.IndTestProducer;
 import edu.cmu.tetradapp.model.SemGraphWrapper;
+import edu.cmu.tetradapp.util.DesktopController;
+import edu.cmu.tetradapp.util.ImageUtils;
 import edu.cmu.tetradapp.util.LayoutEditable;
 import edu.cmu.tetradapp.workbench.DisplayEdge;
 import edu.cmu.tetradapp.workbench.DisplayNode;
 import edu.cmu.tetradapp.workbench.GraphWorkbench;
 import edu.cmu.tetradapp.workbench.LayoutMenu;
-
-import javax.swing.*;
-import javax.swing.border.MatteBorder;
 import java.awt.*;
+import java.awt.Point;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
+import java.net.URL;
 import java.util.*;
 import java.util.List;
-import java.util.prefs.Preferences;
+import javax.help.CSH;
+import javax.help.HelpBroker;
+import javax.help.HelpSet;
+import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+import javax.swing.border.MatteBorder;
+import javax.swing.event.InternalFrameAdapter;
+import javax.swing.event.InternalFrameEvent;
 
 /**
  * Displays a workbench editing workbench area together with a toolbench for
@@ -59,21 +63,110 @@ import java.util.prefs.Preferences;
  */
 public final class SemGraphEditor extends JPanel
         implements GraphEditable, LayoutEditable, DelegatesEditing, IndTestProducer {
-    private final GraphWorkbench workbench;
+
+    private GraphWorkbench workbench;
     private SemGraphWrapper semGraphWrapper;
     private JMenuItem errorTerms;
+    private Parameters parameters;
+
+    private final HelpSet helpSet;
 
     //===========================PUBLIC METHODS========================//
-
-    public SemGraphEditor(SemGraphWrapper semGraphWrapper) {
+    public SemGraphEditor(final SemGraphWrapper semGraphWrapper) {
         if (semGraphWrapper == null) {
             throw new NullPointerException();
         }
 
+        // Initialize helpSet - Zhou
+        String helpHS = "/resources/javahelp/TetradHelp.hs";
+
+        try {
+            URL url = this.getClass().getResource(helpHS);
+            this.helpSet = new HelpSet(null, url);
+        } catch (Exception ee) {
+            System.out.println("HelpSet " + ee.getMessage());
+            System.out.println("HelpSet " + helpHS + " not found");
+            throw new IllegalArgumentException();
+        }
+
+//        setLayout(new BorderLayout());
+//
+//        setEditor(semGraphWrapper);
+        setLayout(new BorderLayout());
+        this.semGraphWrapper = semGraphWrapper;
+        this.parameters = semGraphWrapper.getParameters();
+
+        setEditor(semGraphWrapper);
+
+//        editGraph(graphWrapper.getGraph());
+        this.getWorkbench().addPropertyChangeListener(new PropertyChangeListener() {
+            public void propertyChange(PropertyChangeEvent evt) {
+                String propertyName = evt.getPropertyName();
+
+                if ("graph".equals(propertyName)) {
+                    Graph _graph = (Graph) evt.getNewValue();
+
+                    if (getWorkbench() != null && getSemGraphWrapper() != null) {
+                        getSemGraphWrapper().setGraph(_graph);
+                    }
+                }
+            }
+        });
+
+        int numModels = getSemGraphWrapper().getNumModels();
+
+        if (numModels > 1) {
+            final JComboBox<Integer> comp = new JComboBox<>();
+
+            for (int i = 0; i < numModels; i++) {
+                comp.addItem(i + 1);
+            }
+
+            comp.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    getSemGraphWrapper().setModelIndex(((Integer) comp.getSelectedItem()).intValue() - 1);
+                    setEditor(semGraphWrapper);
+//                    editGraph(getSemGraphWrapper().getGraph());
+                    validate();
+                }
+            });
+
+            comp.setMaximumSize(comp.getPreferredSize());
+
+            Box b = Box.createHorizontalBox();
+            b.add(new JLabel("Using model"));
+            b.add(comp);
+            b.add(new JLabel("from "));
+            b.add(new JLabel(semGraphWrapper.getModelSourceName()));
+            b.add(Box.createHorizontalGlue());
+
+            add(b, BorderLayout.NORTH);
+        }
+
+        this.getWorkbench().addPropertyChangeListener(new PropertyChangeListener() {
+            public void propertyChange(PropertyChangeEvent evt) {
+                String propertyName = evt.getPropertyName();
+
+                if ("graph".equals(propertyName)) {
+                    Graph _graph = (Graph) evt.getNewValue();
+
+                    if (getWorkbench() != null && getSemGraphWrapper() != null) {
+                        getSemGraphWrapper().setGraph(_graph);
+                    }
+                }
+            }
+        });
+
+        validate();
+
+    }
+
+    private void setEditor(SemGraphWrapper semGraphWrapper) {
+        this.parameters = new Parameters(semGraphWrapper.getParameters());
+
         this.semGraphWrapper = semGraphWrapper;
         this.workbench = new GraphWorkbench(semGraphWrapper.getGraph());
-
-        setLayout(new BorderLayout());
 
         SemGraphToolbar toolbar = new SemGraphToolbar(getWorkbench());
         JMenuBar menuBar = createMenuBar();
@@ -84,11 +177,28 @@ public final class SemGraphEditor extends JPanel
         add(toolbar, BorderLayout.WEST);
         add(menuBar, BorderLayout.NORTH);
 
-        JLabel label = new JLabel("Double click variable to change name.");
+        JLabel label = new JLabel("Double click variable to change name. More information on graph edge types");
         label.setFont(new Font("SansSerif", Font.PLAIN, 12));
+
+        // Info button added by Zhou to show edge types
+        JButton infoBtn = new JButton(new ImageIcon(ImageUtils.getImage(this, "info.png")));
+        infoBtn.setBorder(new EmptyBorder(0, 0, 0, 0));
+
+        // Clock info button to show edge types instructions - Zhou
+        infoBtn.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                helpSet.setHomeID("graph_edge_types");
+                HelpBroker broker = helpSet.createHelpBroker();
+                ActionListener listener = new CSH.DisplayHelpFromSource(broker);
+                listener.actionPerformed(e);
+            }
+        });
+
         Box b = Box.createHorizontalBox();
         b.add(Box.createHorizontalStrut(2));
         b.add(label);
+        b.add(infoBtn);
         b.add(Box.createHorizontalGlue());
         b.setBorder(new MatteBorder(0, 0, 1, 0, Color.GRAY));
 
@@ -99,24 +209,14 @@ public final class SemGraphEditor extends JPanel
                 String propertyName = evt.getPropertyName();
 
                 if ("graph".equals(propertyName)) {
-                    SemGraph _graph = (SemGraph) evt.getNewValue();
+                    Graph _graph = (Graph) evt.getNewValue();
 
                     if (getWorkbench() != null) {
-                        getSemGraphWrapper().setSemGraph(_graph);
+                        getSemGraphWrapper().setGraph(_graph);
                     }
                 }
             }
         });
-
-        this.workbench.addPropertyChangeListener(new PropertyChangeListener() {
-            public void propertyChange(PropertyChangeEvent evt) {
-                if ("graph".equals(evt.getPropertyName())) {
-                    getSemGraphWrapper().setSemGraph(
-                            (SemGraph) evt.getNewValue());
-                }
-            }
-        });
-
 
         this.workbench.addPropertyChangeListener(new PropertyChangeListener() {
             public void propertyChange(PropertyChangeEvent evt) {
@@ -131,7 +231,6 @@ public final class SemGraphEditor extends JPanel
     }
 
     //===========================PRIVATE METHODS======================//
-
     /**
      * Sets the name of this editor.
      */
@@ -150,7 +249,7 @@ public final class SemGraphEditor extends JPanel
      */
     public List getSelectedModelComponents() {
         List<Component> selectedComponents = getWorkbench().getSelectedComponents();
-        List<TetradSerializable> selectedModelComponents = new ArrayList<TetradSerializable>();
+        List<TetradSerializable> selectedModelComponents = new ArrayList<>();
 
         for (Object comp : selectedComponents) {
             if (comp instanceof DisplayNode) {
@@ -184,7 +283,6 @@ public final class SemGraphEditor extends JPanel
 
         getWorkbench().selectConnectingEdges();
     }
-
 
     public JComponent getEditDelegate() {
         return getWorkbench();
@@ -243,7 +341,6 @@ public final class SemGraphEditor extends JPanel
     }
 
     //===========================PRIVATE METHODS========================//
-
     private JMenuBar createMenuBar() {
         JMenuBar menuBar = new JMenuBar();
 
@@ -276,7 +373,6 @@ public final class SemGraphEditor extends JPanel
 //
 //        return file;
 //    }
-
     /**
      * Creates the "file" menu, which allows the user to load, save, and post
      * workbench models.
@@ -336,10 +432,10 @@ public final class SemGraphEditor extends JPanel
         graph.add(errorTerms);
         graph.addSeparator();
 
-        JMenuItem correlateExogenous =
-                new JMenuItem("Correlate Exogenous Variables");
-        JMenuItem uncorrelateExogenous =
-                new JMenuItem("Uncorrelate Exogenous Variables");
+        JMenuItem correlateExogenous
+                = new JMenuItem("Correlate Exogenous Variables");
+        JMenuItem uncorrelateExogenous
+                = new JMenuItem("Uncorrelate Exogenous Variables");
         graph.add(correlateExogenous);
         graph.add(uncorrelateExogenous);
         graph.addSeparator();
@@ -365,156 +461,38 @@ public final class SemGraphEditor extends JPanel
 
         randomGraph.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-                RandomGraphEditor editor = new RandomGraphEditor(workbench.getGraph(), true);
+                final GraphParamsEditor editor = new GraphParamsEditor();
+                editor.setParams(parameters);
 
-                int ret = JOptionPane.showConfirmDialog(
-                        SemGraphEditor.this, editor,
-                        "Edit Random DAG Parameters",
-                        JOptionPane.PLAIN_MESSAGE);
+                EditorWindow editorWindow = new EditorWindow(editor, "Edit Random Graph Parameters",
+                        "Done", false, SemGraphEditor.this);
 
-                if (ret == JOptionPane.OK_OPTION) {
-                    Graph graph = null;
-                    Graph dag = new EdgeListGraph();
-                    int numTrials = 0;
+                DesktopController.getInstance().addEditorWindow(editorWindow, JLayeredPane.PALETTE_LAYER);
+                editorWindow.pack();
+                editorWindow.setVisible(true);
 
-                    while (graph == null && ++numTrials < 100) {
+                editorWindow.addInternalFrameListener(new InternalFrameAdapter() {
+                    public void internalFrameClosed(InternalFrameEvent e1) {
+                        EditorWindow window = (EditorWindow) e1.getSource();
 
-                        if (editor.isRandomForward()) {
-                            dag = GraphUtils.randomGraphRandomForwardEdges(getGraph().getNodes(), editor.getNumLatents(), editor.getMaxEdges(), 30, 15, 15, false, true);
-                            GraphUtils.arrangeBySourceGraph(dag, getWorkbench().getGraph());
-                            HashMap<String, PointXy> layout = GraphUtils.grabLayout(workbench.getGraph().getNodes());
-                            GraphUtils.arrangeByLayout(dag, layout);
-                        } else if (editor.isUniformlySelected()) {
-                            if (getGraph().getNumNodes() == editor.getNumNodes()) {
-                                HashMap<String, PointXy> layout = GraphUtils.grabLayout(workbench.getGraph().getNodes());
-
-                                dag = GraphUtils.randomGraph(getGraph().getNodes(), editor.getNumLatents(), editor.getMaxEdges(), editor.getMaxDegree(), editor.getMaxIndegree(), editor.getMaxOutdegree(), editor.isConnected());
-                                GraphUtils.arrangeBySourceGraph(dag, getWorkbench().getGraph());
-
-                                GraphUtils.arrangeByLayout(dag, layout);
-                            } else {
-                                List<Node> nodes = new ArrayList<Node>();
-
-                                for (int i = 0; i < editor.getNumNodes(); i++) {
-                                    nodes.add(new ContinuousVariable("X" + (i + 1)));
-                                }
-
-                                dag = GraphUtils.randomGraph(nodes, editor.getNumLatents(), editor.getMaxEdges(),
-                                        editor.getMaxDegree(), editor.getMaxIndegree(), editor.getMaxOutdegree(), editor.isConnected());
-                            }
-                        } else if (editor.isChooseFixed()) {
-                            do {
-                                if (getGraph().getNumNodes() == editor.getNumNodes()) {
-                                    HashMap<String, PointXy> layout = GraphUtils.grabLayout(workbench.getGraph().getNodes());
-
-                                    dag = GraphUtils.randomGraph(getGraph().getNodes(), editor.getNumLatents(), editor.getMaxEdges(), 30, 15, 15, editor.isConnected());
-
-
-                                    GraphUtils.arrangeByLayout(dag, layout);
-                                } else {
-                                    List<Node> nodes = new ArrayList<Node>();
-
-                                    for (int i = 0; i < editor.getNumNodes(); i++) {
-                                        nodes.add(new ContinuousVariable("X" + (i + 1)));
-                                    }
-
-                                    dag = GraphUtils.randomGraph(nodes, editor.getNumLatents(), editor.getMaxEdges(),
-                                            30, 15, 15, editor.isConnected());
-                                }
-                            } while (dag.getNumEdges() < editor.getMaxEdges());
+                        if (window.isCanceled()) {
+                            return;
                         }
 
-                        boolean addCycles = editor.isAddCycles();
+                        RandomUtil.getInstance().setSeed(new Date().getTime());
+                        Graph graph1 = edu.cmu.tetradapp.util.GraphUtils.makeRandomGraph(getGraph(), parameters);
+
+                        boolean addCycles = parameters.getBoolean("randomAddCycles", false);
 
                         if (addCycles) {
-                            int minCycleLength = editor.getMinCycleLength();
-                            int minNumCycles = editor.getMinNumCycles();
-
-//                            graph = DataGraphUtils.addCycles2(dag, minNumCycles, minCycleLength);
-
-                            graph = GraphUtils.cyclicGraph2(editor.getNumNodes(), editor.getMaxEdges());
-                        } else {
-                            graph = new EdgeListGraph(dag);
+                            int newGraphNumMeasuredNodes = parameters.getInt("newGraphNumMeasuredNodes", 10);
+                            int newGraphNumEdges = parameters.getInt("newGraphNumEdges", 10);
+                            graph1 = GraphUtils.cyclicGraph2(newGraphNumMeasuredNodes, newGraphNumEdges, 6);
                         }
+
+                        getWorkbench().setGraph(graph1);
                     }
-
-                    int minNumCycles = editor.getMinNumCycles();
-                    GraphUtils.addTwoCycles(graph, minNumCycles);
-
-                    if (graph == null) {
-                        JOptionPane.showMessageDialog(SemGraphEditor.this,
-                                "Could not find a graph that fits those constrains.");
-                        getWorkbench().setGraph(new SemGraph(dag));
-                    } else {
-                        getWorkbench().setGraph(new SemGraph(graph));
-                    }
-
-//                    getWorkbench().setGraph(new EdgeListGraph(dag));
-//                    getWorkbench().setGraph(graph);
-                }
-            }
-        });
-
-
-        JMenuItem randomIndicatorModel =
-                new JMenuItem("Random Multiple Indicator Model");
-        graph.add(randomIndicatorModel);
-
-        randomIndicatorModel.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                RandomMimParamsEditor editor = new RandomMimParamsEditor();
-
-                int ret = JOptionPane.showConfirmDialog(
-                        JOptionUtils.centeringComp(), editor,
-                        "Edit Random MIM Parameters",
-                        JOptionPane.OK_CANCEL_OPTION,
-                        JOptionPane.PLAIN_MESSAGE);
-
-                if (ret == JOptionPane.OK_OPTION) {
-                    int numFactors = Preferences.userRoot().getInt(
-                            "randomMimNumFactors", 1);
-                    int numStructuralNodes = Preferences.userRoot().getInt(
-                            "numStructuralNodes", 3);
-                    int maxStructuralEdges = Preferences.userRoot().getInt(
-                            "numStructuralEdges", 3);
-                    int measurementModelDegree = Preferences.userRoot().getInt(
-                            "measurementModelDegree", 3);
-                    int numLatentMeasuredImpureParents = Preferences.userRoot()
-                            .getInt("latentMeasuredImpureParents", 0);
-                    int numMeasuredMeasuredImpureParents =
-                            Preferences.userRoot()
-                                    .getInt("measuredMeasuredImpureParents", 0);
-                    int numMeasuredMeasuredImpureAssociations =
-                            Preferences.userRoot()
-                                    .getInt("measuredMeasuredImpureAssociations",
-                                            0);
-
-                    Graph graph;
-
-                    if (numFactors == 1) {
-                        graph = DataGraphUtils.randomSingleFactorModel(numStructuralNodes,
-                                maxStructuralEdges, measurementModelDegree,
-                                numLatentMeasuredImpureParents,
-                                numMeasuredMeasuredImpureParents,
-                                numMeasuredMeasuredImpureAssociations);
-                    } else if (numFactors == 2) {
-                        graph = DataGraphUtils.randomBifactorModel(numStructuralNodes,
-                                maxStructuralEdges, measurementModelDegree,
-                                numLatentMeasuredImpureParents,
-                                numMeasuredMeasuredImpureParents,
-                                numMeasuredMeasuredImpureAssociations);
-                    } else {
-                        throw new IllegalArgumentException("Can only make random MIMs for 1 or 2 factors, " +
-                                "sorry dude.");
-                    }
-
-                    SemGraph semGraph = new SemGraph(graph);
-                    semGraph.setShowErrorTerms(false);
-
-                    workbench.setGraph(semGraph);
-                    getSemGraphWrapper().setSemGraph(semGraph);
-                    errorTerms.setText("Show Error Terms");
-                }
+                });
             }
         });
 
@@ -522,12 +500,10 @@ public final class SemGraphEditor extends JPanel
         graph.add(new JMenuItem(new SelectBidirectedAction(getWorkbench())));
 //        graph.add(new JMenuItem(new SelectUndirectedAction(getWorkbench())));
 
-
 //        graph.addSeparator();
 //        IndependenceFactsAction action = new IndependenceFactsAction(
 //                JOptionUtils.centeringComp(), this, "D Separation Facts...");
 //        graph.add(action);
-
         return graph;
     }
 
@@ -546,7 +522,7 @@ public final class SemGraphEditor extends JPanel
 
         List<Node> nodes = graph.getNodes();
 
-        List<Node> exoNodes = new LinkedList<Node>();
+        List<Node> exoNodes = new LinkedList<>();
 
         for (int i = 0; i < nodes.size(); i++) {
             Node node = nodes.get(i);
@@ -594,8 +570,3 @@ public final class SemGraphEditor extends JPanel
         return new IndTestDSep(workbench.getGraph());
     }
 }
-
-
-
-
-

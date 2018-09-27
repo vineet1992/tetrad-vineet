@@ -130,7 +130,7 @@ public final class IndTestFisherZGeneralizedInverse implements IndependenceTest 
 //        CorrelationMatrix newCorrMatrix = new CorrelationMatrix(vars, m,
 //                sampleSize);
 //
-//        double alphaNew = getParameter1();
+//        double alphaNew = getAlternativePenalty();
 //        IndependenceTest newIndTest = new IndTestCramerT(newCorrMatrix,
 //                alphaNew);
 //        return newIndTest;
@@ -316,7 +316,7 @@ public final class IndTestFisherZGeneralizedInverse implements IndependenceTest 
      */
     public List<String> getVariableNames() {
         List<Node> variables = getVariables();
-        List<String> variableNames = new ArrayList<String>();
+        List<String> variableNames = new ArrayList<>();
         for (Node variable1 : variables) {
             variableNames.add(variable1.getName());
         }
@@ -421,7 +421,7 @@ public final class IndTestFisherZGeneralizedInverse implements IndependenceTest 
 //                PersistentRandomUtil.getInstance().getEngine());
 //
 //        double p = chiSquare.cdf(sum);
-//        boolean determined = p < 1 - getParameter1();
+//        boolean determined = p < 1 - getAlternativePenalty();
 //
         boolean determined = variance < getAlpha();
 

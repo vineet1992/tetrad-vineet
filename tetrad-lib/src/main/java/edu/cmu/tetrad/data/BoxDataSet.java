@@ -300,7 +300,7 @@ public final class BoxDataSet implements DataSet, TetradSerializable {
 
         }
 
-        throw new IllegalArgumentException("Not a row/col in this data set.");
+        throw new IllegalArgumentException("Not a row/col in this data set: " + row + ", " + col);
     }
 
     /**
@@ -691,22 +691,22 @@ public final class BoxDataSet implements DataSet, TetradSerializable {
         return _dataSet;
     }
 
-    /**
-     * @return true if case multipliers are being used for this data set.
-     */
-    public final boolean isMulipliersCollapsed() {
-        return !getMultipliers().keySet().isEmpty();
-    }
+//    /**
+//     * @return true if case multipliers are being used for this data set.
+//     */
+//    public final boolean isMulipliersCollapsed() {
+//        return !getMultipliers().keySet().isEmpty();
+//    }
 
-    /**
-     * @return the case multiplise for the given case (i.e. row) in the data
-     * set. Is this is n > 1, the interpretation is that the data set
-     * effectively contains n copies of that case.
-     */
-    public final int getMultiplier(int caseNumber) {
-        Integer multiplierInt = getMultipliers().get(caseNumber);
-        return multiplierInt == null ? 1 : multiplierInt;
-    }
+//    /**
+//     * @return the case multiplise for the given case (i.e. row) in the data
+//     * set. Is this is n > 1, the interpretation is that the data set
+//     * effectively contains n copies of that case.
+//     */
+//    public final int getMultiplier(int caseNumber) {
+//        Integer multiplierInt = getMultipliers().get(caseNumber);
+//        return multiplierInt == null ? 1 : multiplierInt;
+//    }
 
     /**
      * Sets the case ID fo the given case numnber to the given value.
@@ -900,27 +900,27 @@ public final class BoxDataSet implements DataSet, TetradSerializable {
         }
     }
 
-    /**
-     * Sets the case multiplier for the given case to the given number (must be
-     * >= 1).
-     */
-    public final void setMultiplier(int caseNumber, int multiplier) {
-        if (caseNumber < 0) {
-            throw new IllegalArgumentException(
-                    "Case numbers must be >= 0: " + caseNumber);
-        }
-
-        if (multiplier < 0) {
-            throw new IllegalArgumentException(
-                    "Multipliers must be >= 0: " + multiplier);
-        }
-
-        if (multiplier == 1) {
-            getMultipliers().remove(caseNumber);
-        } else {
-            getMultipliers().put(caseNumber, multiplier);
-        }
-    }
+//    /**
+//     * Sets the case multiplier for the given case to the given number (must be
+//     * >= 1).
+//     */
+//    public final void setMultiplier(int caseNumber, int multiplier) {
+//        if (caseNumber < 0) {
+//            throw new IllegalArgumentException(
+//                    "Case numbers must be >= 0: " + caseNumber);
+//        }
+//
+//        if (multiplier < 0) {
+//            throw new IllegalArgumentException(
+//                    "Multipliers must be >= 0: " + multiplier);
+//        }
+//
+//        if (multiplier == 1) {
+//            getMultipliers().remove(caseNumber);
+//        } else {
+//            getMultipliers().put(caseNumber, multiplier);
+//        }
+//    }
 
     /**
      * @return a string, suitable for printing, of the dataset. Lines are
@@ -1015,7 +1015,6 @@ public final class BoxDataSet implements DataSet, TetradSerializable {
      * dataset.
      * @throws IllegalStateException if this is not a continuous data set.
      * @see #getVariables
-     * @see #isMulipliersCollapsed()
      */
     public final TetradMatrix getDoubleData() {
         TetradMatrix copy = new TetradMatrix(dataBox.numRows(), dataBox.numCols());

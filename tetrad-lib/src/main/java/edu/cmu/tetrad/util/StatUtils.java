@@ -25,6 +25,7 @@ import cern.colt.list.DoubleArrayList;
 import cern.jet.stat.Descriptive;
 import org.apache.commons.math3.distribution.ChiSquaredDistribution;
 import org.apache.commons.math3.distribution.NormalDistribution;
+import org.apache.commons.math3.linear.SingularMatrixException;
 
 import java.util.*;
 
@@ -71,15 +72,17 @@ public final class StatUtils {
      * @return the mean of the first N values in this array.
      */
     public static double mean(long array[], int N) {
+        double sum = 0.0;
+        int count = 0;
 
-        int i;
-        long sum = 0;
-
-        for (i = 0; i < N; i++) {
-            sum += array[i];
+        for (int i = 0; i < N; i++) {
+            if (!Double.isNaN(array[i])) {
+                sum += array[i];
+                count++;
+            }
         }
 
-        return sum / N;
+        return sum / (double) count;
     }
 
     /**
@@ -89,12 +92,16 @@ public final class StatUtils {
      */
     public static double mean(double array[], int N) {
         double sum = 0.0;
+        int count = 0;
 
         for (int i = 0; i < N; i++) {
-            sum += array[i];
+            if (!Double.isNaN(array[i])) {
+                sum += array[i];
+                count++;
+            }
         }
 
-        return sum / N;
+        return sum / (double) count;
     }
 
     /**
@@ -104,12 +111,16 @@ public final class StatUtils {
      */
     public static double mean(TetradVector data, int N) {
         double sum = 0.0;
+        int count = 0;
 
         for (int i = 0; i < N; i++) {
-            sum += data.get(i);
+            if (!Double.isNaN(data.get(i))) {
+                sum += data.get(i);
+                count++;
+            }
         }
 
-        return sum / N;
+        return sum / (double) count;
     }
 
     /**
@@ -1221,13 +1232,16 @@ public final class StatUtils {
             thirdMoment += s * s * s;
         }
 
+        double ess = secondMoment / N;
+        double esss = thirdMoment / (N - 1);
+
         if (secondMoment == 0) {
             throw new ArithmeticException("StatUtils.skew:  There is no skew " +
                     "when the variance is zero.");
         }
 
         //        thirdMoment /= (N * Math.pow(secondMoment, 1.5));
-        return thirdMoment / Math.pow(secondMoment, 1.5);
+        return esss / Math.pow(ess, 1.5);
     }
 
     /**
@@ -1237,23 +1251,25 @@ public final class StatUtils {
      */
     public static double skewness(double array[], int N) {
         double mean = StatUtils.mean(array, N);
-        double variance = StatUtils.variance(array, N);
-        double skew = 0.0;
+        double secondMoment = 0.0; // StatUtils.variance(array, N);
+        double thirdMoment = 0.0;
 
         for (int j = 0; j < N; j++) {
             double s = array[j] - mean;
-
-            skew += s * s * s;
+            secondMoment += s * s;
+            thirdMoment += s * s * s;
         }
 
-//        if (variance == 0) {
-//            throw new ArithmeticException("StatUtils.skew:  There is no skew " +
-//                    "when the variance is zero.");
-//        }
+        double ess = secondMoment / N;
+        double esss = thirdMoment / (N - 1);
 
-        skew /= (N * Math.pow(variance, 1.5));
+        if (secondMoment == 0) {
+            throw new ArithmeticException("StatUtils.skew:  There is no skew " +
+                    "when the variance is zero.");
+        }
 
-        return skew;
+        //        thirdMoment /= (N * Math.pow(secondMoment, 1.5));
+        return esss / Math.pow(ess, 1.5);
     }
 
     public static double[] removeNaN(double[] x1) {
@@ -1753,19 +1769,8 @@ public final class StatUtils {
 //        return cov / Math.sqrt(var1 * var2);
 
 
-        try {
-            TetradMatrix inverse = submatrix.inverse();
-
-            double a = -1.0 * inverse.get(0, 1);
-            double v0 = inverse.get(0, 0);
-            double v1 = inverse.get(1, 1);
-            double b = Math.sqrt(v0 * v1);
-
-            return a / b;
-        } catch (Exception e) {
-            e.printStackTrace();
-            return Double.NaN;
-        }
+        TetradMatrix inverse = submatrix.inverse();
+        return -(1.0 * inverse.get(0, 1)) / Math.sqrt(inverse.get(0, 0) * inverse.get(1, 1));
     }
 
     /**
@@ -1951,22 +1956,8 @@ public final class StatUtils {
     }
 
     public static double getZForAlpha(double alpha) {
-        double low = 0.0;
-        double high = 20.0;
-        double mid = 5.0;
         NormalDistribution dist = new NormalDistribution(0, 1);
-
-        while (high - low > 1e-4) {
-            mid = (high + low) / 2.0;
-            double _alpha = 2.0 * (1.0 - dist.cumulativeProbability(Math.abs(mid)));
-
-            if (_alpha > alpha) {
-                low = mid;
-            } else {
-                high = mid;
-            }
-        }
-        return mid;
+        return dist.inverseCumulativeProbability(1.0 - alpha / 2.0);
     }
 
     public static double getChiSquareCutoff(double alpha, int df) {
@@ -1989,7 +1980,7 @@ public final class StatUtils {
     }
 
     // Calculates the log of a list of terms, where the argument consists of the logs of the terms.
-    public static double logOfSum(List<Double> logs) {
+    public static double logsum(List<Double> logs) {
 
         Collections.sort(logs, new Comparator<Double>() {
             @Override
@@ -2009,6 +2000,12 @@ public final class StatUtils {
         sum += 1;
 
         return loga0 + log(sum);
+    }
+
+    public static double sum(double[] x) {
+        double sum = 0.0;
+        for (double xx : x) sum += xx;
+        return sum;
     }
 }
 

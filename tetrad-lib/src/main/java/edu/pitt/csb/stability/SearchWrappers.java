@@ -31,6 +31,7 @@ import edu.pitt.csb.mgm.MixedUtils;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.locks.Condition;
 
 /**
  * Created by ajsedgewick on 9/4/15.
@@ -45,12 +46,54 @@ public class SearchWrappers {
         public PcStableWrapper copy(){return new PcStableWrapper(searchParams);}
 
         public Graph search(DataSet ds) {
-            IndTestMultinomialLogisticRegression indTest = new IndTestMultinomialLogisticRegression(ds, searchParams[0]);
+            //System.out.print("Running PCS...");
+            IndTestMultinomialAJ indTest = new IndTestMultinomialAJ(ds, searchParams[0]);
             PcStable pcs = new PcStable(indTest);
+            if(initialGraph!=null)
+                pcs.setInitialGraph(initialGraph);
+            if(knowledge!=null)
+                pcs.setKnowledge(knowledge);
             return pcs.search();
         }
     }
 
+    public static class PcMaxWrapper extends DataGraphSearch {
+        //should be one param for the alpha level of the independance test
+        public PcMaxWrapper(double... params) {
+            super(params);
+        }
+
+        public PcMaxWrapper copy(){return new PcMaxWrapper(searchParams);}
+
+        public Graph search(DataSet ds) {
+            //System.out.print("Running Pc-Max...");
+            IndTestMultinomialAJ indTest = new IndTestMultinomialAJ(ds, searchParams[0]);
+            PcMax pcs = new PcMax(indTest);
+            if(initialGraph!=null)
+                pcs.setInitialGraph(initialGraph);
+            if(knowledge!=null)
+                pcs.setKnowledge(knowledge);
+            return pcs.search();
+        }
+    }
+    public static class CpcStableWrapper extends DataGraphSearch {
+        //should be one param for the alpha level of the independance test
+        public CpcStableWrapper(double... params) {
+            super(params);
+        }
+
+        public PcStableWrapper copy(){return new PcStableWrapper(searchParams);}
+
+        public Graph search(DataSet ds) {
+            IndTestMultinomialAJ indTest = new IndTestMultinomialAJ(ds, searchParams[0]);
+            CpcStable pcs = new CpcStable(indTest);
+            if(initialGraph!=null)
+                pcs.setInitialGraph(initialGraph);
+            if(knowledge!=null)
+                pcs.setKnowledge(knowledge);
+            return pcs.search();
+        }
+    }
     public static class MFMWrapper extends DataGraphSearch {
         public MFMWrapper(double ... params){super(params);}
         public MFMWrapper copy() {return new MFMWrapper(searchParams);};
@@ -101,9 +144,14 @@ public class SearchWrappers {
 
     public Graph search(DataSet ds)
     {
+        //System.out.print("Running FCI...");
         orientations = new HashMap<String,String>();
         IndependenceTest i =  new IndTestMultinomialAJ(ds,searchParams[0]);
         Fci f = new Fci(i);
+        if(initialGraph!=null)
+            f.setInitialGraph(initialGraph);
+        if(knowledge!=null)
+            f.setKnowledge(knowledge);
        Graph g = f.search();
         Map<String,String> temp = f.whyOrient;
         for(String x:temp.keySet())
@@ -115,6 +163,34 @@ public class SearchWrappers {
 
     }
 }
+    public static class FCIMAXWrapper extends DataGraphSearch {
+        public FCIMAXWrapper(double... params) {
+            super(params);
+        }
+
+        public FCIMAXWrapper copy() {
+            return new FCIMAXWrapper(searchParams);
+        }
+
+        public Graph search(DataSet ds) {
+            //System.out.print("Running FCI-MAX...");
+            orientations = new HashMap<String, String>();
+            IndependenceTest i = new IndTestMultinomialAJ(ds, searchParams[0]);
+            FciMaxP f = new FciMaxP(i);
+            if(initialGraph!=null)
+                f.setInitialGraph(initialGraph);
+            if(knowledge!=null)
+                f.setKnowledge(knowledge);
+            Graph g = f.search();
+            Map<String, String> temp = f.whyOrient;
+            for (String x : temp.keySet()) {
+                //TODO make sure that this is ok, for concurrency issues in parallel
+                orientations.put(x, temp.get(x));
+            }
+            return g;
+
+        }
+    }
     public static class MGMWrapper extends DataGraphSearch {
         //should be array three parameters for lambdas of each edge type
         public MGMWrapper(double... params) {
@@ -129,18 +205,48 @@ public class SearchWrappers {
         }
     }
 
-    public static class FgsWrapper extends DataGraphSearch{
-        public FgsWrapper(double...params){
+    public static class FgesWrapper extends DataGraphSearch{
+        public FgesWrapper(double...params){
             super(params);
         }
 
-        public FgsWrapper copy() {return new FgsWrapper(searchParams);}
+        public FgesWrapper copy() {return new FgesWrapper(searchParams);}
 
         public Graph search(DataSet ds){
-            SemBicScore score = new SemBicScore(new CovarianceMatrixOnTheFly(MixedUtils.makeContinuousData(ds)));
-            score.setPenaltyDiscount(searchParams[0]);
-            Fgs fg = new Fgs(score);
-            return fg.search();
+            if(ds.isContinuous()) {
+                SemBicScore score = new SemBicScore(new CovarianceMatrixOnTheFly(MixedUtils.makeContinuousData(ds)));
+                score.setPenaltyDiscount(searchParams[0]);
+                Fges fg = new Fges(score);
+                if(initialGraph!=null)
+                    fg.setInitialGraph(initialGraph);
+                if(knowledge!=null)
+                    fg.setKnowledge(knowledge);
+                return fg.search();
+            }
+            else if(ds.isDiscrete())
+            {
+                BDeuScore score = new BDeuScore(ds);
+                //score.setSamplePrior(searchParams[0]);
+                score.setStructurePrior(searchParams[0]);
+                Fges fg = new Fges(score);
+                if(initialGraph!=null)
+                    fg.setInitialGraph(initialGraph);
+                if(knowledge!=null)
+                    fg.setKnowledge(knowledge);
+                return fg.search();
+            }
+            else
+            {
+                ConditionalGaussianScore score = new ConditionalGaussianScore(ds);
+                score.setStructurePrior(searchParams[0]);
+                Fges fg = new Fges(score);
+                if(initialGraph!=null)
+                    fg.setInitialGraph(initialGraph);
+                if(knowledge!=null)
+                    fg.setKnowledge(knowledge);
+                return fg.search();
+            }
+
         }
     }
 }

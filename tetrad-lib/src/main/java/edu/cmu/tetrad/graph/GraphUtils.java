@@ -22,6 +22,7 @@ package edu.cmu.tetrad.graph;
 
 import edu.cmu.tetrad.util.ChoiceGenerator;
 import edu.cmu.tetrad.util.ForkJoinPoolInstance;
+import edu.cmu.tetrad.util.JsonUtils;
 import edu.cmu.tetrad.util.PointXy;
 import edu.cmu.tetrad.util.RandomUtil;
 import edu.cmu.tetrad.util.TaskManager;
@@ -68,6 +69,7 @@ public final class GraphUtils {
      */
     public static void circleLayout(Graph graph, int centerx, int centery,
             int radius) {
+        if (graph == null) return;
         List<Node> nodes = graph.getNodes();
 
         Collections.sort(nodes, new Comparator<Node>() {
@@ -184,8 +186,8 @@ public final class GraphUtils {
         // It is still unclear whether we should use the random forward edges method or the
         // random uniform method to create random DAGs, hence this method.
         // jdramsey 12/8/2015
-        //return randomGraphRandomForwardEdges(nodes, numLatentConfounders, maxNumEdges, maxDegree, maxIndegree, maxOutdegree, connected, true);
-        return randomGraphUniform(nodes, numLatentConfounders, maxNumEdges, maxDegree, maxIndegree, maxOutdegree, connected);
+        return randomGraphRandomForwardEdges(nodes, numLatentConfounders, maxNumEdges, maxDegree, maxIndegree, maxOutdegree, connected, true);
+//        return randomGraphUniform(nodes, numLatentConfounders, maxNumEdges, maxDegree, maxIndegree, maxOutdegree, connected);
     }
 
     /**
@@ -402,7 +404,7 @@ public final class GraphUtils {
         long size = (long) nodes.size();
 
         if (numEdges < 0 || numEdges > size * (size - 1)) {
-            throw new IllegalArgumentException("NumEdges must be "
+            throw new IllegalArgumentException("numEdges must be "
                     + "greater than 0 and <= (#nodes)(#nodes - 1) / 2: "
                     + numEdges);
         }
@@ -415,18 +417,23 @@ public final class GraphUtils {
 
         final Graph dag = new EdgeListGraphSingleConnections(nodes);
 
+        if (connected) {
+            for (int i = 0; i < nodes.size() - 1; i++) {
+                dag.addDirectedEdge(nodes.get(i), nodes.get(i + 1));
+            }
+        }
+
         final List<Node> nodes2 = dag.getNodes(); // new ArrayList<Node>(nodes);
 
 //        Collections.shuffle(nodes2);
         int trials = 0;
         boolean added = false;
 
-        for (int i = 0; i < numEdges; i++) {
+        for (int i = dag.getNumEdges() - 1; i < numEdges - 1; i++) {
 
-            if ((i + 1) % 1000 == 0) {
-                System.out.println("# edges = " + (i + 1));
-            }
-
+//            if ((i + 1) % 1000 == 0) {
+//                System.out.println("# edges = " + (i + 1));
+//            }
             int c1 = RandomUtil.getInstance().nextInt(nodes2.size());
             int c2 = RandomUtil.getInstance().nextInt(nodes2.size());
 
@@ -481,7 +488,10 @@ public final class GraphUtils {
                 continue;
             }
 
-            dag.addDirectedEdge(n1, n2);
+            if (!dag.isAdjacentTo(n1, n2)) {
+                dag.addDirectedEdge(n1, n2);
+            }
+
             added = true;
         }
 
@@ -510,9 +520,13 @@ public final class GraphUtils {
             double alpha, double beta,
             double delta_in, double delta_out) {
 
+        if (alpha + beta >= 1) {
+            throw new IllegalArgumentException("For the Bollobas et al. algorithm,"
+                    + "\napha + beta + gamma = 1, so alpha + beta must be < 1.");
+        }
+
 //        System.out.println("# nodes = " + _nodes.size() + " latents = " + numLatentConfounders
 //                + "  alpha = " + alpha + " beta = " + beta + " delta_in = " + delta_in + " delta_out = " + delta_out);
-
 //        >>> print inspect.getsource(nx.scale_free_graph)
 //        def scale_free_graph(n,
 //                alpha=0.41,
@@ -561,7 +575,7 @@ public final class GraphUtils {
         //        .. [1] B. Bollob{\'a}s, C. Borgs, J. Chayes, and O. Riordan,
         //            Directed scale-free graphs,
         //                    Proceedings of the fourteenth annual ACM-SIAM symposium on
-        //            Discrete algorithms, 132--139, 2003.
+        //            Discrete algorithm, 132--139, 2003.
         //            """
 //
 //            def _choose_node(G,distribution,delta):
@@ -880,7 +894,7 @@ public final class GraphUtils {
      * Makes a cyclic graph by repeatedly adding cycles of length of 3, 4, or 5
      * to the graph, then finally adding two cycles.
      */
-    public static Graph cyclicGraph2(int numNodes, int numEdges) {
+    public static Graph cyclicGraph2(int numNodes, int numEdges, int maxDegree) {
 
         List<Node> nodes = new ArrayList<>();
 
@@ -913,10 +927,15 @@ public final class GraphUtils {
                 cycleNodes.add(node);
             }
 
-            for (int i = 0; i < cycleSize; i++) {
-                Node node = cycleNodes.get(i);
-
-                if (graph.getAdjacentNodes(node).size() > 3) {
+//            for (int i = 0; i < cycleSize; i++) {
+//                Node node = cycleNodes.get(i);
+//
+//                if (graph.getAdjacentNodes(node).size() > 3) {
+//                    continue LOOP;
+//                }
+//            }
+            for (int i = 0; i < cycleNodes.size(); i++) {
+                if (graph.getDegree(cycleNodes.get(i)) >= maxDegree) {
                     continue LOOP;
                 }
             }
@@ -961,6 +980,121 @@ public final class GraphUtils {
             }
         }
 
+        GraphUtils.circleLayout(graph, 200, 200, 150);
+
+        return graph;
+    }
+
+    /**
+     * Makes a cyclic graph by repeatedly adding cycles of length of 3, 4, or 5
+     * to the graph, then finally adding two cycles.
+     */
+    public static Graph cyclicGraph3(int numNodes, int numEdges, int maxDegree, double probCycle,
+            double probTwoCycle) {
+
+        List<Node> nodes = new ArrayList<>();
+
+        for (int i = 0; i < numNodes; i++) {
+            nodes.add(new GraphNode("X" + (i + 1)));
+        }
+
+        Graph graph = new EdgeListGraph(nodes);
+
+        LOOP:
+        while (graph.getEdges().size() < numEdges /*&& ++count1 < 100*/) {
+//            int cycleSize = RandomUtil.getInstance().nextInt(2) + 4;
+            int cycleSize = RandomUtil.getInstance().nextInt(3) + 3;
+
+            // Pick that many nodes randomly
+            List<Node> cycleNodes = new ArrayList<>();
+            int count2 = -1;
+
+            for (int i = 0; i < cycleSize; i++) {
+                Node node = nodes.get(RandomUtil.getInstance().nextInt(nodes.size()));
+
+                if (cycleNodes.contains(node)) {
+                    i--;
+                    ++count2;
+                    if (count2 < 10) {
+                        continue;
+                    }
+                }
+
+                cycleNodes.add(node);
+            }
+
+//            for (int i = 0; i < cycleSize; i++) {
+//                Node node = cycleNodes.get(i);
+//
+//                if (graph.getAdjacentNodes(node).size() > 3) {
+//                    continue LOOP;
+//                }
+//            }
+            for (int i = 0; i < cycleNodes.size(); i++) {
+                if (graph.getDegree(cycleNodes.get(i)) >= maxDegree) {
+                    continue LOOP;
+                }
+            }
+
+            Edge edge;
+
+            // Make sure you won't created any two cycles (this will be done later, explicitly)
+            for (int i = 0; i < cycleNodes.size() - 1; i++) {
+                edge = Edges.directedEdge(cycleNodes.get(i + 1), cycleNodes.get(i));
+
+                if (graph.containsEdge(edge)) {
+                    continue LOOP;
+                }
+            }
+
+            edge = Edges.directedEdge(cycleNodes.get(0), cycleNodes.get(cycleNodes.size() - 1));
+
+            if (graph.containsEdge(edge)) {
+                continue;
+            }
+
+            for (int i = 0; i < cycleNodes.size() - 1; i++) {
+                edge = Edges.directedEdge(cycleNodes.get(i), cycleNodes.get(i + 1));
+
+                if (!graph.containsEdge(edge)) {
+                    graph.addEdge(edge);
+
+                    if (graph.getNumEdges() == numEdges) {
+                        break LOOP;
+                    }
+                }
+            }
+
+            if (RandomUtil.getInstance().nextDouble() < probCycle) {
+                edge = Edges.directedEdge(cycleNodes.get(cycleNodes.size() - 1), cycleNodes.get(0));
+            } else {
+                edge = Edges.directedEdge(cycleNodes.get(0), cycleNodes.get(cycleNodes.size() - 1));
+            }
+
+            if (!graph.containsEdge(edge)) {
+                graph.addEdge(edge);
+
+                if (graph.getNumEdges() == numEdges) {
+                    break;
+                }
+            }
+        }
+
+        Set<Edge> edges = graph.getEdges();
+
+        for (Edge edge : edges) {
+            Node a = edge.getNode1();
+            Node b = edge.getNode2();
+            if (RandomUtil.getInstance().nextDouble() < probTwoCycle) {
+                graph.removeEdges(a, b);
+                graph.addEdge(Edges.directedEdge(a, b));
+                graph.addEdge(Edges.directedEdge(b, a));
+            }
+        }
+
+//        for (Node node : graph.getNodes()) {
+//            graph.addDirectedEdge(node, node);
+//        }
         GraphUtils.circleLayout(graph, 200, 200, 150);
 
         return graph;
@@ -1078,7 +1212,7 @@ public final class GraphUtils {
      * @return true if <code>set</code> is a clique in <code>graph</code>. </p>
      * R. Silva, June 2004
      */
-    public static boolean isClique(Set<Node> set, Graph graph) {
+    public static boolean isClique(Collection<Node> set, Graph graph) {
         List<Node> setv = new LinkedList<>(set);
         for (int i = 0; i < setv.size() - 1; i++) {
             for (int j = i + 1; j < setv.size(); j++) {
@@ -1563,9 +1697,9 @@ public final class GraphUtils {
             Node next = Edges.traverse(node1, edge);
 
             // Must be a directed edge.
-            /*if (!edge.isDirected()) {
+            if (!edge.isDirected()) {
                 continue;
-            }*/
+            }
 
             // Can't have any colliders on the path.
             if (path.size() > 1) {
@@ -1731,6 +1865,12 @@ public final class GraphUtils {
         return pathString(graph, path, new LinkedList<Node>());
     }
 
+    public static String pathString(Graph graph, Node... x) {
+        List<Node> path = new ArrayList<>();
+        Collections.addAll(path, x);
+        return pathString(graph, path, new LinkedList<Node>());
+    }
+
     private static String pathString(Graph graph, List<Node> path, List<Node> conditioningVars) {
         StringBuilder buf = new StringBuilder();
 
@@ -1836,6 +1976,30 @@ public final class GraphUtils {
             Endpoint endpoint2 = edge.getEndpoint2();
             Edge newEdge = new Edge(node1, node2, endpoint1, endpoint2);
             convertedGraph.addEdge(newEdge);
+        }
+
+        for (Triple triple : originalGraph.getUnderLines()) {
+            convertedGraph.addUnderlineTriple(
+                    convertedGraph.getNode(triple.getX().getName()),
+                    convertedGraph.getNode(triple.getY().getName()),
+                    convertedGraph.getNode(triple.getZ().getName())
+            );
+        }
+
+        for (Triple triple : originalGraph.getDottedUnderlines()) {
+            convertedGraph.addDottedUnderlineTriple(
+                    convertedGraph.getNode(triple.getX().getName()),
+                    convertedGraph.getNode(triple.getY().getName()),
+                    convertedGraph.getNode(triple.getZ().getName())
+            );
+        }
+
+        for (Triple triple : originalGraph.getAmbiguousTriples()) {
+            convertedGraph.addAmbiguousTriple(
+                    convertedGraph.getNode(triple.getX().getName()),
+                    convertedGraph.getNode(triple.getY().getName()),
+                    convertedGraph.getNode(triple.getZ().getName())
+            );
         }
 
         return convertedGraph;
@@ -2024,7 +2188,6 @@ public final class GraphUtils {
      */
     public static String graphToDot(Graph graph) {
         StringBuilder builder = new StringBuilder();
-
         builder.append("digraph g {\n");
         for (Edge edge : graph.getEdges()) {
             builder.append(" \"").append(edge.getNode1()).append("\" -> \"").append(edge.getNode2()).append("\" [arrowtail=");
@@ -2045,8 +2208,8 @@ public final class GraphUtils {
             }
             builder.append("]; \n");
         }
-
         builder.append("}");
+
         return builder.toString();
     }
 
@@ -2392,10 +2555,20 @@ public final class GraphUtils {
     }
 
     public static Graph loadGraphTxt(File file) {
-//        System.out.println(file.getName());
         try {
             Reader in1 = new FileReader(file);
             return readerToGraphTxt(in1);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new IllegalStateException();
+        }
+    }
+
+    public static Graph loadGraphJson(File file) {
+	try {
+            Reader in1 = new FileReader(file);
+            return readerToGraphJson(in1);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -2417,13 +2590,10 @@ public final class GraphUtils {
         Graph graph = new EdgeListGraph();
 
         while (!(line = in.readLine().trim()).equals("")) {
+            String[] tokens = line.split(",");
 
-            String[] tokens = line.split(" ");
-            if(tokens.length < 2)
-                tokens = line.split(",");
             for (String token : tokens) {
-               // System.out.println(token);
-                graph.addNode(new GraphNode(token.trim()));
+                graph.addNode(new GraphNode(token));
             }
         }
 
@@ -2437,13 +2607,17 @@ public final class GraphUtils {
 //                System.out.println(line);
 
             String[] tokens = line.split(" ");
-            String from = tokens[1].trim();
-            String edge = tokens[2].trim();
+
+            String from = tokens[1];
+            String edge = tokens[2];
             String to = tokens[3];
+
             Node _from = graph.getNode(from);
             Node _to = graph.getNode(to);
+
             char end1 = edge.charAt(0);
             char end2 = edge.charAt(2);
+
             Endpoint _end1, _end2;
 
             if (end1 == '<') {
@@ -2468,8 +2642,27 @@ public final class GraphUtils {
 
             Edge _edge = new Edge(_from, _to, _end1, _end2);
 
+            for (int i = 4; i < tokens.length; i++) {
+                _edge.addProperty(Edge.Property.valueOf(tokens[i]));
+            }
+
             graph.addEdge(_edge);
         }
+
+        return graph;
+    }
+
+    public static Graph readerToGraphJson(Reader reader) throws IOException {
+        BufferedReader in = new BufferedReader(reader);
+
+        String json = "";
+        String line;
+
+        while ((line = in.readLine()) != null) {
+            json += line.trim();
+        }
+
+        Graph graph = JsonUtils.parseJSONObjectToTetradGraph(json);
 
         return graph;
     }
@@ -2759,7 +2952,6 @@ public final class GraphUtils {
 
         while (!Q.isEmpty()) {
             Node t = Q.remove();
-//            if (t == to) return true;
 
             for (Node u : G.getAdjacentNodes(t)) {
                 Edge edge = G.getEdge(t, u);
@@ -2936,7 +3128,6 @@ public final class GraphUtils {
         }
 
         List<Node> found = new LinkedList<>();
-        Collections.shuffle(found);
         List<Node> notFound = new ArrayList<>(graph.getNodes());
 
         for (Iterator<Node> i = notFound.iterator(); i.hasNext();) {
@@ -2945,11 +3136,16 @@ public final class GraphUtils {
             }
         }
 
+        List<Node> allNodes = new ArrayList<>(notFound);
+
         while (!notFound.isEmpty()) {
             for (Iterator<Node> it = notFound.iterator(); it.hasNext();) {
                 Node node = it.next();
 
-                if (found.containsAll(graph.getParents(node))) {
+                List<Node> parents = graph.getParents(node);
+                parents.retainAll(allNodes);
+
+                if (found.containsAll(parents)) {
                     found.add(node);
                     it.remove();
                 }
@@ -3330,6 +3526,81 @@ public final class GraphUtils {
         return counts;
     }
 
+    public static void addPagColoring(Graph graph) {
+        for (Edge edge : graph.getEdges()) {
+            if (!Edges.isDirectedEdge(edge)) {
+                continue;
+            }
+
+            Node x = Edges.getDirectedEdgeTail(edge);
+            Node y = Edges.getDirectedEdgeHead(edge);
+
+            graph.removeEdge(edge);
+            graph.addEdge(edge);
+
+            if (existsSemiDirectedPath(x, y, -1, graph)) {
+                edge.addProperty(Edge.Property.nl); // dashed.
+            } else {
+                edge.addProperty(Edge.Property.pl);
+            }
+
+            if (graph.defVisible(edge)) {
+                edge.addProperty(Edge.Property.dd); // green.
+            } else {
+                edge.addProperty(Edge.Property.pd);
+            }
+        }
+    }
+
+    // Returns true if a path consisting of undirected and directed edges toward 'to' exists of
+    // length at most 'bound'. Cycle checker in other words.
+    public static boolean existsSemiDirectedPath(Node from, Node to, int bound, Graph graph) {
+        Queue<Node> Q = new LinkedList<>();
+        Set<Node> V = new HashSet<>();
+        Q.offer(from);
+        V.add(from);
+        Node e = null;
+        int distance = 0;
+
+        while (!Q.isEmpty()) {
+            Node t = Q.remove();
+            if (t == to) {
+                return true;
+            }
+
+            if (e == t) {
+                e = null;
+                distance++;
+                if (distance > (bound == -1 ? 1000 : bound)) {
+                    return false;
+                }
+            }
+
+            for (Node u : graph.getAdjacentNodes(t)) {
+                Edge edge = graph.getEdge(t, u);
+                Node c = GraphUtils.traverseSemiDirected(t, edge);
+                if (c == null) {
+                    continue;
+                }
+
+                if (c == to) {
+                    return true;
+                }
+
+                if (!V.contains(c)) {
+                    V.add(c);
+                    Q.offer(c);
+
+                    if (e == null) {
+                        e = u;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
     private static class Counts {
 
         private int[][] counts;
@@ -3487,7 +3758,9 @@ public final class GraphUtils {
             return 4;
         }
 
-        throw new IllegalArgumentException("Unsupported edgeTop type : " + edgeTop);
+        return 5;
+
+//        throw new IllegalArgumentException("Unsupported edge type : " + edgeTop);
     }
 
     private static int getTypeLeft(Edge edgeLeft, Edge edgeTop) {
@@ -3595,6 +3868,11 @@ public final class GraphUtils {
     }
 
     public static String graphToText(Graph graph) {
+        // add edge properties relating to edge coloring of PAGs
+        if (graph.isPag()) {
+            addPagColoring(graph);
+        }
+
         Formatter fmt = new Formatter();
         fmt.format("%s%n%n", graphNodesToText(graph, "Graph Nodes:", ','));
         fmt.format("%s", graphEdgesToText(graph, "Graph Edges:"));
@@ -3648,12 +3926,47 @@ public final class GraphUtils {
 
         int size = edges.size();
         int count = 0;
+
         for (Edge edge : edges) {
             count++;
+
+            ArrayList<Edge.Property> properties = edge.getProperties();
+
             if (count < size) {
-                fmt.format("%d. %s%n", count, edge);
+                String f = "%d. %s";
+
+                for (int i = 0; i < properties.size(); i++) {
+                    f += " %s";
+                }
+
+                Object[] o = new Object[2 + properties.size()];
+
+                o[0] = count;
+                o[1] = edge;
+
+                for (int i = 0; i < properties.size(); i++) {
+                    o[2 + i] = properties.get(i);
+                }
+
+                fmt.format(f, o);
+                fmt.format("\n");
             } else {
-                fmt.format("%d. %s", count, edge);
+                String f = "%d. %s";
+
+                for (int i = 0; i < properties.size(); i++) {
+                    f += " %s";
+                }
+                Object[] o = new Object[2 + properties.size()];
+
+                o[0] = count;
+                o[1] = edge;
+
+                for (int i = 0; i < properties.size(); i++) {
+                    o[2 + i] = properties.get(i);
+                }
+
+                fmt.format(f, o);
+                fmt.format("\n");
             }
         }
 
@@ -4099,7 +4412,7 @@ public final class GraphUtils {
 
     // Depth first.
     public static boolean isDConnectedTo2(Node x, Node y, List<Node> z, Graph graph) {
-        LinkedList<Node> path = new LinkedList<Node>();
+        LinkedList<Node> path = new LinkedList<>();
 
         path.add(x);
 
@@ -4158,14 +4471,14 @@ public final class GraphUtils {
     }
 
     private static Set<Node> reachableDConnectedNodes(Node x, List<Node> z, Graph graph) {
-        Set<Node> R = new HashSet<Node>();
+        Set<Node> R = new HashSet<>();
         R.add(x);
 
-        Queue<OrderedPair<Node>> Q = new ArrayDeque<OrderedPair<Node>>();
-        Set<OrderedPair<Node>> V = new HashSet<OrderedPair<Node>>();
+        Queue<OrderedPair<Node>> Q = new ArrayDeque<>();
+        Set<OrderedPair<Node>> V = new HashSet<>();
 
         for (Node node : graph.getAdjacentNodes(x)) {
-            OrderedPair<Node> edge = new OrderedPair<Node>(x, node);
+            OrderedPair<Node> edge = new OrderedPair<>(x, node);
             Q.offer(edge);
             V.add(edge);
             R.add(node);
@@ -4186,7 +4499,7 @@ public final class GraphUtils {
                 }
                 R.add(c);
 
-                OrderedPair<Node> u = new OrderedPair<Node>(b, c);
+                OrderedPair<Node> u = new OrderedPair<>(b, c);
                 if (V.contains(u)) {
                     continue;
                 }
@@ -4861,13 +5174,13 @@ public final class GraphUtils {
     }
 
     // Used to find semidirected paths for cycle checking.
-    private static Node traverseSemiDirected(Node node, Edge edge) {
+    public static Node traverseSemiDirected(Node node, Edge edge) {
         if (node == edge.getNode1()) {
-            if (edge.getEndpoint1() == Endpoint.TAIL) {
+            if (edge.getEndpoint1() == Endpoint.TAIL || edge.getEndpoint1() == Endpoint.CIRCLE) {
                 return edge.getNode2();
             }
         } else if (node == edge.getNode2()) {
-            if (edge.getEndpoint2() == Endpoint.TAIL) {
+            if (edge.getEndpoint2() == Endpoint.TAIL || edge.getEndpoint2() == Endpoint.CIRCLE) {
                 return edge.getNode1();
             }
         }

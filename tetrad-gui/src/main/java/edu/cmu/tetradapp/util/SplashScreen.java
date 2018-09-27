@@ -21,6 +21,8 @@
 
 package edu.cmu.tetradapp.util;
 
+import edu.cmu.tetrad.latest.LatestClient;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
@@ -36,12 +38,13 @@ public class SplashScreen {
     private static int MAX;
     private static int COUNTER;
     private static SplashWindow WINDOW;
+    private boolean skipLatest;
 
-    public static void show(Frame parent, String title, int max) {
+    public static void show(Frame parent, String title, int max, boolean skipLatest) {
         hide();
         SplashScreen.COUNTER = 0;
         SplashScreen.MAX = max;
-        WINDOW = new SplashWindow(parent, null, title);
+        WINDOW = new SplashWindow(parent, null, title, skipLatest);
     }
 
     public static void hide() {
@@ -54,8 +57,7 @@ public class SplashScreen {
 
         try {
             Thread.sleep(2000);
-        }
-        catch (InterruptedException e) {
+        } catch (InterruptedException e) {
             // Ignore.
         }
 
@@ -68,7 +70,7 @@ public class SplashScreen {
         increment(1);
     }
 
-    public static void increment(int by) {
+    private static void increment(int by) {
         COUNTER += by;
         if (COUNTER > MAX) {
             COUNTER = MAX;
@@ -79,10 +81,10 @@ public class SplashScreen {
     }
 
     private static class SplashWindow extends Window {
-        Image splashIm;
-        JProgressBar bar;
+        final Image splashIm;
+        final JProgressBar bar;
 
-        SplashWindow(Frame parent, Image image, String title) {
+        SplashWindow(Frame parent, Image image, String title, boolean skipLatest) {
             super(parent);
             this.splashIm = image;
             //setSize(200, 100);
@@ -104,7 +106,22 @@ public class SplashScreen {
             b1.add(Box.createHorizontalGlue());
             b.add(b1);
 
-            JTextArea textArea = new JTextArea(LicenseUtils.copyright());
+            String text = LicenseUtils.copyright();
+
+
+            // optionally check if we are running latest version
+            String version = this.getClass().getPackage().getImplementationVersion();
+            if (! skipLatest) {
+                LatestClient latestClient = LatestClient.getInstance();
+
+                // if no version it means we are not running a jar so probably development
+                if (version == null) version = "DEVELOPMENT";
+                latestClient.checkLatest("tetrad", version);
+                StringBuilder latestResult = new StringBuilder(latestClient.getLatestResult(60));
+                text = text + "\n" + latestResult.toString();
+            }
+
+            JTextArea textArea = new JTextArea(text);
             textArea.setBorder(new EmptyBorder(5, 5, 5, 5));
             b.add(textArea);
 

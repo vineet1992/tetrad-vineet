@@ -34,6 +34,8 @@ import edu.cmu.tetrad.sem.SemIm;
 import edu.cmu.tetrad.sem.SemPm;
 import edu.cmu.tetrad.util.RandomUtil;
 import edu.pitt.csb.mgm.IndTestMultinomialLogisticRegressionWald;
+
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -47,6 +49,7 @@ import static org.junit.Assert.assertEquals;
  *
  * @author Joseph Ramsey
  */
+@Ignore
 public class TestIndTestWaldLR {
 
     @Test
@@ -56,7 +59,7 @@ public class TestIndTestWaldLR {
         int numPassed = 0;
 
         for (int i = 0; i < 10; i++) {
-            List<Node> nodes = new ArrayList<Node>();
+            List<Node> nodes = new ArrayList<>();
 
             for (int i1 = 0; i1 < 10; i1++) {
                 nodes.add(new ContinuousVariable("X" + (i1 + 1)));
@@ -80,7 +83,7 @@ public class TestIndTestWaldLR {
             Node x4 = data.getVariable("X4");
             Node x5 = data.getVariable("X5");
 
-            List<Node> cond = new ArrayList<Node>();
+            List<Node> cond = new ArrayList<>();
             cond.add(x3);
             cond.add(x4);
             cond.add(x5);
@@ -88,7 +91,7 @@ public class TestIndTestWaldLR {
             Node x1Graph = graph.getNode(x1.getName());
             Node x2Graph = graph.getNode(x2.getName());
 
-            List<Node> condGraph = new ArrayList<Node>();
+            List<Node> condGraph = new ArrayList<>();
 
             for (Node node : cond) {
                 condGraph.add(graph.getNode(node.getName()));

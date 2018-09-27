@@ -33,20 +33,11 @@ import java.util.*;
  *
  * @author Joseph Ramsey
  */
-public final class Dag implements Graph /*, KnowledgeTransferable*/ {
+public final class Dag implements Graph {
     static final long serialVersionUID = 23L;
-//    private Knowledge knowledge;
-    /**
-     * The constraints that the graph must satisfy.
-     */
-    private final static GraphConstraint[] constraints = {
-            new MeasuredLatentOnly(), new AtMostOneEdgePerPair(),
-            new NoEdgesToSelf(), new DirectedEdgesOnly(), new InArrowImpliesNonancestor()};
 
     /**
      * The wrapped graph.
-     *
-     * @serial
      */
     private final Graph graph;
 
@@ -71,37 +62,25 @@ public final class Dag implements Graph /*, KnowledgeTransferable*/ {
 
     private Map<Node, Integer> nodesHash = new HashMap<>();
 
+    private boolean pag;
+    private boolean pattern;
+
     //===============================CONSTRUCTORS=======================//
 
     /**
      * Constructs a new directed acyclic graph (DAG).
      */
     public Dag() {
-//    	this.knowledge = new Knowledge2();
 
         // Must use EdgeListGraph because property change events are correctly implemeted. Don't change it!
         // unless you fix that or the interface will break the interface! jdramsey 2015-6-5
         this.graph = new EdgeListGraph();
-//        setGraphConstraintsChecked(true);
-        List<GraphConstraint> constraints1 = Arrays.asList(constraints);
-
-        for (GraphConstraint aConstraints1 : constraints1) {
-            addGraphConstraint(aConstraints1);
-        }
 
         reconstituteDpath();
     }
 
     public Dag(List<Node> nodes) {
-//    	this.knowledge = new Knowledge2();
         this.graph = new EdgeListGraphSingleConnections(nodes);
-//        setGraphConstraintsChecked(true);
-        List<GraphConstraint> constraints1 = Arrays.asList(constraints);
-
-        for (GraphConstraint aConstraints1 : constraints1) {
-            addGraphConstraint(aConstraints1);
-        }
-
         reconstituteDpath();
     }
 
@@ -113,13 +92,11 @@ public final class Dag implements Graph /*, KnowledgeTransferable*/ {
      *                                  reason be converted into a DAG.
      */
     public Dag(Graph graph) throws IllegalArgumentException {
-        this.graph = new EdgeListGraph();
-
-        List<GraphConstraint> constraints1 = Arrays.asList(constraints);
-
-        for (GraphConstraint aConstraints1 : constraints1) {
-            addGraphConstraint(aConstraints1);
+        if (graph.existsDirectedCycle()) {
+            throw new IllegalArgumentException("That graph was not acyclic.");
         }
+
+        this.graph = new EdgeListGraph();
 
         transferNodesAndEdges(graph);
         resetDPath();
@@ -173,10 +150,6 @@ public final class Dag implements Graph /*, KnowledgeTransferable*/ {
 
     public boolean addDirectedEdge(Node node1, Node node2) {
         return addEdge(Edges.directedEdge(node1, node2));
-    }
-
-    public boolean addGraphConstraint(GraphConstraint gc) {
-        return getGraph().addGraphConstraint(gc);
     }
 
     public boolean addPartiallyOrientedEdge(Node node1, Node node2) {
@@ -335,10 +308,6 @@ public final class Dag implements Graph /*, KnowledgeTransferable*/ {
         return getGraph().getNumEdges(node);
     }
 
-    public List<GraphConstraint> getGraphConstraints() {
-        return getGraph().getGraphConstraints();
-    }
-
     public List<Node> getChildren(Node node) {
         return getGraph().getChildren(node);
     }
@@ -365,6 +334,11 @@ public final class Dag implements Graph /*, KnowledgeTransferable*/ {
 
     public int getIndegree(Node node) {
         return getGraph().getIndegree(node);
+    }
+
+    @Override
+    public int getDegree(Node node) {
+        return getGraph().getDegree(node);
     }
 
     public int getOutdegree(Node node) {
@@ -413,6 +387,11 @@ public final class Dag implements Graph /*, KnowledgeTransferable*/ {
         return GraphUtils.getSepset(n1, n2, this);
     }
 
+    @Override
+    public void setNodes(List<Node> nodes) {
+        graph.setNodes(nodes);
+    }
+
     public boolean isAdjacentTo(Node nodeX, Node nodeY) {
         return getGraph().isAdjacentTo(nodeX, nodeY);
     }
@@ -427,10 +406,6 @@ public final class Dag implements Graph /*, KnowledgeTransferable*/ {
 
     public boolean isUndirectedFromTo(Node node1, Node node2) {
         return false;
-    }
-
-    public boolean isGraphConstraintsChecked() {
-        return getGraph().isGraphConstraintsChecked();
     }
 
     public boolean isParentOf(Node node1, Node node2) {
@@ -499,10 +474,6 @@ public final class Dag implements Graph /*, KnowledgeTransferable*/ {
 
     public Graph subgraph(List<Node> nodes) {
         return getGraph().subgraph(nodes);
-    }
-
-    public void setGraphConstraintsChecked(boolean checked) {
-        getGraph().setGraphConstraintsChecked(checked);
     }
 
     public boolean removeEdge(Edge edge) {
@@ -702,9 +673,6 @@ public final class Dag implements Graph /*, KnowledgeTransferable*/ {
      * class, even if Tetrad sessions were previously saved out using a version
      * of the class that didn't include it. (That's what the
      * "s.defaultReadObject();" is for. See J. Bloch, Effective Java, for help.
-     *
-     * @throws java.io.IOException
-     * @throws ClassNotFoundException
      */
     private void readObject(ObjectInputStream s)
             throws IOException, ClassNotFoundException {
@@ -719,7 +687,35 @@ public final class Dag implements Graph /*, KnowledgeTransferable*/ {
         return graph;
     }
 
+    @Override
+    public List<String> getTriplesClassificationTypes() {
+        return null;
+    }
 
+    @Override
+    public List<List<Triple>> getTriplesLists(Node node) {
+        return null;
+    }
+
+    @Override
+    public boolean isPag() {
+        return pag;
+    }
+
+    @Override
+    public void setPag(boolean pag) {
+        this.pag = pag;
+    }
+
+    @Override
+    public boolean isPattern() {
+        return pattern;
+    }
+
+    @Override
+    public void setPattern(boolean pattern) {
+        this.pattern = pattern;
+    }
 }
 
 

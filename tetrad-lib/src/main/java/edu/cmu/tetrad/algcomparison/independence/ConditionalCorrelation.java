@@ -1,34 +1,32 @@
 package edu.cmu.tetrad.algcomparison.independence;
 
-import edu.cmu.tetrad.algcomparison.simulation.Parameters;
-import edu.cmu.tetrad.data.DataSet;
+import edu.cmu.tetrad.data.DataModel;
+import edu.cmu.tetrad.data.DataUtils;
+import edu.cmu.tetrad.util.Parameters;
 import edu.cmu.tetrad.data.DataType;
 import edu.cmu.tetrad.search.IndTestConditionalCorrelation;
 import edu.cmu.tetrad.search.IndependenceTest;
 
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Wrapper for Fisher Z test.
+ *
  * @author jdramsey
  */
-public class ConditionalCorrelation implements IndTestWrapper {
-    private DataSet dataSet = null;
-    private IndependenceTest test = null;
+public class ConditionalCorrelation implements IndependenceWrapper {
+    static final long serialVersionUID = 23L;
 
     @Override
-    public IndependenceTest getTest(DataSet dataSet, Parameters parameters) {
-        if (dataSet != this.dataSet) {
-            this.dataSet = dataSet;
-            this.test = new IndTestConditionalCorrelation(dataSet, parameters.getDouble("alpha"));
-        }
-        return test;
+    public IndependenceTest getTest(DataModel dataSet, Parameters parameters) {
+        return new IndTestConditionalCorrelation(DataUtils.getContinuousDataSet(dataSet),
+                parameters.getDouble("alpha"));
     }
 
     @Override
     public String getDescription() {
-        return "Fisher Z test";
+        return "Conditional correlation test";
     }
 
     @Override
@@ -38,7 +36,9 @@ public class ConditionalCorrelation implements IndTestWrapper {
 
     @Override
     public List<String> getParameters() {
-        return Collections.singletonList("alpha");
+        List<String> params = new ArrayList<>();
+        params.add("alpha");
+        return params;
     }
 
 }

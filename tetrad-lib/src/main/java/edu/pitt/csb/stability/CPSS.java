@@ -42,21 +42,14 @@ public class CPSS {
     private DataSet data;
     private double [] lambda; //Array of lambda values for MGM
     private int [][] subs;
-
+//TODO need to modify this in a similar way as Bootstrap to get compatibility with runAlgorithms
 
     public CPSS(DataSet data, double [] lambda, double bound)
     {
         this.data = data;
         this.lambda = lambda;
         this.bound = bound;
-        if(bound<=0.001)
-            boundIndex=0;
-        else if(bound<=0.01)
-            boundIndex=1;
-        else if(bound <=0.05)
-            boundIndex=2;
-        else
-            boundIndex = 3;
+        this.boundIndex = getBoundIndex(bound);
         this.p = data.getNumColumns()*(data.getNumColumns()-1)/2;
     }
 
@@ -65,6 +58,14 @@ public class CPSS {
         this.data = data;
         this.lambda = lambda;
         this.bound = bound;
+        this.boundIndex = getBoundIndex(bound);
+        this.p = data.getNumColumns()*(data.getNumColumns()-1)/2;
+        this.subs = subs;
+    }
+
+    private static int getBoundIndex(double bound)
+    {
+        int boundIndex = -1;
         if(bound<=0.001)
             boundIndex=0;
         else if(bound<=0.01)
@@ -73,10 +74,8 @@ public class CPSS {
             boundIndex=2;
         else
             boundIndex = 3;
-        this.p = data.getNumColumns()*(data.getNumColumns()-1)/2;
-        this.subs = subs;
+        return boundIndex;
     }
-
     public static int[][] createSubs(DataSet data, int B)
     {
         ArrayList<Integer>tempInds  = new ArrayList<Integer>();
@@ -540,7 +539,33 @@ public class CPSS {
         return finalGraph;
     }
 
-    public double computeTao()
+    public static double computeTao(double theta,double bound)
+    {
+        final int boundIndex = getBoundIndex(bound);
+        final double thetaInc = 0.01;
+        //TODO Debug this
+        try {
+            BufferedReader b = new BufferedReader(new FileReader("tao_values.txt"));
+            if(theta < 0.01)
+                theta = 0.01;
+            while(b.ready())
+            {
+                String [] line = b.readLine().split("\t");
+                if(theta>=Double.parseDouble(line[0]) && theta <= (Double.parseDouble(line[0])+thetaInc))
+                    return Double.parseDouble(line[boundIndex+1]);
+            }
+            System.err.println("Theta out of bounds");
+            System.exit(-1);
+            return -1;
+        }
+        catch(Exception e)
+        {
+            System.err.println("Exception in computing tao");
+            e.printStackTrace();
+            return -1;
+        }
+    }
+    private double computeTao()
     {
         final double thetaInc = 0.01;
         //TODO Debug this

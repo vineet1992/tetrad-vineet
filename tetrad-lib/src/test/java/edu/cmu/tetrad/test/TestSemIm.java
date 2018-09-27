@@ -23,6 +23,7 @@ package edu.cmu.tetrad.test;
 
 import cern.colt.list.DoubleArrayList;
 import cern.jet.stat.Descriptive;
+import edu.cmu.tetrad.util.Parameters;
 import edu.cmu.tetrad.data.ContinuousVariable;
 import edu.cmu.tetrad.data.CovarianceMatrix;
 import edu.cmu.tetrad.data.DataSet;
@@ -343,36 +344,12 @@ public class TestSemIm {
         g.addBidirectedEdge(x1, x2);
 
         SemPm semPm = new SemPm(g);
-        SemImInitializationParams params = new SemImInitializationParams();
+        Parameters params = new Parameters();
         SemIm semIm = new SemIm(semPm, params);
 
         SemIm modified = modifySemImStandardizedInterventionOnTargetParents(semIm, x4);
 
         modified.simulateData(1000, false);
-
-    }
-
-    @Test
-    public void test10() {
-        int numNodes = 1000;
-        List<Node> nodes = new ArrayList<>();
-        for (int i = 0; i < numNodes; i++) {
-            nodes.add(new ContinuousVariable("X" + (i + 1)));
-        }
-
-        Graph g = GraphUtils.randomGraphRandomForwardEdges(10, 0, 10, 10, 10, 10, false);
-
-//        SemPm pm = new SemPm(g);
-//        SemIm im = new SemIm(pm);
-//        DataSet d = im.simulateData(1000, false);
-
-        LargeSemSimulator sim = new LargeSemSimulator(g);
-//        sim.simulateDataAcyclic(1000);
-
-        System.out.println(MatrixUtils.toString(sim.getCoefficientMatrix()));
-        System.out.println("dim = " + sim.getCoefficientMatrix()[1][1]);
-
-//        System.out.println(sim.simulateDataAcyclic(1000));
 
     }
 

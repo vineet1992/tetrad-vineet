@@ -33,7 +33,6 @@ import java.util.List;
  */
 public class BDeScore implements LocalDiscreteScore {
     private DataSet dataSet;
-
     public BDeScore(DataSet dataSet) {
         if (dataSet == null) {
             throw new NullPointerException();
@@ -92,9 +91,9 @@ public class BDeScore implements LocalDiscreteScore {
 
             int rowIndex = getRowIndex(dims, values);
 
-            for (int m = 0; m < dataSet().getMultiplier(n); m++) {
-                n_ijk[rowIndex][childValue]++;
-            }
+//            for (int m = 0; m < dataSet().getMultiplier(n); m++) {
+            n_ijk[rowIndex][childValue]++;
+//            }
         }
 
         // Row sums.
@@ -196,16 +195,6 @@ public class BDeScore implements LocalDiscreteScore {
     }
 
     @Override
-    public double getParameter1() {
-        return 0;
-    }
-
-    @Override
-    public void setParameter1(double alpha) {
-
-    }
-
-    @Override
     public Node getVariable(String targetName) {
         for (Node node : dataSet.getVariables()) {
             if (node.getName().equals(targetName)) {
@@ -217,8 +206,13 @@ public class BDeScore implements LocalDiscreteScore {
     }
 
     @Override
-    public int getMaxIndegree() {
+    public int getMaxDegree() {
         return 1000;
+    }
+
+    @Override
+    public boolean determines(List<Node> z, Node y) {
+        return false;
     }
 }
 

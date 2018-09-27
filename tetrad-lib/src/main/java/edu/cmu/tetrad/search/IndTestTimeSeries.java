@@ -39,6 +39,7 @@ import java.util.List;
  * Structural Vector Autoregressions."</p>
  *
  * @author Joseph Ramsey
+ * @deprecated
  */
 public final class IndTestTimeSeries implements IndependenceTest {
 
@@ -249,7 +250,7 @@ public final class IndTestTimeSeries implements IndependenceTest {
      */
     public List<String> getVariableNames() {
         List<Node> variables = getVariables();
-        List<String> variableNames = new ArrayList<String>();
+        List<String> variableNames = new ArrayList<>();
 
         for (Node variable : variables) {
             variableNames.add(variable.getName());

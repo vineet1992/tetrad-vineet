@@ -22,8 +22,10 @@
 package edu.cmu.tetradapp.model.datamanip;
 
 import edu.cmu.tetrad.data.*;
+import edu.cmu.tetrad.util.Parameters;
 import edu.cmu.tetrad.util.TetradSerializableUtils;
 import edu.cmu.tetradapp.model.DataWrapper;
+import edu.cmu.tetradapp.model.PcRunner;
 
 /**
  * GUI model for the permute rows function in RectangularDataSet.
@@ -36,7 +38,7 @@ public class FirstDifferencesWrapper extends DataWrapper {
     /**
      * Constructs the wrapper given some data and the params.
      */
-    public FirstDifferencesWrapper(DataWrapper wrapper) {
+    public FirstDifferencesWrapper(DataWrapper wrapper, Parameters params) {
         LogDataUtils.logDataModelList("Parent data in which rows have been randomly permuted.", getDataModelList());
 
         DataModelList inList = wrapper.getDataModelList();
@@ -78,8 +80,8 @@ public class FirstDifferencesWrapper extends DataWrapper {
      *
      * @see TetradSerializableUtils
      */
-    public static DataWrapper serializableInstance() {
-        return new FirstDifferencesWrapper(DataWrapper.serializableInstance());
+    public static PcRunner serializableInstance() {
+        return PcRunner.serializableInstance();
     }
 }
 

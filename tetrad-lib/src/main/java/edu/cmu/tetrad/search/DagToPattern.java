@@ -36,8 +36,9 @@ import java.util.Set;
  * Implements the PC ("Peter/Clark") algorithm, as specified in Chapter 6 of Spirtes, Glymour, and Scheines, "Causation,
  * Prediction, and Search," 2nd edition, with a modified rule set in step D due to Chris Meek. For the modified rule
  * set, see Chris Meek (1995), "Causal inference and causal explanation with background knowledge."
- *
+ *  
  * @author Joseph Ramsey.
+ * @deprecated Use SearchGraphUtils.patternFromDag(dag);
  */
 public class DagToPattern {
 
@@ -215,9 +216,8 @@ public class DagToPattern {
 
         List<Node> allNodes = dag.getNodes();
 
-        List<Node> measured = new ArrayList<Node>();
+        List<Node> measured = new ArrayList<>();
 
-        System.out.println("Finding measured nodes");
         for (Node node : allNodes) {
             if (node.getNodeType() == NodeType.MEASURED) {
                 measured.add(node);
@@ -227,7 +227,6 @@ public class DagToPattern {
         graph = new EdgeListGraphSingleConnections(measured);
         graph.fullyConnect(Endpoint.CIRCLE);
 
-        System.out.println("Getting sepsets");
         for (int i = 0; i < measured.size(); i++) {
             for (int j = i + 1; j < measured.size(); j++) {
                 Node n1 = measured.get(i);
@@ -238,19 +237,14 @@ public class DagToPattern {
             }
         }
 
-        System.out.println("Enumerating triples");
         enumerateTriples();
 
-        System.out.println("PC Orient");
         SearchGraphUtils.pcOrientbk(knowledge, graph, measured);
-        System.out.println("Orient colliders");
         SearchGraphUtils.orientCollidersUsingSepsets(this.sepsets, knowledge, graph, verbose);
 
         MeekRules rules = new MeekRules();
         rules.setAggressivelyPreventCycles(this.aggressivelyPreventCycles);
         rules.setKnowledge(knowledge);
-
-        System.out.println("Meek Rules");
         rules.orientImplied(graph);
 
         this.logger.log("graph", "\nReturning this graph: " + graph);
@@ -288,7 +282,7 @@ public class DagToPattern {
     }
 
     public Set<Edge> getAdjacencies() {
-        Set<Edge> adjacencies = new HashSet<Edge>();
+        Set<Edge> adjacencies = new HashSet<>();
         for (Edge edge : graph.getEdges()) {
             adjacencies.add(edge);
         }
@@ -300,14 +294,14 @@ public class DagToPattern {
         Set<Edge> nonAdjacencies = complete.getEdges();
         Graph undirected = GraphUtils.undirectedGraph(graph);
         nonAdjacencies.removeAll(undirected.getEdges());
-        return new HashSet<Edge>(nonAdjacencies);
+        return new HashSet<>(nonAdjacencies);
     }
 
     //===============================PRIVATE METHODS=======================//
 
     private void enumerateTriples() {
-        this.unshieldedColliders = new HashSet<Triple>();
-        this.unshieldedNoncolliders = new HashSet<Triple>();
+        this.unshieldedColliders = new HashSet<>();
+        this.unshieldedNoncolliders = new HashSet<>();
 
         for (Node y : graph.getNodes()) {
             List<Node> adj = graph.getAdjacentNodes(y);

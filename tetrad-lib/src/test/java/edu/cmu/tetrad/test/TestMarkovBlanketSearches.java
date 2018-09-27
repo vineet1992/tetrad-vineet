@@ -125,7 +125,7 @@ public class TestMarkovBlanketSearches {
 //            params.setNumTests(30);
 //            params.setMinMbSize(
 //                    8);
-//            params.setParameter1(0.05);
+//            params.setAlternativePenalty(0.05);
 //            params.setMinNumCategories(2);
 //            params.setMaxNumCategories(4);
 //            params.setAlgNames(Arrays.asList("PCMB", "CPCMB", "GS",
@@ -176,7 +176,7 @@ public class TestMarkovBlanketSearches {
 //            params.setMaxIndegree(2);
 //            params.setNumTests(30);
 //            params.setMinMbSize(8);
-//            params.setParameter1(0.01);
+//            params.setAlternativePenalty(0.01);
 //            params.setMinNumCategories(2);
 //            params.setMaxNumCategories(4);
 //            params.setAlgNames(Arrays.asList("HITON-MB", "MMMB", "MBFS"));
@@ -214,7 +214,7 @@ public class TestMarkovBlanketSearches {
 //            params.setMaxIndegree(3);
 //            params.setNumTests(30);
 //            params.setMinMbSize(6);
-//            params.setParameter1(0.05);
+//            params.setAlternativePenalty(0.05);
 //            params.setMinNumCategories(2);
 //            params.setMaxNumCategories(4);
 ////            params.setAlgNames(Arrays.asList("PCMB", "CPCMB", "GS",
@@ -241,7 +241,7 @@ public class TestMarkovBlanketSearches {
 //        int minNumCategories = params.getMinNumCategories();
 //        int maxNumCategories = params.getMaxNumCategories();
 //
-//        println(out, "Alpha = " + params.getParameter1());
+//        println(out, "Alpha = " + params.getAlternativePenalty());
 //        println(out, "# variables = " + params.getNumVars());
 //        println(out, "# edges = " + numEdges);
 //        println(out, "# samples = " + params.getSampleSize());
@@ -259,7 +259,7 @@ public class TestMarkovBlanketSearches {
 //
 ////        LogUtils.getInstance().add(System.out, Level.FINEST);
 //
-//        List<MbSearch> algorithms =
+//        List<MbSearch> algorithm =
 //                new LinkedList<MbSearch>();
 //
 //        List<Stats> collectedStats = new ArrayList<Stats>();
@@ -286,16 +286,16 @@ public class TestMarkovBlanketSearches {
 //                if (params.isDiscrete()) {
 //                    dataSet = simulateDiscrete(randomGraph, dataSet, params.getSampleSize(),
 //                            minNumCategories, maxNumCategories);
-//                    test = new IndTestGSquare(dataSet, params.getParameter1());
+//                    test = new IndTestGSquare(dataSet, params.getAlternativePenalty());
 //                } else {
 //                    dataSet = simulateContinuous(randomGraph, params.getSampleSize(), dataSet);
-//                    test = new IndTestFisherZ(dataSet, params.getParameter1());
+//                    test = new IndTestFisherZ(dataSet, params.getAlternativePenalty());
 //                }
 //
-//                algorithms.clear();
+//                algorithm.clear();
 //
 //                for (String algName : algNames) {
-//                    algorithms.add(getAlgorithm(algName, test, params.getMaxIndegree(), dataSet));
+//                    algorithm.add(getAlgorithm(algName, test, params.getMaxIndegree(), dataSet));
 //                }
 //            }
 //
@@ -349,12 +349,12 @@ public class TestMarkovBlanketSearches {
 //
 //            println(out, "n = " + (n + 1));
 //
-//            for (MbSearch algorithm : new LinkedList<MbSearch>(algorithms)) {
+//            for (MbSearch algorithm : new LinkedList<MbSearch>(algorithm)) {
 ////                System.out.println("Running " + algorithm.getAlgorithmName() + "...");
 //                Stats stats = printNodeStats(algorithm, t, truth, i, out, params.getTimeLimit());
 //
 //                if (stats == null) {
-////                    algorithms.remove(algorithm);
+////                    algorithm.remove(algorithm);
 ////
 ////                    for (Stats _stats : new LinkedList<Stats>(collectedStats)) {
 ////                        if (_stats.getAlgorithm() == algorithm) {
@@ -382,7 +382,7 @@ public class TestMarkovBlanketSearches {
 //
 //        println(out, "\tFP\tFN\tErr\tCorr\tTruth\tTime");
 //
-//        for (MbSearch algorithm : algorithms) {
+//        for (MbSearch algorithm : algorithm) {
 //            int fpSum = 0, fnSum = 0, errorsSum = 0, truthSum = 0;
 //            long timeSum = 0;
 //            int n = 0;
@@ -997,11 +997,11 @@ public class TestMarkovBlanketSearches {
 //            this.minMbSize = minMbSize;
 //        }
 //
-//        public double getParameter1() {
+//        public double getAlternativePenalty() {
 //            return alpha;
 //        }
 //
-//        public void setParameter1(double alpha) {
+//        public void setAlternativePenalty(double alpha) {
 //            this.alpha = alpha;
 //        }
 //

@@ -22,17 +22,14 @@
 package edu.cmu.tetradapp.workbench;
 
 import edu.cmu.tetrad.graph.*;
-import edu.cmu.tetrad.util.JOptionUtils;
+import edu.cmu.tetrad.graph.TripleClassifier;
 import edu.cmu.tetradapp.model.EditorUtils;
 
-import javax.swing.*;
 import java.awt.*;
-import java.awt.event.KeyAdapter;
-import java.awt.event.KeyEvent;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.prefs.Preferences;
 
 /**
  * Extends AbstractWorkbench in the ways needed to display tetrad-style graphs.
@@ -41,7 +38,7 @@ import java.util.prefs.Preferences;
  * @author Willie Wheeler
  * @see AbstractWorkbench
  */
-public class GraphWorkbench extends AbstractWorkbench {
+public class GraphWorkbench extends AbstractWorkbench implements TripleClassifier {
 
     //=================PUBLIC STATIC FINAL FIELDS=========================//
     public static final int MEASURED_NODE = 0;
@@ -221,19 +218,21 @@ public class GraphWorkbench extends AbstractWorkbench {
      * @return the new tracking edge (a display edge).
      */
     public IDisplayEdge getNewTrackingEdge(DisplayNode node, Point mouseLoc) {
+        Color color = null;
+
         switch (edgeMode) {
             case DIRECTED_EDGE:
-                return new DisplayEdge(node, mouseLoc, DisplayEdge.DIRECTED);
+                return new DisplayEdge(node, mouseLoc, DisplayEdge.DIRECTED, color);
 
             case NONDIRECTED_EDGE:
-                return new DisplayEdge(node, mouseLoc, DisplayEdge.NONDIRECTED);
+                return new DisplayEdge(node, mouseLoc, DisplayEdge.NONDIRECTED, color);
 
             case PARTIALLY_ORIENTED_EDGE:
                 return new DisplayEdge(node, mouseLoc,
-                        DisplayEdge.PARTIALLY_ORIENTED);
+                        DisplayEdge.PARTIALLY_ORIENTED, color);
 
             case BIDIRECTED_EDGE:
-                return new DisplayEdge(node, mouseLoc, DisplayEdge.BIDIRECTED);
+                return new DisplayEdge(node, mouseLoc, DisplayEdge.BIDIRECTED, color);
 
             default :
                 throw new IllegalStateException();
@@ -396,6 +395,28 @@ public class GraphWorkbench extends AbstractWorkbench {
             }
         }
         return false;
+    }
+
+    /**
+     * @return the names of the triple classifications. Coordinates with <code>getTriplesList</code>
+     */
+    public List<String> getTriplesClassificationTypes() {
+        List<String> names = new ArrayList<>();
+        names.add("Underlines");
+        names.add("Dotted Underlines");
+        return names;
+    }
+
+    /**
+     * @return the list of triples corresponding to <code>getTripleClassificationNames</code> for the given
+     * node.
+     */
+    public List<List<Triple>> getTriplesLists(Node node) {
+        List<List<Triple>> triplesList = new ArrayList<>();
+        Graph graph = getGraph();
+        triplesList.add(GraphUtils.getUnderlinedTriplesFromGraph(node, graph));
+        triplesList.add(GraphUtils.getDottedUnderlinedTriplesFromGraph(node, graph));
+        return triplesList;
     }
 }
 

@@ -1,29 +1,33 @@
 package edu.cmu.tetrad.algcomparison.independence;
 
-import edu.cmu.tetrad.algcomparison.simulation.Parameters;
-import edu.cmu.tetrad.data.DataSet;
-import edu.cmu.tetrad.data.DataType;
+import edu.cmu.tetrad.data.*;
+import edu.cmu.tetrad.util.Parameters;
 import edu.cmu.tetrad.search.IndTestFisherZ;
 import edu.cmu.tetrad.search.IndependenceTest;
 
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Wrapper for Fisher Z test.
+ *
  * @author jdramsey
  */
-public class FisherZ implements IndTestWrapper {
-    private DataSet dataSet = null;
-    private IndependenceTest test = null;
+public class FisherZ implements IndependenceWrapper {
+    static final long serialVersionUID = 23L;
 
     @Override
-    public IndependenceTest getTest(DataSet dataSet, Parameters parameters) {
-        if (dataSet != this.dataSet) {
-            this.dataSet = dataSet;
-            this.test = new IndTestFisherZ(dataSet, parameters.getDouble("alpha"));
+    public IndependenceTest getTest(DataModel dataSet, Parameters parameters) {
+        double alpha = parameters.getDouble("alpha");
+
+        if (dataSet instanceof ICovarianceMatrix) {
+            return new IndTestFisherZ((ICovarianceMatrix) dataSet, alpha);
+        } else if (dataSet instanceof DataSet) {
+            return new IndTestFisherZ((DataSet) dataSet, alpha);
+
         }
-        return test;
+
+        throw new IllegalArgumentException("Expecting eithet a data set or a covariance matrix.");
     }
 
     @Override
@@ -38,7 +42,8 @@ public class FisherZ implements IndTestWrapper {
 
     @Override
     public List<String> getParameters() {
-        return Collections.singletonList("alpha");
+        List<String> params = new ArrayList<>();
+        params.add("alpha");
+        return params;
     }
-
 }

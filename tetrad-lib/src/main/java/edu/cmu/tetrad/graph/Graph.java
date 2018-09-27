@@ -39,7 +39,7 @@ import java.util.Set;
  * @author Joseph Ramsey
  * @see Endpoint
  */
-public interface Graph extends TetradSerializable {
+public interface Graph extends TetradSerializable, TripleClassifier {
     long serialVersionUID = 23L;
 
     /**
@@ -74,13 +74,6 @@ public interface Graph extends TetradSerializable {
      * @return true if the edge was added, false if not.
      */
     boolean addEdge(Edge edge);
-
-    /**
-     * Adds a graph constraint.
-     *
-     * @return true if the constraint was added, false if not.
-     */
-    boolean addGraphConstraint(GraphConstraint gc);
 
     /**
      * Adds a node to the graph. Precondition: The proposed name of the node
@@ -249,14 +242,14 @@ public interface Graph extends TetradSerializable {
     Endpoint[][] getEndpointMatrix();
 
     /**
-     * @return the list of graph constraints for this graph.
+     * @return the number of arrow endpoints adjacent to a node.
      */
-    List<GraphConstraint> getGraphConstraints();
+    int getIndegree(Node node);
 
     /**
      * @return the number of arrow endpoints adjacent to a node.
      */
-    int getIndegree(Node node);
+    int getDegree(Node node);
 
     /**
      * @return the node with the given string name.  In case of accidental
@@ -379,6 +372,14 @@ public interface Graph extends TetradSerializable {
      */
     boolean isDConnectedTo(Node node1, Node node2, List<Node> z);
 
+    boolean isPattern();
+
+    void setPattern(boolean pattern);
+
+    boolean isPag();
+
+    void setPag(boolean pag);
+
     /**
      * Determines whether one node is d-separated from another. Two elements are   E
      * d-separated just in case they are not d-connected.
@@ -493,18 +494,6 @@ public interface Graph extends TetradSerializable {
     boolean setEndpoint(Node from, Node to, Endpoint endPoint);
 
     /**
-     * @return true iff graph constraints will be checked for future graph
-     * modifications.
-     */
-    boolean isGraphConstraintsChecked();
-
-    /**
-     * Set whether graph constraints will be checked for future graph
-     * modifications.
-     */
-    void setGraphConstraintsChecked(boolean checked);
-
-    /**
      * Constructs and returns a subgraph consisting of a given subset of the
      * nodes of this graph together with the edges between them.
      */
@@ -522,8 +511,7 @@ public interface Graph extends TetradSerializable {
      * the old graph to the new graph.
      *
      * @param graph the graph from which nodes and edges are to be pilfered.
-     * @throws java.lang.IllegalArgumentException This exception is thrown if adding some node or edge violates
-     *                                            one of the basicConstraints of this graph.
+     * @throws java.lang.IllegalArgumentException This exception is thrown if adding some node.
      */
     void transferNodesAndEdges(Graph graph) throws IllegalArgumentException;
 
@@ -661,9 +649,7 @@ public interface Graph extends TetradSerializable {
 
     List<Node> getSepset(Node n1, Node n2);
 
-    /*
-     *  Change the node named original in this graph to the name change
-     */
+    void setNodes(List<Node> nodes);
 }
 
 

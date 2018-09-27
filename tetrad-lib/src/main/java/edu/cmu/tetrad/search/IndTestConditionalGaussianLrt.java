@@ -40,16 +40,18 @@ import java.util.*;
  *
  * @author Joseph Ramsey
  */
-public class IndTestConditionalGaussianLrt implements IndependenceTest {
+public class IndTestConditionalGaussianLRT implements IndependenceTest {
     private DataSet data;
     private Map<Node, Integer> nodesHash;
     private double alpha = 0.001;
 
     // Likelihood function
     private ConditionalGaussianLikelihood likelihood;
+    private double pValue = Double.NaN;
+    private int numCategoriesToDiscretize = 3;
+    private double penaltyDiscount;
 
-
-    public IndTestConditionalGaussianLrt(DataSet data, double alpha) {
+    public IndTestConditionalGaussianLRT(DataSet data, double alpha) {
         this.data = data;
         this.likelihood = new ConditionalGaussianLikelihood(data);
 
@@ -91,15 +93,25 @@ public class IndTestConditionalGaussianLrt implements IndependenceTest {
             list2[i] = _z;
         }
 
-        ConditionalGaussianLikelihood.Ret ret1 = likelihood.getLikelihoodRatio(_x, list1);
-        ConditionalGaussianLikelihood.Ret ret2 = likelihood.getLikelihoodRatio(_x, list2);
+        ConditionalGaussianLikelihood.Ret ret1 = likelihood.getLikelihood(_x, list1);
+        ConditionalGaussianLikelihood.Ret ret2 = likelihood.getLikelihood(_x, list2);
 
         double lik = ret1.getLik() - ret2.getLik();
         double dof = ret1.getDof() - ret2.getDof();
 
-        if (dof <= 0) dof = 0;
+        if (dof <= 0) {
+            dof = 1;
+//            throw new IllegalArgumentException("DOF must be >= 1");
+        }
 
-        double p = 1.0 - new ChiSquaredDistribution(dof).cumulativeProbability(2.0 * lik);
+        double p = 0;
+        try {
+            p = 1.0 - new ChiSquaredDistribution(dof).cumulativeProbability(2.0 * lik);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        this.pValue = p;
 
         return p > alpha;
     }
@@ -128,7 +140,7 @@ public class IndTestConditionalGaussianLrt implements IndependenceTest {
      * not meaningful for tis test.
      */
     public double getPValue() {
-        return Double.NaN;
+        return this.pValue;
     }
 
     /**
@@ -144,7 +156,7 @@ public class IndTestConditionalGaussianLrt implements IndependenceTest {
      */
     public List<String> getVariableNames() {
         List<Node> variables = getVariables();
-        List<String> variableNames = new ArrayList<String>();
+        List<String> variableNames = new ArrayList<>();
         for (Node variable1 : variables) {
             variableNames.add(variable1.getName());
         }
@@ -174,14 +186,14 @@ public class IndTestConditionalGaussianLrt implements IndependenceTest {
      * @throws UnsupportedOperationException if there is no significance level.
      */
     public double getAlpha() {
-        return Double.NaN;
+        return alpha;
     }
 
     /**
      * Sets the significance level.
      */
     public void setAlpha(double alpha) {
-
+        this.alpha = alpha;
     }
 
     public DataSet getData() {
@@ -209,8 +221,9 @@ public class IndTestConditionalGaussianLrt implements IndependenceTest {
     }
 
     @Override
+
     public double getScore() {
-        return getPValue();
+        return getAlpha() - getPValue();
     }
 
     /**
@@ -219,5 +232,13 @@ public class IndTestConditionalGaussianLrt implements IndependenceTest {
     public String toString() {
         NumberFormat nf = new DecimalFormat("0.0000");
         return "Multinomial Logistic Regression, alpha = " + nf.format(getAlpha());
+    }
+
+    public void setNumCategoriesToDiscretize(int numCategoriesToDiscretize) {
+        this.numCategoriesToDiscretize = numCategoriesToDiscretize;
+    }
+
+    public void setPenaltyDiscount(double penaltyDiscount) {
+        this.penaltyDiscount = penaltyDiscount;
     }
 }

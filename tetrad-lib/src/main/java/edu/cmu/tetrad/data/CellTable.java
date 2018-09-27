@@ -57,7 +57,7 @@ public final class CellTable {
     }
 
     @SuppressWarnings({"ConstantConditions"})
-    public final void addToTable(DataSet dataSet, int[] indices) {
+    public synchronized final void addToTable(DataSet dataSet, int[] indices) {
         int[] dims = new int[indices.length];
 
         for (int i = 0; i < indices.length; i++) {
@@ -87,7 +87,6 @@ public final class CellTable {
 
             table.increment(coords, 1);
         }
-
     }
 
     /**
@@ -109,7 +108,7 @@ public final class CellTable {
      * @param coords an array of the sort described above.
      * @return the marginal sum specified.
      */
-    public final long calcMargin(int[] coords) {
+    public synchronized final long calcMargin(int[] coords) {
         internalCoordCopy(coords);
 
         int sum = 0;
@@ -142,7 +141,7 @@ public final class CellTable {
      * @param marginVars an <code>int[]</code> value
      * @return an <code>int</code> value
      */
-    public final long calcMargin(int[] coords, int[] marginVars) {
+    public synchronized final long calcMargin(int[] coords, int[] marginVars) {
         internalCoordCopy(coords);
 
         for (int marginVar : marginVars) {
@@ -156,7 +155,7 @@ public final class CellTable {
      * Makes a copy of the coordinate array so that the original is not messed
      * up.
      */
-    private void internalCoordCopy(int[] coords) {
+    private synchronized void internalCoordCopy(int[] coords) {
         if ((this.coordCopy == null) ||
                 (this.coordCopy.length != coords.length)) {
             this.coordCopy = new int[coords.length];

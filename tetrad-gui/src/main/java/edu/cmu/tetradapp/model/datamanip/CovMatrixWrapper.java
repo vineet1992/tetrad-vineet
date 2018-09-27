@@ -24,9 +24,11 @@ package edu.cmu.tetradapp.model.datamanip;
 import edu.cmu.tetrad.data.*;
 import edu.cmu.tetrad.graph.Node;
 import edu.cmu.tetrad.sem.SemIm;
+import edu.cmu.tetrad.util.Parameters;
 import edu.cmu.tetrad.util.TetradMatrix;
 import edu.cmu.tetrad.util.TetradSerializableUtils;
 import edu.cmu.tetradapp.model.DataWrapper;
+import edu.cmu.tetradapp.model.PcRunner;
 import edu.cmu.tetradapp.model.SemImWrapper;
 
 import java.util.List;
@@ -42,7 +44,7 @@ public class CovMatrixWrapper extends DataWrapper {
     /**
      * Splits the given data set by collinear columns.
      */
-    public CovMatrixWrapper(DataWrapper wrapper) {
+    public CovMatrixWrapper(DataWrapper wrapper, Parameters params) {
         if (wrapper == null) {
             throw new NullPointerException("The given data must not be null");
         }
@@ -93,22 +95,22 @@ public class CovMatrixWrapper extends DataWrapper {
 
     }
 
-    public CovMatrixWrapper(SemImWrapper wrapper) {
-        if (wrapper == null) {
-            throw new NullPointerException("The Sem IM must not be null.");
-        }
-
-        SemIm semIm = wrapper.getSemIm();
-
-        TetradMatrix matrix = semIm.getImplCovar(true);
-        List<Node> variables = semIm.getSemPm().getVariableNodes();
-
-        ICovarianceMatrix covarianceMatrix = new CovarianceMatrix(variables, matrix, semIm.getSampleSize());
-        setDataModel(covarianceMatrix);
-        setSourceGraph(semIm.getSemPm().getGraph());
-
-        LogDataUtils.logDataModelList("Conversion of data to covariance matrix form.", getDataModelList());
-    }
+//    public CovMatrixWrapper(SemImWrapper wrapper) {
+//        if (wrapper == null) {
+//            throw new NullPointerException("The Sem IM must not be null.");
+//        }
+//
+//        SemIm semIm = wrapper.getSemIm();
+//
+//        TetradMatrix matrix = semIm.getImplCovar(true);
+//        List<Node> variables = semIm.getSemPm().getVariableNodes();
+//
+//        ICovarianceMatrix covarianceMatrix = new CovarianceMatrix(variables, matrix, semIm.getSampleSize());
+//        setDataModel(covarianceMatrix);
+//        setSourceGraph(semIm.getSemPm().getGraph());
+//
+//        LogDataUtils.logDataModelList("Conversion of data to covariance matrix form.", getDataModelList());
+//    }
 
 
     /**
@@ -116,8 +118,8 @@ public class CovMatrixWrapper extends DataWrapper {
      *
      * @see TetradSerializableUtils
      */
-    public static DataWrapper serializableInstance() {
-        return new CovMatrixWrapper(new DataWrapper(DataUtils.continuousSerializableInstance()));
+    public static PcRunner serializableInstance() {
+        return PcRunner.serializableInstance();
     }
 
 

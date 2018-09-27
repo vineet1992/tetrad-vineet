@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 
 import static edu.pitt.csb.stability.StabilityUtils.StabilitySearchPar;
+import static edu.pitt.csb.stability.StabilityUtils.getSubSize;
 
 /**
  * Created by vinee_000 on 9/13/2017.
@@ -54,9 +55,7 @@ public class STARS {
             gamma = g;
             alpha = alp;
             d = dat;
-            b = (int)Math.floor( 10*Math.sqrt(dat.getNumRows()));
-            if (b >= d.getNumRows())
-                b = d.getNumRows()/2;
+            this.b  = getSubSize(dat.getNumRows());
 
         }
     public STARS(DataSet dat,double [] alp,double g,int numSub, Algorithm a)
@@ -65,9 +64,7 @@ public class STARS {
         gamma = g;
         alpha = alp;
         d = dat;
-        b = (int)Math.floor( 10*Math.sqrt(dat.getNumRows()));
-        if (b >= d.getNumRows())
-            b = d.getNumRows()/2;
+        this.b = getSubSize(dat.getNumRows());
         alg = a;
 
     }
@@ -87,9 +84,7 @@ public class STARS {
         gamma = g;
         alpha = alp;
         d = dat;
-        b = (int)Math.floor( 10*Math.sqrt(dat.getNumRows()));
-        if (b >= d.getNumRows())
-            b = d.getNumRows()/2;
+        this.b = getSubSize(dat.getNumRows());
         alg = a;
 
     }
@@ -110,9 +105,7 @@ public class STARS {
             gamma = g;
             alpha = alp;
             d = dat;
-            b = (int)Math.floor( 10*Math.sqrt(dat.getNumRows()));
-            if (b >= d.getNumRows())
-                b = d.getNumRows()/2;
+            this.b = getSubSize(dat.getNumRows());
 
         }
 
@@ -135,6 +128,12 @@ public class STARS {
             mgmLambda = lambda;
         }
 
+        private DoubleMatrix2D getInstability(Algorithm alg, DataSet d, double alpha, int N, int b)
+        {
+            DoubleMatrix2D insta = null;
+            insta = StabilityUtils.StabilitySearchPar(d,Algorithm.algToSearchWrapper(alg,new double []  {alpha}),N,b);
+            return insta;
+        }
         public double getAlpha(boolean FGS)
         {
             double [][] result = new double[alpha.length][4];
@@ -144,12 +143,13 @@ public class STARS {
             {
                 reverse(alpha);
             }
-            if(!d.isMixed())
-            {
                 double [] stab = new double[alpha.length];
 
                 for(int i = alpha.length-1; i >= 0;i--) {
-                    DoubleMatrix2D insta = StabilityUtils.StabilitySearchPar(d, new SearchWrappers.FgsWrapper(alpha[i]),N,b);
+                    System.out.println("Testing parameter..." + alpha[i]);
+                    DoubleMatrix2D insta = getInstability(alg,d,alpha[i],N,b);
+
+
                     double sum = 0;
                     for(int j = 0; j < insta.rows();j++)
                     {
@@ -184,7 +184,7 @@ public class STARS {
                 {
                     if(stab[i] < gamma)
                     {
-                        DoubleMatrix2D insta = StabilityUtils.StabilitySearchPar(d, new SearchWrappers.FgsWrapper(alpha[i]),N,b);
+                        DoubleMatrix2D insta = getInstability(alg,d,alpha[i],N,b);
                         stabilities = insta.toArray();
                         return alpha[i];
                     }
@@ -194,18 +194,10 @@ public class STARS {
                         min = stab[i];
                     }
                 }
-                DoubleMatrix2D insta = StabilityUtils.StabilitySearchPar(d, new SearchWrappers.FgsWrapper(alpha[minIndex]),N,b);
+                DoubleMatrix2D insta = getInstability(alg,d,alpha[minIndex],N,b);
 
                 stabilities = insta.toArray();
                 return alpha[minIndex];
-
-            }
-            else {
-                DoubleMatrix2D insta = StabilityUtils.StabilitySearchPar(d, new SearchWrappers.FgsWrapper(alpha[0]),N,b);
-                stabilities = insta.toArray();
-                return alpha[0];
-            }
-
         }
         public double [][] runSTARS()
         {

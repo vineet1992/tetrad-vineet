@@ -516,7 +516,7 @@ public final class DiscreteVariable extends AbstractVariable
     /**
      * Sets the category of the category at the given index.
      */
-    private synchronized void setCategories(int numCategories) {
+    private void setCategories(int numCategories) {
         String[] categories = new String[numCategories];
 
         for (int i = 0; i < numCategories; i++) {
@@ -534,7 +534,7 @@ public final class DiscreteVariable extends AbstractVariable
         return this.pcs;
     }
 
-    private static List<String> getStoredCategoryList(
+    private static synchronized List<String> getStoredCategoryList(
             List<String> categoryList) {
         if (categoryList == null) {
             throw new NullPointerException();

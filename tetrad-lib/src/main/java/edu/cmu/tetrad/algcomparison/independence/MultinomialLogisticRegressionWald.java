@@ -1,31 +1,28 @@
 package edu.cmu.tetrad.algcomparison.independence;
 
-import edu.cmu.tetrad.algcomparison.simulation.Parameters;
-import edu.cmu.tetrad.data.DataSet;
+import edu.cmu.tetrad.data.DataModel;
+import edu.cmu.tetrad.data.DataUtils;
+import edu.cmu.tetrad.util.Parameters;
 import edu.cmu.tetrad.data.DataType;
 import edu.pitt.csb.mgm.IndTestMultinomialLogisticRegressionWald;
 
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Wrapper for Fisher Z test.
+ *
  * @author jdramsey
  */
-public class MultinomialLogisticRegressionWald implements IndTestWrapper {
-    private DataSet dataSet = null;
-    private edu.cmu.tetrad.search.IndependenceTest test = null;
+public class MultinomialLogisticRegressionWald implements IndependenceWrapper {
+    static final long serialVersionUID = 23L;
 
     @Override
-    public edu.cmu.tetrad.search.IndependenceTest getTest(DataSet dataSet, Parameters parameters) {
-        if (dataSet != this.dataSet) {
-            this.dataSet = dataSet;
-            this.test = new IndTestMultinomialLogisticRegressionWald(
-                    dataSet,
-                    parameters.getDouble("alpha"),
-                    false);
-        }
-        return test;
+    public edu.cmu.tetrad.search.IndependenceTest getTest(DataModel dataSet, Parameters parameters) {
+        return new IndTestMultinomialLogisticRegressionWald(
+                DataUtils.getMixedDataSet(dataSet),
+                parameters.getDouble("alpha"),
+                false);
     }
 
     @Override
@@ -40,7 +37,8 @@ public class MultinomialLogisticRegressionWald implements IndTestWrapper {
 
     @Override
     public List<String> getParameters() {
-        return Collections.singletonList("alpha");
+        List<String> params = new ArrayList<>();
+        params.add("alpha");
+        return params;
     }
-
 }

@@ -38,6 +38,8 @@ public class LagGraph implements Graph {
     private List<String> variables = new ArrayList<>();
     private int numLags = 0;
     private Map<String, List<Node>> laggedVariables = new HashMap<>();
+    private boolean pag;
+    private boolean pattern;
 
     // New methods.
     public boolean addVariable(String variable) {
@@ -100,10 +102,6 @@ public class LagGraph implements Graph {
     }
 
     public boolean addEdge(Edge edge) {
-        throw new UnsupportedOperationException();
-    }
-
-    public boolean addGraphConstraint(GraphConstraint gc) {
         throw new UnsupportedOperationException();
     }
 
@@ -203,12 +201,13 @@ public class LagGraph implements Graph {
         return getGraph().getEndpointMatrix();
     }
 
-    public List<GraphConstraint> getGraphConstraints() {
-        return getGraph().getGraphConstraints();
-    }
-
     public int getIndegree(Node node) {
         return getGraph().getIndegree(node);
+    }
+
+    @Override
+    public int getDegree(Node node) {
+        return getGraph().getDegree(node);
     }
 
     public Node getNode(String name) {
@@ -351,14 +350,6 @@ public class LagGraph implements Graph {
         return getGraph().setEndpoint(from, to, endPoint);
     }
 
-    public boolean isGraphConstraintsChecked() {
-        return getGraph().isGraphConstraintsChecked();
-    }
-
-    public void setGraphConstraintsChecked(boolean checked) {
-        getGraph().setGraphConstraintsChecked(checked);
-    }
-
     public Graph subgraph(List<Node> nodes) {
         return getGraph().subgraph(nodes);
     }
@@ -461,12 +452,47 @@ public class LagGraph implements Graph {
         throw new UnsupportedOperationException();
     }
 
+    @Override
+    public void setNodes(List<Node> nodes) {
+        graph.setNodes(nodes);
+    }
+
     private Dag getGraph() {
         return graph;
     }
 
     public void setGraph(Dag graph) {
         this.graph = graph;
+    }
+
+    @Override
+    public List<String> getTriplesClassificationTypes() {
+        return null;
+    }
+
+    @Override
+    public List<List<Triple>> getTriplesLists(Node node) {
+        return null;
+    }
+
+    @Override
+    public boolean isPag() {
+        return pag;
+    }
+
+    @Override
+    public void setPag(boolean pag) {
+        this.pag = pag;
+    }
+
+    @Override
+    public boolean isPattern() {
+        return pattern;
+    }
+
+    @Override
+    public void setPattern(boolean pattern) {
+        this.pattern = pattern;
     }
 }
 

@@ -57,7 +57,7 @@ class GraphToolbar extends JPanel implements PropertyChangeListener {
     /**
      * The panel that the buttons are in.
      */
-    private Box buttonsPanel = Box.createVerticalBox();
+    private final Box buttonsPanel = Box.createVerticalBox();
 
     // The buttons in the toolbar.
     private JToggleButton move, addObserved, addLatent, addDirectedEdge, addNondirectedEdge, addPartiallyOrientedEdge, addBidirectedEdge;
@@ -123,7 +123,7 @@ class GraphToolbar extends JPanel implements PropertyChangeListener {
         });
         addObserved.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-                addObserved.getModel().setSelected(true);                          
+                addObserved.getModel().setSelected(true);
                 setWorkbenchMode(GraphWorkbench.ADD_NODE);
                 setNodeMode(GraphWorkbench.MEASURED_NODE);
             }
@@ -188,6 +188,11 @@ class GraphToolbar extends JPanel implements PropertyChangeListener {
      */
     private void setWorkbenchMode(int mode) {
         workbench.setWorkbenchMode(mode);
+//        Toolkit toolkit = Toolkit.getDefaultToolkit();
+//        Image image = ImageUtils.getImage(this, "cursorImage.png");
+//        Cursor c = toolkit.createCustomCursor(image, new Point(10, 10), "img");
+//        setCursor(c);
+
         setCursor(workbench.getCursor());
     }
 

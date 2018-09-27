@@ -113,6 +113,31 @@ public final class TimeSeriesData implements DataModel {
         this.name = name;
     }
 
+    @Override
+    public boolean isContinuous() {
+        return true;
+    }
+
+    @Override
+    public boolean isDiscrete() {
+        return false;
+    }
+
+    @Override
+    public boolean isMixed() {
+        return false;
+    }
+
+    @Override
+    public Node getVariable(String name) {
+        return null;
+    }
+
+    @Override
+    public DataModel copy() {
+        return null;
+    }
+
     public final List<Node> getVariables() {
         List<String> varNames = getVariableNames();
         List<Node> vars = new LinkedList<>();

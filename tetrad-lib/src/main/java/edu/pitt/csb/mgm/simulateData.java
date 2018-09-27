@@ -1,8 +1,10 @@
 package edu.pitt.csb.mgm;
 
-import edu.cmu.tetrad.algcomparison.simulation.ContinuousLinearGaussianSemSimulation;
 import edu.cmu.tetrad.algcomparison.simulation.MixedLeeHastieSimulation;
 import edu.cmu.tetrad.algcomparison.simulation.Parameters;
+import edu.cmu.tetrad.data.CovarianceMatrix;
+import edu.cmu.tetrad.data.DataUtils;
+import edu.cmu.tetrad.data.ICovarianceMatrix;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.Node;
 import edu.cmu.tetrad.util.TetradMatrix;
@@ -102,11 +104,11 @@ public class simulateData {
             else
             {
                 PrintStream out = new PrintStream(directory + "/Graphs/Graph_" + i + ".txt");
-                ContinuousLinearGaussianSemSimulation c = new ContinuousLinearGaussianSemSimulation();
+                MixedLeeHastieSimulation c = new MixedLeeHastieSimulation();
                 Parameters p = new Parameters();
                 p.setValue("numMeasures",numVariables);
                 p.setValue("sampleSize",sampleSize);
-                p.setValue("percentDiscreteForMixedSimulation",percentDiscrete);
+                p.setValue("percentDiscreteForMixedSimulation",0);
                 p.setValue("numCategories",numCategories);
                 NormalDistribution n = new NormalDistribution(numVariables,numVariables/4);
                 if(numEdgesRandom)
@@ -122,10 +124,11 @@ public class simulateData {
                 out.println(c.getTrueGraph());
                 out.flush();
                 out.close();
+                ICovarianceMatrix cov = DataUtils.getCovMatrix(c.getDataSet(0));
                 out = new PrintStream(directory + "/Graphs/Adj_Mat_" + i + ".txt");
                 printAdjMat(c.getTrueGraph(),out);
                 out = new PrintStream(directory + "/Data/Covariance_" + i + ".txt");
-                printCovMat(c.cov,out);
+                printCovMat(cov,out);
                 out = new PrintStream(directory + "/Data/Data_" + i + ".txt");
                 out.println(c.getDataSet(0));
                 out.flush();
@@ -158,16 +161,16 @@ public class simulateData {
         out.flush();
         out.close();
     }
-    public static void printCovMat(TetradMatrix cov, PrintStream out)
+    public static void printCovMat(ICovarianceMatrix cov, PrintStream out)
     {
-        for(int i = 0; i < cov.rows();i++)
+        for(int i = 0; i < cov.getDimension();i++)
         {
-            for(int j = 0; j < cov.columns();j++)
+            for(int j = 0; j < cov.getDimension();j++)
             {
-                    if(j==cov.columns()-1)
-                        out.println(cov.get(i,j));
+                    if(j==cov.getDimension()-1)
+                        out.println(cov.getValue(i,j));
                     else
-                        out.print(cov.get(i,j) + "\t");
+                        out.print(cov.getValue(i,j) + "\t");
 
             }
         }

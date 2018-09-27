@@ -17,7 +17,7 @@ public class WFgs implements GraphSearch {
 
     private List<Node> searchVariables;
     private Map<Node, List<Node>> variablesPerNode = new HashMap<Node, List<Node>>();
-    private Fgs2 fgs;
+    private Fges fgs;
     private double penaltyDiscount;
     private SemBicScore score;
 
@@ -40,7 +40,7 @@ public class WFgs implements GraphSearch {
 
         SemBicScore score = new SemBicScore(covariances);
         this.score = score;
-        this.fgs = new Fgs2(score);
+        this.fgs = new Fges(score);
     }
 
     private List<Node> expandVariable(DataSet dataSet, Node node) {

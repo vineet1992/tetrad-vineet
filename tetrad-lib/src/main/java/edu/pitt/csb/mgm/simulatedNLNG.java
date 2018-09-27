@@ -1,7 +1,7 @@
 package edu.pitt.csb.mgm;
 
 import edu.cmu.tetrad.algcomparison.Comparison;
-import edu.cmu.tetrad.algcomparison.simulation.ContinuousLinearGaussianSemSimulation;
+import edu.cmu.tetrad.algcomparison.simulation.MixedLeeHastieSimulation;
 import edu.cmu.tetrad.algcomparison.simulation.Parameters;
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.graph.Graph;
@@ -26,7 +26,7 @@ public class simulatedNLNG {
         {
             Parameters p = new Parameters();
             //p.setValue("");
-            ContinuousLinearGaussianSemSimulation c = new ContinuousLinearGaussianSemSimulation();
+            MixedLeeHastieSimulation c = new MixedLeeHastieSimulation();
             c.simulate(p);
            DataSet d =  c.getDataSet(0);
            Graph g = c.getTrueGraph();

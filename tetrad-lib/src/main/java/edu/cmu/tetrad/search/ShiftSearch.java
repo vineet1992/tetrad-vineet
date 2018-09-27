@@ -155,7 +155,7 @@ public class ShiftSearch {
     }
 
     private List<DataSet> truncateDataSets(List<DataSet> dataSets, int topMargin, int bottomMargin) {
-        List<DataSet> truncatedData = new ArrayList<DataSet>();
+        List<DataSet> truncatedData = new ArrayList<>();
 
         for (DataSet dataSet : dataSets) {
             TetradMatrix mat = dataSet.getDoubleData();
@@ -180,9 +180,9 @@ public class ShiftSearch {
     }
 
     private double getAvgBic(List<DataModel> dataSets) {
-        SemBicScoreImages fgsScore = new SemBicScoreImages(dataSets);
-        fgsScore.setPenaltyDiscount(c);
-        Fgs images = new Fgs(fgsScore);
+        SemBicScoreImages fgesScore = new SemBicScoreImages(dataSets);
+        fgesScore.setPenaltyDiscount(c);
+        Fges images = new Fges(fgesScore);
         images.setKnowledge(knowledge);
         images.search();
         return -images.getModelScore() / dataSets.size();

@@ -1,40 +1,48 @@
 package edu.cmu.tetrad.algcomparison.simulation;
 
-import edu.cmu.tetrad.data.DataType;
+import edu.cmu.tetrad.data.DataModel;
+import edu.cmu.tetrad.util.Parameters;
 import edu.cmu.tetrad.data.DataReader;
 import edu.cmu.tetrad.data.DataSet;
+import edu.cmu.tetrad.data.DataType;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.GraphUtils;
 
-import java.io.*;
-import java.util.ArrayList;
-import java.util.List;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.*;
 
 /**
  * @author jdramsey
  */
 public class LoadContinuousDataAndGraphs implements Simulation {
+    static final long serialVersionUID = 23L;
     private String path;
-    private Graph graph;
-    private List<DataSet> dataSets;
+    private List<Graph> graphs = new ArrayList<>();
+    private List<DataSet> dataSets = new ArrayList<>();
+    private List<String> usedParameters = new ArrayList<>();
 
     public LoadContinuousDataAndGraphs(String path) {
         this.path = path;
     }
 
     @Override
-    public void simulate(Parameters parameters) {
+    public void createData(Parameters parameters) {
         this.dataSets = new ArrayList<>();
 
         if (new File(path + "/data").exists()) {
             int numDataSets = new File(path + "/data").listFiles().length;
 
-            File file2 = new File(path + "/graph/graph.txt");
-            System.out.println("Loading graph from " + file2.getAbsolutePath());
-            this.graph = GraphUtils.loadGraphTxt(file2);
-
             try {
                 for (int i = 0; i < numDataSets; i++) {
+                    File file2 = new File(path + "/graph/graph." + (i + 1) + ".txt");
+                    System.out.println("Loading graph from " + file2.getAbsolutePath());
+                    this.graphs.add(GraphUtils.loadGraphTxt(file2));
+
+                    edu.cmu.tetrad.graph.GraphUtils.circleLayout(this.graphs.get(i), 225, 200, 150);
+
                     File file1 = new File(path + "/data/data." + (i + 1) + ".txt");
 
                     System.out.println("Loading data from " + file1.getAbsolutePath());
@@ -53,11 +61,19 @@ public class LoadContinuousDataAndGraphs implements Simulation {
                         String[] tokens = line.split(" = ");
                         String key = tokens[0];
                         String value = tokens[1];
-                        parameters.put(key, Double.parseDouble(value));
+
+                        try {
+                            double _value = Double.parseDouble(value);
+                            usedParameters.add(key);
+                            parameters.set(key, _value);
+                        } catch (NumberFormatException e) {
+                            usedParameters.add(key);
+                            parameters.set(key, value);
+                        }
                     }
                 }
 
-                parameters.put("numRuns", numDataSets);
+                parameters.set("numRuns", numDataSets);
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -65,12 +81,12 @@ public class LoadContinuousDataAndGraphs implements Simulation {
     }
 
     @Override
-    public Graph getTrueGraph() {
-        return graph;
+    public Graph getTrueGraph(int index) {
+        return graphs.get(index);
     }
 
     @Override
-    public DataSet getDataSet(int index) {
+    public DataModel getDataModel(int index) {
         return dataSets.get(index);
     }
 
@@ -97,12 +113,11 @@ public class LoadContinuousDataAndGraphs implements Simulation {
 
     @Override
     public List<String> getParameters() {
-        List<String> parameters = new ArrayList<>();
-        return parameters;
+        return usedParameters;
     }
 
     @Override
-    public int getNumDataSets() {
+    public int getNumDataModels() {
         return dataSets.size();
     }
 

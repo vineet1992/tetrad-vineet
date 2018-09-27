@@ -1,29 +1,26 @@
 package edu.cmu.tetrad.algcomparison.independence;
 
-import edu.cmu.tetrad.algcomparison.simulation.Parameters;
-import edu.cmu.tetrad.data.DataSet;
+import edu.cmu.tetrad.data.DataModel;
+import edu.cmu.tetrad.data.DataUtils;
+import edu.cmu.tetrad.util.Parameters;
 import edu.cmu.tetrad.data.DataType;
 import edu.cmu.tetrad.search.IndTestChiSquare;
 import edu.cmu.tetrad.search.IndependenceTest;
 
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Wrapper for Fisher Z test.
+ *
  * @author jdramsey
  */
-public class ChiSquare implements IndTestWrapper {
-    private DataSet dataSet = null;
-    private edu.cmu.tetrad.search.IndependenceTest test = null;
+public class ChiSquare implements IndependenceWrapper {
+    static final long serialVersionUID = 23L;
 
     @Override
-    public IndependenceTest getTest(DataSet dataSet, Parameters parameters) {
-        if (dataSet != this.dataSet) {
-            this.dataSet = dataSet;
-            this.test = new IndTestChiSquare(dataSet, parameters.getDouble("alpha"));
-        }
-        return test;
+    public IndependenceTest getTest(DataModel dataSet, Parameters parameters) {
+        return new IndTestChiSquare(DataUtils.getDiscreteDataSet(dataSet), parameters.getDouble("alpha"));
     }
 
     @Override
@@ -33,12 +30,14 @@ public class ChiSquare implements IndTestWrapper {
 
     @Override
     public DataType getDataType() {
-        return DataType.Continuous;
+        return DataType.Discrete;
     }
 
     @Override
     public List<String> getParameters() {
-        return Collections.singletonList("alpha");
+        List<String> params = new ArrayList<>();
+        params.add("alpha");
+        return params;
     }
 
 }

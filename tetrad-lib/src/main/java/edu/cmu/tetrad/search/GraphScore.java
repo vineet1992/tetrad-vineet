@@ -184,19 +184,24 @@ public class GraphScore implements Score {
     }
 
     @Override
-    public int getMaxIndegree() {
+    public int getMaxDegree() {
         return 1000;
+    }
+
+    @Override
+    public boolean determines(List<Node> z, Node y) {
+        return false;
     }
 
     public int getSampleSize() {
         return 0;
     }
 
-    public double getParameter1() {
-        throw new UnsupportedOperationException("No alpha can be set when searching usign d-separation.");
+    public boolean getAlternativePenalty() {
+        return false;
     }
 
-    public void setParameter1(double alpha) {
+    public void setAlternativePenalty(double alpha) {
         throw new UnsupportedOperationException("No alpha can be set when searching usign d-separation.");
     }
 
