@@ -49,6 +49,7 @@ import java.util.List;
  * This class has been compiled into a .jar file for efficient use
  * TODO allow input of true graph in order to estimate typical orientation and adjacency problems
  * TODO Edit sif to work with PAGs
+ * TODO Allow for bootstrapping of the entire causal process
  */
 public class runAlgorithms {
     private static Graph trueGraph = null; //TODO
