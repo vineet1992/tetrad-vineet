@@ -885,6 +885,8 @@ public static int [][] generateSubsamples(int N, int sampleSize)
     return result;
 }
 
+//Get subsample size given sample size
+    //Uses the heuristic given in Learning Mixed Graphical Models with Separate Sparsity Parameters and Stability-Based Model Selection
 public static int getSubSize(int sampleSize)
 {
     int b = (int)Math.floor( 10*Math.sqrt(sampleSize));

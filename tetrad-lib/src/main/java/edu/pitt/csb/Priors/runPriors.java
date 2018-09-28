@@ -29,22 +29,20 @@ import java.util.*;
 //TODO Change the loadPriors function here and in realDataPriorTest to treat missing value as null instead of 0
 public class runPriors {
 
-    private static boolean verbose = false;
+    private static boolean verbose = false; //Do we print out thorough output?
     public static void main(String [] args) {
 
-        String priorDirectory = "pathway_lists";
-        boolean priorMatrices = true;
-        String dataFile = "";
-        String runName = "";
-        boolean excludeUnreliable = false;
-        double unreliableThreshold = 0.05;
-        int ns = 20;
-        int numLambdas = 40;
-        double low = 0.05;
-        double high = 0.95;
-        boolean loocv = false;
-        boolean makeScores = false;
-        boolean fullCounts = false;
+        String priorDirectory = "pathway_lists"; //Directory of prior knowledge files, we assume that every file in here is a prior knowledge file
+        boolean priorMatrices = true; //Are priors in the form of a matrix or a sif file?
+        String dataFile = ""; //Filename of the dataset to analyze
+        String runName = ""; //Name of the run to produce output directory
+        int ns = 20; //Number of subsamples to test
+        int numLambdas = 40; //Number of lambda values to test
+        double low = 0.05; //Low end of lambda range to do knee point analysis
+        double high = 0.95; //High end of lambda range to do knee point analysis
+        boolean loocv = false; //Do we do leave-one-out cross validation instead of ns subsamples
+        boolean makeScores = false; //Should we make edge score matrices?
+        boolean fullCounts = false; //Do we want to output counts for edges across subsamples / lambda parameters
         int index = 0;
         List<String> toRemove = new ArrayList<String>();
         try {
@@ -79,9 +77,6 @@ public class runPriors {
                 } else if (args[index].equals("-data")) {
                     dataFile = args[index + 1];
                     index += 2;
-                } else if (args[index].equals("-ex")) {
-                    excludeUnreliable = true;
-                    index++;
                 }
                 else if(args[index].equals("-rm"))
                 {
@@ -92,9 +87,6 @@ public class runPriors {
                          count++;
                      }
                      index = count;
-                } else if (args[index].equals("-t")) {
-                    unreliableThreshold = Double.parseDouble(args[index + 1]);
-                    index += 2;
                 } else if (args[index].equals("-loocv")) {
                     loocv = true;
                     index++;
@@ -131,11 +123,15 @@ public class runPriors {
             e.printStackTrace();
             System.exit(-1);
         }
+
+        //Create lambda range to test based on input parameters
         double [] initLambdas = new double[numLambdas];
         for(int i = 0; i < numLambdas;i++)
         {
             initLambdas[i] = low + i*(high-low)/numLambdas;
         }
+
+        //Load in the dataset
         DataSet d = null;
         try {
             d = MixedUtils.loadDataSet2(dataFile);
@@ -151,11 +147,13 @@ public class runPriors {
         {
             System.out.println("Removing Variables... " + toRemove);
         }
-        //System.out.println(toRemove);
+        //Remove variables specified by the user
         for(String s:toRemove)
         {
             d.removeColumn(d.getVariable(s));
         }
+
+        //Add dummy discrete variable to the dataset if only a continuous dataset is provided
         boolean addedDummy = false;
         if(d.isContinuous())
         {
@@ -194,6 +192,8 @@ public class runPriors {
             }
             x.mkdir();
 
+
+            //Loading in prior knowledge files
             File f = new File(priorDirectory);
             if(!f.isDirectory())
             {
@@ -203,6 +203,9 @@ public class runPriors {
             HashMap<Integer,String> fileMap = new HashMap<Integer,String>();
             int numPriors = f.listFiles().length;
             SparseDoubleMatrix2D[] priors = new SparseDoubleMatrix2D[numPriors];
+
+            //Load in each prior from the directory, accounting for whether its a matrix or an sif file
+            //Add accounting for whether a dummy variable was added to the data
             for(int i = 0;i < f.listFiles().length;i++)
             {
                 fileMap.put(i,f.listFiles()[i].getName());
@@ -223,21 +226,7 @@ public class runPriors {
                     priors[i] = new SparseDoubleMatrix2D(realDataPriorTest.loadPrior(new File(currFile),d.getNumColumns()));
                 }
             }
-           /* if(verbose)
-            {
-                for(int i = 0; i < numPriors;i++)
-                {
-                    System.out.println(f.listFiles()[i].getName() + " Prior");
-                    for(int j = 0; j < d.getNumColumns();j++)
-                    {
-                        System.out.print(d.getVariableNames().get(j) + " ");
-                    }
-
-                    System.out.println(priors[i]);
-                }
-            }*/
-
-
+            //Delete maintenance files
             File t = new File("temp.txt");
             t.deleteOnExit();
             t = new File("temp_2.txt");
@@ -246,18 +235,27 @@ public class runPriors {
 
 
 
+            //Generate subsample indices
             int [][] samps = genSubs(d,ns,loocv);
             System.out.println("Done");
+            //Generate lambda parameters to test based on knee points and initial lambdas
             System.out.print("Generating Lambda Params...");
             mgmPriors m = new mgmPriors(ns,initLambdas,d,priors,samps,verbose);
             System.out.println("Done");
+
+
+            //Set piMGM to output edge scores (subsampled data after computing optimal lambda parameters)
             if(makeScores) {
                 m.makeEdgeScores();
             }
+
+            //Run piMGM
             System.out.print("Running piMGM...");
             Graph g = m.runPriors();
             System.out.println("Done");
             System.out.print("Printing Results...");
+
+            //Print all result files, edge scores, and full edge counts(across subsamples and params)
             printAllResults(g,m,runName,fileMap);
             if(makeScores)
             {
@@ -281,11 +279,10 @@ public class runPriors {
     }
 
 
+
     public static int [][] genSubs(DataSet d, int ns, boolean loocv)
     {
-        int b = (int) Math.floor(10 * Math.sqrt(d.getNumRows()));
-        if (b >= d.getNumRows())
-            b = d.getNumRows() / 2;
+        int b = StabilityUtils.getSubSize(d.getNumRows());
         int [][] samps = new int[ns][];
         boolean done = false;
         int attempts = 10000;
