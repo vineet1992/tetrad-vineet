@@ -21,7 +21,7 @@ import java.io.PrintStream;
 import java.util.List;
 
 
-//TODO Add scale free graph parameters
+
 /**
  * Created by vinee_000 on 9/12/2017.
  */
