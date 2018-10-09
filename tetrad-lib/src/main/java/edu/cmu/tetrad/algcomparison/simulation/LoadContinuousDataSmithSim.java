@@ -6,6 +6,7 @@ import edu.cmu.tetrad.graph.EdgeListGraph;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.GraphUtils;
 import edu.cmu.tetrad.graph.Node;
+import edu.cmu.tetrad.util.IM;
 import edu.cmu.tetrad.util.Parameters;
 
 import java.io.File;
@@ -104,6 +105,9 @@ public class LoadContinuousDataSmithSim implements Simulation, HasParameterValue
             throw new RuntimeException(e);
         }
     }
+
+    public void setInitialGraph(Graph g){throw new UnsupportedOperationException();}
+    public IM getInstantiatedModel(int index){throw new UnsupportedOperationException();}
 
     @Override
     public List<String> getParameters() {

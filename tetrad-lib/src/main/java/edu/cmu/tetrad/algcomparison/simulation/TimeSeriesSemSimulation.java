@@ -6,6 +6,7 @@ import edu.cmu.tetrad.algcomparison.utils.HasKnowledge;
 import edu.cmu.tetrad.data.DataModel;
 import edu.cmu.tetrad.graph.Node;
 import edu.cmu.tetrad.graph.TimeLagGraph;
+import edu.cmu.tetrad.util.IM;
 import edu.cmu.tetrad.util.Parameters;
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.data.DataType;
@@ -181,5 +182,9 @@ public class TimeSeriesSemSimulation implements Simulation, HasKnowledge {
             }
         }
     }
+
+    public void setInitialGraph(Graph g){throw new UnsupportedOperationException();}
+    public IM getInstantiatedModel(int index){throw new UnsupportedOperationException();}
+
 
 }

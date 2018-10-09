@@ -3,6 +3,7 @@ package edu.cmu.tetrad.algcomparison.simulation;
 import edu.cmu.tetrad.algcomparison.graph.RandomGraph;
 import edu.cmu.tetrad.algcomparison.utils.HasParameters;
 import edu.cmu.tetrad.data.DataModel;
+import edu.cmu.tetrad.util.IM;
 import edu.cmu.tetrad.util.Parameters;
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.data.DataType;
@@ -26,11 +27,21 @@ public class LeeHastieSimulation implements Simulation, HasParameters {
     private RandomGraph randomGraph;
     private List<DataSet> dataSets = new ArrayList<>();
     private List<Graph> graphs = new ArrayList<>();
+    private List<GeneralizedSemIm> ims = new ArrayList<>();
     private DataType dataType;
     private List<Node> shuffledOrder;
+    private Graph initGraph; //Added to include a possible initial graph from which to generate data
 
     public LeeHastieSimulation(RandomGraph graph) {
         this.randomGraph = graph;
+        this.initGraph = null;
+    }
+
+
+    //Added by Vineet for separate inclusion of an initial graph
+    public void setInitialGraph(Graph g)
+    {
+        this.initGraph = g;
     }
 
     @Override
@@ -50,8 +61,12 @@ public class LeeHastieSimulation implements Simulation, HasParameters {
         if (continuous) this.dataType = DataType.Continuous;
 
         this.shuffledOrder = null;
-
-        Graph graph = randomGraph.createGraph(parameters);
+        //THIS IS CODE I ADDED TO ALLOW FOR SEPARATE INCLUSION OF AN INITIAL GRAPH (Vineet)
+        Graph graph;
+        if(initGraph==null)
+            graph = randomGraph.createGraph(parameters);
+        else
+            graph = initGraph;
 
         dataSets = new ArrayList<>();
         graphs = new ArrayList<>();
@@ -80,6 +95,9 @@ public class LeeHastieSimulation implements Simulation, HasParameters {
     public DataModel getDataModel(int index) {
         return dataSets.get(index);
     }
+
+    @Override
+    public IM getInstantiatedModel(int index){return ims.get(index);}
 
     @Override
     public String getDescription() {
@@ -122,8 +140,8 @@ public class LeeHastieSimulation implements Simulation, HasParameters {
 
         for (int i = 0; i < nodes.size(); i++) {
             if (i < nodes.size() * parameters.getDouble("percentDiscrete") * 0.01) {
-                final int minNumCategories = parameters.getInt("numCategories");
-                final int maxNumCategories = parameters.getInt("numCategories");
+                final int minNumCategories = parameters.getInt("minCategories");
+                final int maxNumCategories = parameters.getInt("maxCategories");
                 final int value = pickNumCategories(minNumCategories, maxNumCategories);
                 nd.put(shuffledOrder.get(i).getName(), value);
             } else {
@@ -133,8 +151,13 @@ public class LeeHastieSimulation implements Simulation, HasParameters {
 
         Graph graph = MixedUtils.makeMixedGraph(dag, nd);
 
-        GeneralizedSemPm pm = MixedUtils.GaussianCategoricalPm(graph, "Split(-1.5,-.5,.5,1.5)");
+        final double coefLow = parameters.getDouble("coefLow");
+        final double coefHigh = parameters.getDouble("coefHigh");
+        final double varLow = parameters.getDouble("varLow");
+        final double varHigh = parameters.getDouble("varHigh");
+        GeneralizedSemPm pm = MixedUtils.GaussianCategoricalPm(graph, "Split(" + (-1*coefHigh) + "," + (-1*coefLow) + "," + coefLow + "," + coefHigh + ")",varLow,varHigh);
         GeneralizedSemIm im = MixedUtils.GaussianCategoricalIm(pm);
+        ims.add(im);
 
         DataSet ds = im.simulateDataAvoidInfinity(parameters.getInt("sampleSize"), false);
         return MixedUtils.makeMixedData(ds, nd);

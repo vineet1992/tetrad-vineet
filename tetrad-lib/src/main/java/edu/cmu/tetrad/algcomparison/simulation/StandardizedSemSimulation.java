@@ -10,6 +10,7 @@ import edu.cmu.tetrad.graph.SemGraph;
 import edu.cmu.tetrad.sem.SemIm;
 import edu.cmu.tetrad.sem.SemPm;
 import edu.cmu.tetrad.sem.StandardizedSemIm;
+import edu.cmu.tetrad.util.IM;
 import edu.cmu.tetrad.util.Parameters;
 
 import java.util.ArrayList;
@@ -117,4 +118,9 @@ public class StandardizedSemSimulation implements Simulation {
 
         return standardizedIm.simulateData(parameters.getInt("sampleSize"), false);
     }
+
+
+    public void setInitialGraph(Graph g){throw new UnsupportedOperationException();}
+    public IM getInstantiatedModel(int index){throw new UnsupportedOperationException();}
+
 }

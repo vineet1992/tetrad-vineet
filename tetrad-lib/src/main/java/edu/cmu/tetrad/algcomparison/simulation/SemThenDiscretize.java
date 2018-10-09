@@ -2,6 +2,7 @@ package edu.cmu.tetrad.algcomparison.simulation;
 
 import edu.cmu.tetrad.algcomparison.graph.RandomGraph;
 import edu.cmu.tetrad.data.DataModel;
+import edu.cmu.tetrad.util.IM;
 import edu.cmu.tetrad.util.Parameters;
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.data.DataType;
@@ -132,4 +133,9 @@ public class SemThenDiscretize implements Simulation {
 
         return discretizer.discretize();
     }
+
+
+    public void setInitialGraph(Graph g){throw new UnsupportedOperationException();}
+    public IM getInstantiatedModel(int index){throw new UnsupportedOperationException();}
+
 }

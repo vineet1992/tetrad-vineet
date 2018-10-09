@@ -23,6 +23,7 @@ public class ConditionalGaussianSimulation implements Simulation {
     private RandomGraph randomGraph;
     private List<DataSet> dataSets = new ArrayList<>();
     private List<Graph> graphs = new ArrayList<>();
+    private List<GeneralizedSemIm> ims = new ArrayList<>();
     private DataType dataType;
     private List<Node> shuffledOrder;
     private double varLow = 1;
@@ -32,11 +33,20 @@ public class ConditionalGaussianSimulation implements Simulation {
     private boolean coefSymmetric = true;
     private double meanLow = -1;
     private double meanHigh = 1;
+    private Graph initGraph;
+
+
+    //TODO Figure this out
+    public IM getInstantiatedModel(int index){return null;}
 
     public ConditionalGaussianSimulation(RandomGraph graph) {
         this.randomGraph = graph;
     }
 
+    public void setInitialGraph(Graph g)
+    {
+        initGraph = g;
+    }
     @Override
     public void createData(edu.cmu.tetrad.util.Parameters parameters) {
         setVarLow(parameters.getDouble("varLow"));
@@ -64,7 +74,10 @@ public class ConditionalGaussianSimulation implements Simulation {
 
         this.shuffledOrder = null;
 
-        Graph graph = randomGraph.createGraph(parameters);
+
+            Graph graph = randomGraph.createGraph(parameters);
+        if(initGraph !=null)
+            graph = initGraph;
 
         dataSets = new ArrayList<>();
         graphs = new ArrayList<>();

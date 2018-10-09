@@ -1,25 +1,23 @@
 package edu.cmu.tetrad.algcomparison.graph;
 
-import edu.cmu.tetrad.util.Parameters;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.GraphUtils;
+import edu.cmu.tetrad.util.Parameters;
 import org.apache.commons.math3.distribution.NormalDistribution;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Creates a random graph by adding forward edges.
- *
- * @author jdramsey
+ * Created by vinee_000 on 10/4/2018.
  */
-public class RandomForward implements RandomGraph {
+public class RandomGraphUniform implements RandomGraph {
     static final long serialVersionUID = 23L;
 
     @Override
     public Graph createGraph(Parameters parameters) {
         NormalDistribution nd = new NormalDistribution(parameters.getDouble("meanDegree"),parameters.getDouble("devDegree"));
-        return GraphUtils.randomGraphRandomForwardEdges(
+        return GraphUtils.randomGraphUniform(
                 parameters.getInt("numMeasures") + parameters.getInt("numLatents"),
                 parameters.getInt("numLatents"),
                 (int)(nd.sample()* parameters.getInt("numMeasures") / 2),
@@ -31,7 +29,7 @@ public class RandomForward implements RandomGraph {
 
     @Override
     public String getDescription() {
-        return "Graph constructed by adding random forward edges";
+        return "Graph constructed by generating a graph uniformly at random";
     }
 
     @Override

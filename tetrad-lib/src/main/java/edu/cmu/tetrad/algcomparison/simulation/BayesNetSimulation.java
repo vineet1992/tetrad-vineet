@@ -10,6 +10,7 @@ import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.data.DataType;
 import edu.cmu.tetrad.graph.EdgeListGraph;
 import edu.cmu.tetrad.graph.Graph;
+import edu.cmu.tetrad.util.IM;
 import edu.cmu.tetrad.util.Parameters;
 
 import java.util.ArrayList;
@@ -26,6 +27,7 @@ public class BayesNetSimulation implements Simulation {
     private List<DataSet> dataSets = new ArrayList<>();
     private List<Graph> graphs = new ArrayList<>();
     private List<BayesIm> ims = new ArrayList<>();
+    private Graph initGraph;
 
     public BayesNetSimulation(RandomGraph graph) {
         this.randomGraph = graph;
@@ -36,6 +38,11 @@ public class BayesNetSimulation implements Simulation {
         this.pm = pm;
     }
 
+    public void setInitialGraph(Graph g)
+    {
+        initGraph = g;
+    }
+
     public BayesNetSimulation(BayesIm im ) {
         this.randomGraph = new SingleGraph(im.getDag());
         this.im = im;
@@ -44,7 +51,11 @@ public class BayesNetSimulation implements Simulation {
 
     @Override
     public void createData(Parameters parameters) {
-        Graph graph = randomGraph.createGraph(parameters);
+        Graph graph = null;
+        if(initGraph!=null)
+            graph = initGraph;
+        else
+            graph = randomGraph.createGraph(parameters);
 
         dataSets = new ArrayList<>();
         graphs = new ArrayList<>();
@@ -107,6 +118,9 @@ public class BayesNetSimulation implements Simulation {
     }
 
     @Override
+    public IM getInstantiatedModel(int index){return ims.get(index);}
+
+    @Override
     public int getNumDataModels() {
         return dataSets.size();
     }
@@ -144,6 +158,7 @@ public class BayesNetSimulation implements Simulation {
                 return im.simulateData(parameters.getInt("sampleSize"), false);
             }
         } catch (Exception e) {
+            e.printStackTrace();
             throw new IllegalArgumentException("Sorry, I couldn't simulate from that Bayes IM; perhaps not all of\n" +
                     "the parameters have been specified.");
         }

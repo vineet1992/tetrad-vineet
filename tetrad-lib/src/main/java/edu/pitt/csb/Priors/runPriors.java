@@ -244,7 +244,7 @@ public class runPriors {
             System.out.println("Done");
 
 
-            //Set piMGM to output edge scores (subsampled data after computing optimal lambda parameters)
+            //Set piMGM to output edge scores subsampled data after computing optimal lambda parameters)
             if(makeScores) {
                 m.makeEdgeScores();
             }
@@ -255,7 +255,7 @@ public class runPriors {
             System.out.println("Done");
             System.out.print("Printing Results...");
 
-            //Print all result files, edge scores, and full edge counts(across subsamples and params)
+            //Print all result files, edge scores, and full edge counts (across subsamples and params)
             printAllResults(g,m,runName,fileMap);
             if(makeScores)
             {

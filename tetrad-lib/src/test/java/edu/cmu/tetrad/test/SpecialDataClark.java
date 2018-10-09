@@ -15,6 +15,7 @@ import edu.cmu.tetrad.graph.Node;
 import edu.cmu.tetrad.graph.NodeType;
 import edu.cmu.tetrad.sem.GeneralizedSemIm;
 import edu.cmu.tetrad.sem.GeneralizedSemPm;
+import edu.cmu.tetrad.util.IM;
 import edu.cmu.tetrad.util.Parameters;
 import edu.cmu.tetrad.util.RandomUtil;
 import org.apache.commons.lang3.RandomUtils;
@@ -84,6 +85,10 @@ public class SpecialDataClark implements Simulation {
     public String getDescription() {
         return "Bayes net simulation using " + randomGraph.getDescription();
     }
+
+
+    public void setInitialGraph(Graph g){throw new UnsupportedOperationException();}
+    public IM getInstantiatedModel(int index){throw new UnsupportedOperationException();}
 
     @Override
     public List<String> getParameters() {

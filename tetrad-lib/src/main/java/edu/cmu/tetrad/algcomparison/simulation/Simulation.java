@@ -2,6 +2,7 @@ package edu.cmu.tetrad.algcomparison.simulation;
 
 import edu.cmu.tetrad.algcomparison.utils.HasParameters;
 import edu.cmu.tetrad.data.DataModel;
+import edu.cmu.tetrad.util.IM;
 import edu.cmu.tetrad.util.Parameters;
 import edu.cmu.tetrad.data.DataType;
 import edu.cmu.tetrad.graph.Graph;
@@ -55,4 +56,10 @@ public interface Simulation extends HasParameters, TetradSerializable {
      * parameters whose values can be varied.
      */
     List<String> getParameters();
+    /*
+    Added by Vineet, ensures that user of simulation can set an initial graph instead of randomly generating one in the simulation class itself
+     */
+    void setInitialGraph(Graph g);
+
+    IM getInstantiatedModel(int index);
 }

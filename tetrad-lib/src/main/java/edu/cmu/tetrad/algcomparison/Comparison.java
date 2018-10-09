@@ -1570,6 +1570,10 @@ public class Comparison {
             return dataModels.size();
         }
 
+        public void setInitialGraph(Graph g){throw new UnsupportedOperationException();}
+        public IM getInstantiatedModel(int index){throw new UnsupportedOperationException();}
+
+
         @Override
         public Graph getTrueGraph(int index) {
             if (graphs.get(index) == null) return null;
@@ -1651,6 +1655,8 @@ public class Comparison {
         public int getIndex() {
             return index;
         }
+
+
 
         public AlgorithmSimulationWrapper getWrapper() {
             return wrapper;

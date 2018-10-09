@@ -6,6 +6,7 @@ import edu.cmu.tetrad.graph.GraphUtils;
 import edu.cmu.tetrad.graph.Node;
 import edu.cmu.tetrad.sem.GeneralizedSemIm;
 import edu.cmu.tetrad.sem.GeneralizedSemPm;
+import edu.cmu.tetrad.util.IM;
 import edu.pitt.csb.mgm.MixedUtils;
 import org.apache.commons.math3.stat.inference.TTest;
 
@@ -213,6 +214,9 @@ public class MixedLeeHastieSimulation implements Simulation {
         DataSet ds = im.simulateDataAvoidInfinity(parameters.getInt("sampleSize"), false);
         return MixedUtils.makeMixedData(ds, nd);
     }
+
+    public void setInitialGraph(Graph g){throw new UnsupportedOperationException();}
+    public IM getInstantiatedModel(int index){throw new UnsupportedOperationException();}
 
 }
 /*    public DataSet simulate(Graph dag, Parameters parameters)

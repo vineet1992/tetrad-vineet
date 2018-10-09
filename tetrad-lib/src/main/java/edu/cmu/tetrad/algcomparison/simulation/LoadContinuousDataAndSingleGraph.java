@@ -7,6 +7,7 @@ import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.data.DataType;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.GraphUtils;
+import edu.cmu.tetrad.util.IM;
 import edu.cmu.tetrad.util.Parameters;
 
 import java.io.File;
@@ -122,4 +123,9 @@ public class LoadContinuousDataAndSingleGraph implements Simulation, HasParamete
     public Parameters getParameterValues() {
         return parametersValues;
     }
+
+
+    public void setInitialGraph(Graph g){throw new UnsupportedOperationException();}
+    public IM getInstantiatedModel(int index){throw new UnsupportedOperationException();}
+
 }

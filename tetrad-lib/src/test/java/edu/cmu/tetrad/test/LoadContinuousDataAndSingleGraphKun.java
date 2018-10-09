@@ -5,6 +5,7 @@ import edu.cmu.tetrad.algcomparison.utils.HasParameterValues;
 import edu.cmu.tetrad.data.*;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.GraphUtils;
+import edu.cmu.tetrad.util.IM;
 import edu.cmu.tetrad.util.Parameters;
 
 import java.io.File;
@@ -91,4 +92,8 @@ public class LoadContinuousDataAndSingleGraphKun implements Simulation, HasParam
     public Parameters getParameterValues() {
         return parametersValues;
     }
+
+    public void setInitialGraph(Graph g){throw new UnsupportedOperationException();}
+    public IM getInstantiatedModel(int index){throw new UnsupportedOperationException();}
+
 }

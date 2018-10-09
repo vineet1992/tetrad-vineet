@@ -383,9 +383,13 @@ public class MixedUtils {
         return semPm;
     }
 
+
+    public static GeneralizedSemPm GaussianCategoricalPm(Graph trueGraph, String paramTemplate) throws IllegalStateException{
+        return GaussianCategoricalPm(trueGraph,paramTemplate,1,2);///Default values for varLow and varHigh
+    }
     //generate PM from trueGraph for mixed Gaussian and Categorical variables
     //public static GeneralizedSemPm GaussianCategoricalPm(Graph trueGraph, HashMap<String, Integer> nodeDists, String paramTemplate) throws IllegalStateException{
-    public static GeneralizedSemPm GaussianCategoricalPm(Graph trueGraph, String paramTemplate) throws IllegalStateException{
+    public static GeneralizedSemPm GaussianCategoricalPm(Graph trueGraph, String paramTemplate, double varLow, double varHigh) throws IllegalStateException{
 
         Map<String, Integer> nodeDists = getNodeDists(trueGraph);
 
@@ -400,7 +404,7 @@ public class MixedUtils {
             semPm.setStartsWithParametersTemplate("D", paramTemplate);
 
             // empirically should give us a stddev of 1 - 2
-            semPm.setStartsWithParametersTemplate("s", "U(1,2)");
+            semPm.setStartsWithParametersTemplate("s", "U(" + varLow + "," + varHigh + ")");
 
             //if we don't use NB error, we could do this instead
             //String templateDisc = "DiscError(err, (TSUM(NEW(B)*$)), (TSUM(NEW(B)*$)), (TSUM(NEW(B)*$)))";

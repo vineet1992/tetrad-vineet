@@ -16,13 +16,14 @@ import java.util.Map;
  * Created by vinee_000 on 7/27/2018.
  */
 public class constructPrior {
+    private static String priorDir = "C:/Users/vinee_000/Documents/CS Academic Stuff/Graduate/Current Projects/Olja_Cancer_Trials/RNA-Seq-Data/piMGM Analysis/Prediction_RNA_Seq/";
     public static void main(String[] args) throws Exception {
 
 
         boolean mSig = true;
         boolean string = true;
         boolean geneList = false;
-        String dataset = "genes_with_clinical.txt";
+        String dataset = "All_Data.txt";
 
         DataSet data = MixedUtils.loadDataSet2(dataset);
         HashMap<String,Integer> map = null;
@@ -66,7 +67,7 @@ if(geneList) {
 
     public static DoubleMatrix2D makePriorGeneList(DataSet data)throws Exception
     {
-        BufferedReader b = new BufferedReader(new FileReader("gene_list.txt"));
+        BufferedReader b = new BufferedReader(new FileReader(priorDir + "gene_list.txt"));
         ArrayList<String> genes = new ArrayList<String>();
         while(b.ready())
             genes.add(b.readLine());
@@ -124,7 +125,7 @@ if(geneList) {
     public static HashMap<String, Double> readMSig()throws Exception
     {
         HashMap<String,Double> result = new HashMap<String,Double>();
-        BufferedReader b = new BufferedReader(new FileReader("gene_similarity_matrix_cosine.txt"));
+        BufferedReader b = new BufferedReader(new FileReader(priorDir + "gene_similarity_matrix_cosine.txt"));
         String [] names = b.readLine().split("\t");
         int row = 0;
         while(b.ready())
@@ -205,7 +206,7 @@ if(geneList) {
     public static HashMap<String,Integer> getScores(Map<String,String> gp)throws Exception
     {
         HashMap<String,Integer> map = new HashMap<String,Integer>();
-        BufferedReader b = new BufferedReader(new FileReader("9606.protein.links.v10.5.txt"));
+        BufferedReader b = new BufferedReader(new FileReader(priorDir + "9606.protein.links.v10.5.txt"));
         b.readLine();
         int total = 0;
         int found = 0;
@@ -228,7 +229,7 @@ if(geneList) {
     public static HashMap<String,String> readGeneProtein() throws Exception
     {
         HashMap<String,String> map = new HashMap<String,String>();
-        BufferedReader b = new BufferedReader(new FileReader("gene_protein_mapping.txt"));
+        BufferedReader b = new BufferedReader(new FileReader(priorDir + "gene_protein_mapping.txt"));
         b.readLine();
         while(b.ready())
         {

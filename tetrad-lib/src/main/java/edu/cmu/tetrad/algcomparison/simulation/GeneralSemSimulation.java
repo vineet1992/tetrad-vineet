@@ -10,6 +10,7 @@ import edu.cmu.tetrad.graph.Node;
 import edu.cmu.tetrad.graph.NodeType;
 import edu.cmu.tetrad.graph.SemGraph;
 import edu.cmu.tetrad.sem.*;
+import edu.cmu.tetrad.util.IM;
 import edu.cmu.tetrad.util.Parameters;
 
 import java.text.ParseException;
@@ -170,4 +171,8 @@ public class GeneralSemSimulation implements Simulation {
     public List<GeneralizedSemIm> getIms() {
         return ims;
     }
+
+    public void setInitialGraph(Graph g){throw new UnsupportedOperationException();}
+    public IM getInstantiatedModel(int index){throw new UnsupportedOperationException();}
+
 }

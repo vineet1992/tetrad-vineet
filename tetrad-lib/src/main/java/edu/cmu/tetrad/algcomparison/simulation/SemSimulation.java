@@ -5,6 +5,7 @@ import edu.cmu.tetrad.algcomparison.graph.SingleGraph;
 import edu.cmu.tetrad.data.DataModel;
 import edu.cmu.tetrad.data.DataUtils;
 import edu.cmu.tetrad.graph.SemGraph;
+import edu.cmu.tetrad.util.IM;
 import edu.cmu.tetrad.util.Parameters;
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.data.DataType;
@@ -30,6 +31,7 @@ public class SemSimulation implements Simulation {
     private List<DataSet> dataSets = new ArrayList<>();
     private List<Graph> graphs = new ArrayList<>();
     private List<SemIm> ims = new ArrayList<>();
+    private Graph initGraph;
 
     public SemSimulation(RandomGraph graph) {
         this.randomGraph = graph;
@@ -40,6 +42,11 @@ public class SemSimulation implements Simulation {
         graph.setShowErrorTerms(false);
         this.randomGraph = new SingleGraph(graph);
         this.pm = pm;
+    }
+
+    public void setInitialGraph(Graph g)
+    {
+        initGraph = g;
     }
 
     public SemSimulation(SemIm im) {
@@ -53,6 +60,8 @@ public class SemSimulation implements Simulation {
     @Override
     public void createData(Parameters parameters) throws Exception {
         Graph graph = randomGraph.createGraph(parameters);
+        if(initGraph!=null)
+            graph = initGraph;
 
         dataSets = new ArrayList<>();
         graphs = new ArrayList<>();
@@ -171,4 +180,6 @@ public class SemSimulation implements Simulation {
     public List<SemIm> getSemIms() {
         return ims;
     }
+
+    public IM getInstantiatedModel(int index){return ims.get(index);}
 }
