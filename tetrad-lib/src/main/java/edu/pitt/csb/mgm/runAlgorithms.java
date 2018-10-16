@@ -86,6 +86,7 @@ public class runAlgorithms {
     private static double paramLowStars = -1;//Lov value of parameter range to test for StARS
     private static double paramHighStars = -1;//High value of parameter range to test for StARS
     private static Graph initGraph; //Initial Undirected Skeleton to use before running causal discovery
+    private static ArrayList<String> toRemove = new ArrayList<String>();
     public static void main(String[] args) throws Exception{
         try {
 
@@ -192,6 +193,7 @@ public class runAlgorithms {
                 else if(args[count].equals("-steps")) //Should steps be run?
                 {
                     runSteps = true;
+                    runMGM = true;
                     if(args.length==count+1 || args[count+1].startsWith("-")) {
                         count++;
                     }
@@ -284,6 +286,22 @@ public class runAlgorithms {
                     }
                     count+=2;
                 }
+                else if(args[count].equals("-rv"))
+                {
+                    toRemove = new ArrayList<String>();
+                    int index = count+1;
+                    while(index < args.length && !args[index].startsWith("-"))
+                    {
+                        toRemove.add(args[index]);
+                        index++;
+                    }
+                    count = index;
+                }
+                else if(args[count].equals("-runMGM"))
+                {
+                    runMGM = true;
+                    count++;
+                }
                 else
                 {
                     throw new Exception("Unsupported Command Line Switch: " + args[count]);
@@ -300,6 +318,10 @@ public class runAlgorithms {
             System.out.println("Loaded dataset: " + d + "\n Dataset is mixed? " + d.isMixed());
 
 
+            for(String s: toRemove)
+            {
+                d.removeColumn(d.getVariable(s));
+            }
             //Exit program if no algorithm is specfiied
             if(alg.equals("None")&&!runMGM &&!runSteps)
             {
