@@ -231,7 +231,7 @@ public class LogisticRegression implements TetradSerializable {
             double curr = (System.nanoTime()-start)/Math.pow(10,9);
             if(curr>5)
             {
-                System.out.println("Log Reg taking forever");
+                //System.out.println("Log Reg taking forever");
                 return null;
             }
             llP = ll;
