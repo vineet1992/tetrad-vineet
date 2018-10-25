@@ -45,7 +45,7 @@ public class RunPrefDiv {
     private int numFolds = 10; //Number of folds for internal cross validation
     private int topK = 50;
     private double accuracy = 0; //TODO what's the right value for this to get good clusters? 0?
-    private double radius = 0.5; //TODO decide if we should use the radius or the max cluster size
+    private double radius = 0.5;
     private int numAlphas = 20; //How many alpha values should we test? (Data-Theory tradeoff alpha)
     private double alphaLimit = 1; //The largest value of alpha we test
     private double lambdaLow = 0.05; //Lambda low limit
@@ -58,6 +58,7 @@ public class RunPrefDiv {
     private boolean useClusterStability = false; //cluster stability, or gene wise stability
     private boolean partialCorr = false; //Use partial correlations instead of correlation for continuous variables
     private double [][] lastStepsStabilities; //Last set of gene stabilities given by StEPS
+    private boolean normalize = false;//Should we run NPN on the intensity and similarity data?
 
     private ArrayList<String> stabPS;//PrintStream to output file where we have run\talpha\tstability
     private boolean includeAccuracy = false; //When writing the stability output to file, should we include an accuracy score for each stability data point
@@ -452,7 +453,7 @@ public class RunPrefDiv {
 
                         DataSet dataSubSamp = train.subsetRows(allInds[s/2][s%2]);
 
-                        ArrayList<Gene> curr = Functions.computeAllIntensities(genes,alpha,dataSubSamp,target,partialCorr);
+                        ArrayList<Gene> curr = Functions.computeAllIntensities(genes,alpha,dataSubSamp,target,partialCorr,normalize,false);
                         long time = System.nanoTime();
                         //PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,PrefDiv.findTopKIntensity(curr,topK),dissimilarity,alp,dataSubSamp,true);
                         //p.setCluster(true);
@@ -462,7 +463,8 @@ public class RunPrefDiv {
 
                         time = System.nanoTime();
                         Collections.sort(curr,Gene.IntensityComparator);
-                        PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,PrefDiv.findTopKIntensity(curr,topK),dissimilarity,alpha,dataSubSamp,approxCorrelations,partialCorr);
+                        PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,dissimilarity,alpha,dataSubSamp,approxCorrelations,partialCorr);
+                        //PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,PrefDiv.findTopKIntensity(curr,topK),dissimilarity,alpha,dataSubSamp,approxCorrelations,partialCorr);
                         p.setCluster(true);
                         ArrayList<Gene> result = p.diverset();
                         allClusters.add(p.clusters);
@@ -504,9 +506,10 @@ public class RunPrefDiv {
         lastGeneSet = stableSet(geneCount);
         System.out.println("Top K Genes: " + lastGeneSet);
 
-        ArrayList<Gene> curr = Functions.computeAllIntensities(genes,alpha,data,target,partialCorr);
+        ArrayList<Gene> curr = Functions.computeAllIntensities(genes,alpha,data,target,partialCorr,normalize,false);
         Collections.sort(curr,Gene.IntensityComparator);
-        PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,PrefDiv.findTopKIntensity(curr,topK),dissimilarity,alpha,data,approxCorrelations,partialCorr);
+        PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,dissimilarity,alpha,data,approxCorrelations,partialCorr);
+        //PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,PrefDiv.findTopKIntensity(curr,topK),dissimilarity,alpha,data,approxCorrelations,partialCorr);
         p.setCluster(true);
         p.diverset();
         lastClusters = p.clusters;
@@ -766,7 +769,7 @@ public class RunPrefDiv {
 
                         DataSet dataSubSamp = data.subsetRows(subs[s]);
 
-                        ArrayList<Gene> curr = Functions.computeAllIntensities(genes,alp,dataSubSamp,target,partialCorr);
+                        ArrayList<Gene> curr = Functions.computeAllIntensities(genes,alp,dataSubSamp,target,partialCorr,normalize,false);
                         long time = System.nanoTime();
                         //PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,PrefDiv.findTopKIntensity(curr,topK),dissimilarity,alp,dataSubSamp,true);
                         //p.setCluster(true);
@@ -776,7 +779,8 @@ public class RunPrefDiv {
 
                         time = System.nanoTime();
                         Collections.sort(curr,Gene.IntensityComparator);
-                        PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,PrefDiv.findTopKIntensity(curr,topK),dissimilarity,alp,dataSubSamp,approxCorrelations,partialCorr);
+                        PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,dissimilarity,alp,dataSubSamp,approxCorrelations,partialCorr);
+                        //PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,PrefDiv.findTopKIntensity(curr,topK),dissimilarity,alp,dataSubSamp,approxCorrelations,partialCorr);
                         p.setCluster(true);
                         ArrayList<Gene> result = p.diverset();
                         allClusters.add(p.clusters);
@@ -809,9 +813,10 @@ public class RunPrefDiv {
         final int chunk = 1000;
 
         pool.invoke(new StabilityAction(chunk, 0, subs.length));
-        ArrayList<Gene> curr = Functions.computeAllIntensities(genes,alp,data,target,partialCorr);
+        ArrayList<Gene> curr = Functions.computeAllIntensities(genes,alp,data,target,partialCorr,normalize,false);
         Collections.sort(curr,Gene.IntensityComparator);
-        PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,PrefDiv.findTopKIntensity(curr,topK),dissimilarity,alp,data,approxCorrelations,partialCorr);
+        PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,dissimilarity,alp,data,approxCorrelations,partialCorr);
+        //PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,PrefDiv.findTopKIntensity(curr,topK),dissimilarity,alp,data,approxCorrelations,partialCorr);
         p.setCluster(true);
         lastGeneSet = p.diverset();
         lastClusters = p.clusters;

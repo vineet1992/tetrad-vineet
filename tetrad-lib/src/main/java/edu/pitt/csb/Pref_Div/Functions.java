@@ -57,7 +57,11 @@ public class Functions
 
 
     //Computes all gene-gene correlations for the current subsample d
-    public static float [] computeAllCorrelations(ArrayList<Gene> items, DataSet d,boolean partialCorr)
+    //Input: List of Genes, only the symbol needs to be filled in
+    //Input: DataSet d, a dataset on which to compute correlations
+    //Input: partialCorr, whether or not partialcorrelations given the rest of the genes should be computed instead of univariate corrs
+    //Output: A float [] with all of the gene-gene correlations
+    public static float [] computeAllCorrelations(ArrayList<Gene> items, DataSet d,boolean partialCorr, boolean pvals)
     {
         TetradMatrix c = null;
         if(partialCorr)
@@ -97,12 +101,27 @@ public class Functions
        // System.out.print("Non paranormal Normalization...");
         //time = System.nanoTime();
         corrs = NPN(corrs,true);
+        if(pvals)
+            corrs = getPVals(corrs);
+
+
+
         //time = System.nanoTime()-time;
         //System.out.println("Done: " + time/Math.pow(10,9));
 
         return corrs;
     }
 
+
+    public static float[] getPVals(float [] corrs)
+    {
+        NormalDistribution n = new NormalDistribution(0,1);
+        for(int i = 0; i < corrs.length;i++)
+        {
+            corrs[i] = (float)n.cumulativeProbability(corrs[i]);
+        }
+        return corrs;
+    }
 
 
     public static ArrayList<Gene> computeIntensitiesUnsupervised(ArrayList<Gene> g1,double a, DataSet data)
@@ -136,9 +155,10 @@ public class Functions
         return g1;
 
     }
+
     //Compute intensities for all genes according to the appropriate method depending upon mixed or cont-cont interaction types
     //Requires that theory intensity is specified a priori for each gene object in g1
-    public static ArrayList<Gene> computeAllIntensities(ArrayList<Gene> g1, double a, DataSet data, String target,boolean usePc)
+    public static ArrayList<Gene> computeAllIntensities(ArrayList<Gene> g1, double a, DataSet data, String target,boolean usePc,boolean normalize,boolean pvals)
     {
         if(target==null || target.equals(""))
         {
@@ -172,7 +192,10 @@ public class Functions
             else //Use Mutual Information
                 corrs[i] = (float) mixedMI(temp[data.getColumn(data.getVariable(i))],temp[y],numCats);
         }
-        corrs = NPN(corrs,false);
+        if(normalize)
+            corrs = NPN(corrs,false);
+        if(pvals)
+            corrs = getPVals(corrs);
         for(int i = 0; i < g1.size();i++) {
             try {
                 g1.get(i).foldChange = corrs[i];
@@ -545,15 +568,50 @@ public class Functions
         return 1;
     }
 
+    //Another version of loading the intensity data file, here we maintain all of the individual sources, instead of combining them
+    //THIS RETURNS A Num Sources x Num Genes Array, transpose of the other methods
+    public static float[][] loadIntensityData(String file,boolean normalize)
+    {
+        try {
+            BufferedReader b = new BufferedReader(new FileReader(file));
+            int numSources = b.readLine().split("\t").length - 1;
+            int ng = 0;
+            while (b.ready()) {
+                b.readLine();
+                ng++;
+            }
+            float[][] output = new float[numSources][ng];
+            for (int i = 0; i < numSources; i++) {
+                b = new BufferedReader(new FileReader(file));
+                b.readLine(); //Eat the header
+                for (int j = 0; j < ng; j++) {
+                    String[] line = b.readLine().split("\t");
+                    output[i][j] = Float.parseFloat(line[i + 1]);
+                }
+                if (normalize)
+                    output[i] = NPNIgnore(output[i], -1.0F, false);
+                b.close();
+            }
+
+            return output;
+            //TODO Have to decide what to do with discrete theory sources!
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
     //Loads gene data from an intensity file, assumes that rows are individual genes
+    //ASSUMES THAT THE FILE HAS A HEADER
     //Columns are: Gene Name Theory Intensity_1 ... Theory Intensity_N
-    public static ArrayList<Gene> loadGeneData(String file, boolean normalize)
+    //TODO This normalization is backwards need to fix
+    public static ArrayList<Gene> loadGeneData(String file, boolean normalize, double[] weights)
     {
             try {
                 ArrayList<Gene> temp = new ArrayList<Gene>();
                 BufferedReader b = new BufferedReader(new FileReader(file));
                 int numSources = b.readLine().split("\t").length-1;
-                int ng = 1;
+                int ng = 0;
                 while(b.ready())
                 {
                     b.readLine();
@@ -564,6 +622,7 @@ public class Functions
                     for(int i = 0; i < numSources;i++)
                     {
                         b = new BufferedReader(new FileReader(file));
+                        b.readLine(); //Eat the header
                         for(int j = 0; j < ng;j++)
                         {
                             String [] line = b.readLine().split("\t");
@@ -575,11 +634,27 @@ public class Functions
                         b.close();
                     }
 
-                //TODO Have to decide what to do with discrete theory sources!
                 for(int i = 0; i < ng;i++) {
                     Gene g = new Gene(i);
-                    double mean = mean(output[i]);
-                    g.theoryIntensity = mean;
+                    double res = 0;
+                    double weight = 0;
+                    boolean found = false;
+                    for(int j = 0; j < numSources;j++)
+                    {
+                        if (output[i][j]>=0)
+                        {
+                            res+= output[i][j]*weights[j];
+                            weight+=weights[j];
+                            found = true;
+                        }
+                    }
+                    if(!found) //Set to -1 if no prior information for this gene
+                    {
+                        g.theoryIntensity = -1;
+                    }
+                    else {
+                        g.theoryIntensity = res / weight;
+                    }
                     g.symbol = names.get(i);
                     temp.add(g);
                 }
@@ -910,7 +985,9 @@ public class Functions
 
 
 
-    //TODO restructure this method to be if(normalize)blablabla, then regardless do the second part
+    //Input: Theory similarity file, setup as a matrix where rows and columns are variables
+    //Output:float [] representation of this matrix, where float[i] can be converted to matrix[j,k] using a standard row-order conversion
+    //Optional input: Normalize- should the floats be put through an NPN normalization
     public static float [] loadTheoryMatrix(String theoryFile, boolean normalize)
     {
         int length = numGenes*(numGenes-1)/2;
@@ -1296,13 +1373,13 @@ public class Functions
                 if (t[i] > (1. - delta)) t[i] = (float)(1. - delta);
                 t[i] = (float)normalDistribution.inverseCumulativeProbability((double)t[i]);
             }
-time = System.nanoTime()-time;
+            time = System.nanoTime()-time;
         //    System.out.println("Time to Compute ICP's: " + time/Math.pow(10,9));
 
 
-time = System.nanoTime();
-        double mu1 = mean(t);
-        double std1 = sd(t,mu1);
+            time = System.nanoTime();
+            double mu1 = mean(t);
+            double std1 = sd(t,mu1);
 
             for (int i = 0; i < t.length; i++) {
                 t[i] /= std1;

@@ -450,7 +450,7 @@ public class mgmPriors {
         //Now we need to figure out how to modify MGM to use the 6 lambdas instead of 3
     }
 
-    private double[] getAlpha(double[] tao) {
+    public static double[] getAlpha(double[] tao) {
         //HEURISTIC HACK TO ENSURE THAT THERE IS NO ZERO VALUE
         double min = Double.MAX_VALUE;
         for(int i = 0; i < tao.length;i++)
@@ -559,7 +559,7 @@ public class mgmPriors {
             log.flush();
         return edgeCounts;
     }
-    private double[] getWeights(double[] alpha) {
+    public static double[] getWeights(double[] alpha) {
         double alpSum = StatUtils.sum(alpha);
         double[] weights = new double[alpha.length];
         for (int i = 0; i < alpha.length; i++)
@@ -888,12 +888,15 @@ public class mgmPriors {
         for (int i = 0; i < temp.rows(); i++) {
             for (int j = i + 1; j < temp.columns(); j++) {
                 double sum = 0;
+                double totWeight = 0;
                 for (int k = 0; k < priors.length; k++) {
 
-                    if (sourcePrior[i][j][k])
+                    if (sourcePrior[i][j][k]) {
+                        totWeight+= weights[k];
                         sum += weights[k] * tao[k] * tao[k] + Math.pow(u_mixture.get(i, j) - phi[k].get(i, j), 2);
+                    }
                 }
-                temp.set(i, j, sum);
+                temp.set(i, j, sum/totWeight);
             }
         }
         return temp;
@@ -906,15 +909,17 @@ public class mgmPriors {
             for (int j = i + 1; j < temp.columns(); j++) {
 
                 double sum = 0;
+                double totWeight = 0;
                 for (int k = 0; k < priors.length; k++) {
 
                     if (sourcePrior[i][j][k]) {
 
 
                         sum += weights[k] * phi[k].get(i, j);
+                        totWeight+= weights[k];
                     }
                 }
-                temp.set(i, j, sum);
+                temp.set(i, j, sum/totWeight);
             }
         }
         return temp;

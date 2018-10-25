@@ -25,29 +25,29 @@ public class PrefDiv {
     public HashMap<Gene,List<Gene>> clusters;
     private float [] corrMat;
     private float [] theoryMat;
-    public double topKIntensity;
-   private double []diverse;
    private double alpha;
    private int preSampleSize = 5000;
    private DataSet data;
    private boolean clustering = false;
    private boolean computeCorrs;
+   private boolean corrsGiven;
    private boolean partialCorr;
    private ArrayList<Float> sampledCorrs;
 
    //TODO clustering is fine, need to decide if variables in the same cluster are allowed to be in the Top K together?
     //TODO Don't think it make ssense to use partial correlation for the quick approximation calculation?
-    public PrefDiv(ArrayList<Gene> items, int topK, double accuracy, double radius, double topKIntensity,float [] theory,double alpha,DataSet data,boolean computeAllCorrs,boolean partialCorr) {
+    //TODO Clean up this whole code, might be redundant, might be broken when not clustering and not using theory and data together
+    public PrefDiv(ArrayList<Gene> items, int topK, double accuracy, double radius, float [] theory,double alpha,DataSet data,boolean computeAllCorrs,boolean partialCorr) {
     	this.topK = topK;
     	this.accuracy = accuracy;
     	this.radius = radius;
     	this.items = items;
     	this.result = new ArrayList<Gene>();
-    	this.topKIntensity = topKIntensity;
     	this.theoryMat = theory;
+    	this.corrsGiven = false;
     	this.partialCorr = partialCorr;
     	if(computeAllCorrs)
-    	    corrMat = Functions.computeAllCorrelations(items,data,partialCorr);
+    	    corrMat = Functions.computeAllCorrelations(items,data,partialCorr,false);
     	else {
             corrMat = new float[(items.size() * (items.size() - 1)) / 2];
         }
@@ -55,15 +55,21 @@ public class PrefDiv {
     	this.data = data;
     	this.computeCorrs = computeAllCorrs;
     }
-    
-	public PrefDiv(double[]d, ArrayList<Gene> items, int topK, double accuracy, double radius, double topKIntensity) {
-    	this.diverse = d;
-		this.topK = topK;
+
+    //Constructor when only using data
+	public PrefDiv(ArrayList<Gene> items, int topK, double accuracy, double radius, float[] corrs) {
+		this.partialCorr = false;
+		this.corrMat = corrs;
+		this.computeCorrs = false;
+		this.corrsGiven = true;
+        this.topK = topK;
     	this.accuracy = accuracy;
     	this.radius = radius;
     	this.items = items;
     	this.result = new ArrayList<Gene>();
-    	this.topKIntensity = topKIntensity;
+    	this.theoryMat = null;
+    	this.alpha = 1;
+
     }
     //============================================================
     //====================== Algorithm ===========================
@@ -89,7 +95,7 @@ public class PrefDiv {
     
     public ArrayList<Gene> diverset() {
 
-	    if(!computeCorrs)
+	    if(!computeCorrs && !corrsGiven)
 	        sampleCorrelations();
 	    long time = System.nanoTime();
       //  System.out.println("original item size = " + this.items.size());
@@ -378,14 +384,16 @@ public class PrefDiv {
             j = temp;
         }
         float c = corrMat[Functions.getIndex(i,j,items.size())];
-        if(!computeCorrs)
+        if(!computeCorrs && !corrsGiven)
         {
             if(c==0.0f)
             {
                 c = corrOnTheFly(i,j);
             }
         }
-        c = -1*c;
+        c = 1-c; //c is a probability of being connected, so 1-c can be a dissimilarity or a distance measure
+        if(theoryMat==null)
+            return c;
         if(theoryMat[Functions.getIndex(i,j,items.size())]==-1)
             return c;
         else
@@ -486,14 +494,6 @@ public class PrefDiv {
             averageSum = averageSum + this.result.get(i).intensityValue;
         }
         return averageSum/this.result.size();
-    }
- 
-    public double normalizedIntensity() {
-    	double averageSum = 0;
-        for (int i = 0; i < this.result.size(); i++) {
-            averageSum = averageSum + this.result.get(i).intensityValue;
-        }
-        return averageSum/this.topKIntensity;
     }
 
 

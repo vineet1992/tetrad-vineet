@@ -14,39 +14,35 @@ public class PrefExperiment
 
 
 	//TODO Add if target variable is null, just use the highest variance genes as the intensity score, implemented need to debug
-	//TODO if disease IDs are null, just use the data for intensity, implemented need to debug
+
+	//TODO adapt this to use PiPrefDiv and those expected input files
 	public static void main(String [] args) throws Exception
 	{
 		//PARAMS
 		int numAlphas = 20;
 		int ns = 20;
 		double threshold = 0.1;
-		double accuracy = 0;
-		double radius = 0.5; //NEED to figure out how to set this in a principled way TODO
-		int [] topK = {50};
-		int [] diseases = {6142}; //Default is breast cancer
+		int numParams = -1;
+		int numRadii = 4;
+		double rLow = 0.01;
+		double rHigh = 0.99;
+		int kLow = 1;
+		int kHigh = 150;
+		int numK = 4;
 		boolean normalizeFiles = false;
 		boolean loocv = false;
+		boolean bootstrap = false;
 		boolean approxCorrelations = true;
+		boolean useGraph = false;
 		String dataFile = "";
 		String intensityFile = "";
-		String dissimilarityFile = "";
+		String directory = ".";
+		String dissimilarityDir = "";
+
 		String outputFile = "";
 		String clusterFile = "";
 		String graphFile = "";
 		String target = "";
-		String [] files = new String[5];
-		//files[0] = "TCGA_BRCA_FILES/expression_transposed_npn.txt";
-		files[0] = "MUC1_RNA_Seq.txt"; //File with only gene expression, rows are genes, columns are samples
-		//files[1] = "MI_Genes.txt";
-		//files[1] = "TCGA_BRCA_FILES/foldChanges_new.txt"; //TODO Need to compute this file here locally
-
-		//Constant theory files if using the default theory matrices
-		files[1] = "all_gene_disease_associations.tsv";
-		files[2] = "final_gene_data.txt";
-		files[3] = "Data Files/string_parsed.txt";
-		/////////////////////////////////////////////////////////////
-
 
 		int index = 0;
 		while(index < args.length)
@@ -55,51 +51,11 @@ public class PrefExperiment
 				if (args[index].equals("-ns")) {
 					ns = Integer.parseInt(args[index + 1]);
 					index += 2;
-				} else if (args[index].equals("-na")) {
-					numAlphas = Integer.parseInt(args[index + 1]);
-					index += 2;
-				} else if (args[index].equals("-A")) {
-					accuracy = Double.parseDouble(args[index + 1]);
-					index += 2;
-				} else if (args[index].equals("-r")) {
-					radius = Double.parseDouble(args[index + 1]);
-					index += 2;
-				} else if (args[index].equals("-topK")) {
-					index++;
-					ArrayList<Integer> temp = new ArrayList<Integer>();
-					while (!args[index].startsWith("-")) {
-						temp.add(Integer.parseInt(args[index]));
-						index++;
-					}
-					Integer[] t = (Integer[]) temp.toArray();
-					topK = new int[t.length];
-					for (int i = 0; i < t.length; i++)
-						topK[i] = t[i];
-				} else if (args[index].equals("-D")) {
-					index++;
-					ArrayList<Integer> temp = new ArrayList<Integer>();
-					while (!args[index].startsWith("-")) {
-						temp.add(Integer.parseInt(args[index]));
-						index++;
-					}
-					Integer[] t = (Integer[]) temp.toArray();
-					diseases = new int[t.length];
-					for (int i = 0; i < t.length; i++)
-						diseases[i] = t[i];
-				} else if (args[index].equals("-normal")) {
-					normalizeFiles = true;
-					index++;
-				} else if (args[index].equals("-t")) {
+				}  else if (args[index].equals("-t")) {
 					target = args[index + 1];
 					index += 2;
 				} else if (args[index].equals("-data")) {
 					dataFile = args[index + 1];
-					index += 2;
-				} else if (args[index].equals("-in")) {
-					intensityFile = args[index + 1];
-					index += 2;
-				} else if (args[index].equals("-dis")) {
-					dissimilarityFile = args[index + 1];
 					index += 2;
 				} else if (args[index].equals("-out")) {
 					outputFile = args[index + 1];
@@ -111,6 +67,21 @@ public class PrefExperiment
 				else if(args[index].equals("-graph"))
 				{
 					graphFile = args[index+1];
+					index+=2;
+				}
+				else if(args[index].equals("-numRadii"))
+				{
+					numRadii = Integer.parseInt(args[index+1]);
+					index+=2;
+				}
+				else if(args[index].equals("-numK"))
+				{
+					numK = Integer.parseInt(args[index+1]);
+					index+=2;
+				}
+				else if(args[index].equals("-numParams"))
+				{
+					numParams = Integer.parseInt(args[index+1]);
 					index+=2;
 				}
 				else if(args[index].equals("-g"))
@@ -128,6 +99,43 @@ public class PrefExperiment
 					approxCorrelations = true;
 					index++;
 				}
+				else if(args[index].equals("-kRange"))
+				{
+					kLow = Integer.parseInt(args[index+1]);
+					kHigh = Integer.parseInt(args[index+2]);
+					index+=3;
+				}
+				else if(args[index].equals("-rRange"))
+				{
+					rLow = Double.parseDouble(args[index+1]);
+					rHigh = Double.parseDouble(args[index+2]);
+					index+=3;
+				}
+				else if(args[index].equals("-dissim"))
+				{
+					dissimilarityDir = args[index+1];
+					index+=2;
+				}
+				else if(args[index].equals("-dir"))
+				{
+					directory = args[index+1];
+					index+=2;
+				}
+				else if(args[index].equals("-boot"))
+				{
+					bootstrap = true;
+					index++;
+				}
+				else if(args[index].equals("-useCausalGraph"))
+				{
+					useGraph = true;
+					index++;
+				}
+				else if(args[index].equals("-iFile"))
+				{
+					intensityFile = args[index+1];
+					index+=2;
+				}
 			}
 			catch(ArrayIndexOutOfBoundsException e)
 			{
@@ -141,16 +149,17 @@ public class PrefExperiment
 			}
 		}
 
-	/*	if(target.equals(""))
-		{
-			System.err.println("Can't compute intensity values without a target, usage: (-t <target>)");
-			System.exit(-1);
-		}*/
 		if(dataFile.equals(""))
 		{
 			System.err.println("No data file specified, usage: (-data <filename>)");
 			System.exit(-1);
 		}
+		if(dissimilarityDir.equals(""))
+		{
+			System.err.println("No dissimilarity directory specified, please use -dissim <Dissimilarity Directory>\nAll dissimilarity prior knowledge files should be included in this directory");
+			System.exit(-1);
+		}
+
 		if(outputFile.equals(""))
 		{
 			outputFile = "OUT_" + dataFile;
@@ -171,75 +180,64 @@ public class PrefExperiment
 			e.printStackTrace();
 			System.exit(-1);
 		}
-		float [] dissimilarity;
-		ArrayList<Gene> g;
-		files[0] = dataFile;
-		if(dissimilarityFile.equals("") || intensityFile.equals(""))//Use Default Theory computations (user only specifies the data file)
+		PiPrefDiv ppd;
+		double [] initRadii = new double[numRadii];
+		int [] initK = new int[numK];
+		for(int i = 0; i < numRadii;i++)
 		{
-			System.out.print("Creating Gene Data...");
-			g = Functions.loadGeneData(".",files,diseases,true);
-			System.out.println("Done");
-			System.out.print("Creating Theory Data...");
-			dissimilarity = Functions.createTheoryMatrix("all_dissimilarity_sources.txt");
-			System.out.println("Done");
-			intensityFile = "all_genes.txt";
-			g = Functions.loadGeneData(intensityFile,normalizeFiles);
+			initRadii[i] = rLow + i*(rHigh-rLow)/numRadii;
 		}
-		else { //Use user specified, files
-			System.out.print("Loading Gene Data...");
-			g = Functions.loadGeneData(intensityFile, normalizeFiles);
-			System.out.println("Done");
-			System.out.print("Loading Theory Matrix...");
-			dissimilarity = Functions.loadTheoryMatrix(dissimilarityFile,normalizeFiles);
-			System.out.println("Done");
+		for(int i = 0; i < numK;i++)
+		{
+			initK[i] = (int)(kLow + i*(kHigh-kLow)/(double)numK);
 		}
-		//ArrayList<Gene> g = Functions.loadGeneData(".",files,diseases,true);
-		for(int k = 0; k < topK.length;k++) //Loop over sizes of returned results (Top-K)
-					{
-						System.out.println("Running Pref Div for Top-" + topK[k] + " Genes");
-						//Print out to the file for each size of returned results
-						PrintStream out = new PrintStream(k + "_" + outputFile);
-						PrintStream out2 = new PrintStream(k + "_" + graphFile);
-						PrintStream out3 = new PrintStream(k + "_" + clusterFile);
-						//Run Pref-Div algorithm to find a diverse and relevant gene set
-						RunPrefDiv r = new RunPrefDiv(dissimilarity,g,data,target,loocv);
-						r.setNS(ns);
-						r.setAccuracy(accuracy);
-						r.setNumAlphas(numAlphas);
-						r.setRadius(radius);
-						r.setTopK(topK[k]);
-						r.setThreshold(threshold);
-						r.setApproxCorrelations(approxCorrelations);
-						Graph causal = r.getCausalGraph(target);
-						ArrayList<Gene> Result = r.getLastGeneSet();
 
-						out2.println(causal);
-						out2.flush();
-						out2.close();
-						for(Gene stuff: Result)
-						{
-							out.println(stuff.symbol);
-						}
-						for(Gene stuff:r.getClusters().keySet())
-						{
-							List<Gene> temp = r.getClusters().get(stuff);
-							if(temp==null)
-								out3.println(stuff.symbol);
-							else
-								out3.print(stuff.symbol + "\t");
-							if(temp!=null) {
-								for (int i = 0; i < temp.size(); i++) {
-									if (i == temp.size() - 1)
-										out3.println(temp.get(i).symbol);
-									else
-										out3.print(temp.get(i).symbol + "\t");
-								}
-							}
-						}
-						out3.flush();
-						out3.close();
-						out.flush();
-						out.close();
-					}
+
+			ppd = new PiPrefDiv(data,target,initRadii,initK);
+
+
+		if(bootstrap)
+			ns = data.getNumRows();
+		ppd.setLOOCV(loocv);
+		ppd.setVerbose();
+
+		File dDir = new File(directory + "/" + dissimilarityDir);
+		File [] files = dDir.listFiles();
+
+		String [] diss = new String[files.length];
+		for(int i = 0; i < files.length;i++)
+		{
+			diss[i] = files[i].getAbsolutePath();
+		}
+		ArrayList<Gene> output = ppd.selectGenes(bootstrap,ns,intensityFile,diss,useGraph);
+		Map<Gene,List<Gene>> map = ppd.getLastCluster();
+
+		printOutput(output,map,directory);
+
+
+	}
+
+
+	public static void printOutput(ArrayList<Gene> top, Map<Gene,List<Gene>> map, String currDir)
+	{
+		try {
+			PrintStream out = new PrintStream(currDir + "/selected_genes.txt");
+			for (int i = 0; i < top.size(); i++) {
+				out.print(top.get(i) + "\t");
+				List<Gene> list = map.get(top.get(i));
+				for (int j = 0; j < list.size(); j++) {
+					out.print(list.get(j) + "\t");
+
+				}
+				out.println();
+
+			}
+			out.flush();
+			out.close();
+		}catch(Exception e)
+		{
+			System.err.println("Couldn't write output to file...printing error message");
+			e.printStackTrace();
+		}
 	}
 }
