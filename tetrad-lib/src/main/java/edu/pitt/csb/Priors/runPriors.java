@@ -38,7 +38,7 @@ public class runPriors {
         String runName = ""; //Name of the run to produce output directory
         int ns = 20; //Number of subsamples to test
         int numLambdas = 40; //Number of lambda values to test
-        double low = 0.05; //Low end of lambda range to do knee point analysis
+        double low = 0.1; //Low end of lambda range to do knee point analysis
         double high = 0.95; //High end of lambda range to do knee point analysis
         boolean loocv = false; //Do we do leave-one-out cross validation instead of ns subsamples
         boolean makeScores = false; //Should we make edge score matrices?
@@ -151,6 +151,10 @@ public class runPriors {
         for(String s:toRemove)
         {
             d.removeColumn(d.getVariable(s));
+        }
+        if(loocv)
+        {
+            ns = d.getNumRows();
         }
 
         //Add dummy discrete variable to the dataset if only a continuous dataset is provided
@@ -283,10 +287,16 @@ public class runPriors {
     public static int [][] genSubs(DataSet d, int ns, boolean loocv)
     {
         int b = StabilityUtils.getSubSize(d.getNumRows());
+        if(loocv)
+            ns = d.getNumRows();
         int [][] samps = new int[ns][];
         boolean done = false;
         int attempts = 10000;
-        DataSet[] subsamples = new DataSet[ns];
+        DataSet [] subsamples;
+        if(loocv)
+            subsamples = new DataSet[d.getNumRows()];
+        else
+            subsamples = new DataSet[ns];
         System.out.print("Generating subsamples and ensuring variance...");
         while(!done && attempts > 0) {
             done = true;
@@ -295,7 +305,7 @@ public class runPriors {
             else
                 samps = StabilityUtils.subSampleNoReplacement(d.getNumRows(), b, ns);
 
-            for (int j = 0; j < ns; j++) {
+            for (int j = 0; j < samps.length; j++) {
                 subsamples[j] = d.subsetRows(samps[j]);
                 int col = checkForVariance(subsamples[j],d);
                 if(col!=-1)
