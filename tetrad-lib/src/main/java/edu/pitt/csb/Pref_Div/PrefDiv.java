@@ -47,7 +47,7 @@ public class PrefDiv {
     	this.corrsGiven = false;
     	this.partialCorr = partialCorr;
     	if(computeAllCorrs)
-    	    corrMat = Functions.computeAllCorrelations(items,data,partialCorr,false);
+    	    corrMat = Functions.computeAllCorrelations(items,data,partialCorr,false,false,1);
     	else {
             corrMat = new float[(items.size() * (items.size() - 1)) / 2];
         }

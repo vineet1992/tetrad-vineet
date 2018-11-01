@@ -19,16 +19,18 @@ public class PrefExperiment
 	public static void main(String [] args) throws Exception
 	{
 		//PARAMS
+
 		int numAlphas = 20;
 		int ns = 20;
 		double threshold = 0.1;
 		int numParams = -1;
-		int numRadii = 4;
+		int numRadii = 10;
+		int K = 20;
 		double rLow = 0.01;
-		double rHigh = 0.99;
-		int kLow = 1;
-		int kHigh = 150;
-		int numK = 4;
+		double rHigh = 0.3;
+		double tLow = 0.01;
+		double tHigh = 0.1;
+		int numThreshold = 10;
 		boolean normalizeFiles = false;
 		boolean loocv = false;
 		boolean bootstrap = false;
@@ -74,9 +76,9 @@ public class PrefExperiment
 					numRadii = Integer.parseInt(args[index+1]);
 					index+=2;
 				}
-				else if(args[index].equals("-numK"))
+				else if(args[index].equals("-numThreshold"))
 				{
-					numK = Integer.parseInt(args[index+1]);
+					numThreshold = Integer.parseInt(args[index+1]);
 					index+=2;
 				}
 				else if(args[index].equals("-numParams"))
@@ -89,6 +91,11 @@ public class PrefExperiment
 					threshold = Double.parseDouble(args[index+1]);
 					index+=2;
 				}
+				else if(args[index].equals("-K"))
+				{
+					K = Integer.parseInt(args[index+1]);
+					index+=2;
+				}
 				else if(args[index].equals("-loocv"))
 				{
 					loocv = true;
@@ -99,10 +106,10 @@ public class PrefExperiment
 					approxCorrelations = true;
 					index++;
 				}
-				else if(args[index].equals("-kRange"))
+				else if(args[index].equals("-tRange"))
 				{
-					kLow = Integer.parseInt(args[index+1]);
-					kHigh = Integer.parseInt(args[index+2]);
+					tLow = Integer.parseInt(args[index+1]);
+					tHigh = Integer.parseInt(args[index+2]);
 					index+=3;
 				}
 				else if(args[index].equals("-rRange"))
@@ -182,18 +189,18 @@ public class PrefExperiment
 		}
 		PiPrefDiv ppd;
 		double [] initRadii = new double[numRadii];
-		int [] initK = new int[numK];
+		double [] initThreshold = new double[numThreshold];
 		for(int i = 0; i < numRadii;i++)
 		{
 			initRadii[i] = rLow + i*(rHigh-rLow)/numRadii;
 		}
-		for(int i = 0; i < numK;i++)
+		for(int i = 0; i < numThreshold;i++)
 		{
-			initK[i] = (int)(kLow + i*(kHigh-kLow)/(double)numK);
+			initThreshold[i] = (tLow + i*(tHigh-tLow)/(double)numThreshold);
 		}
 
 
-			ppd = new PiPrefDiv(data,target,initRadii,initK);
+			ppd = new PiPrefDiv(data,target,initRadii,initThreshold,K);
 
 
 		if(bootstrap)

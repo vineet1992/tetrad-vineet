@@ -453,7 +453,7 @@ public class RunPrefDiv {
 
                         DataSet dataSubSamp = train.subsetRows(allInds[s/2][s%2]);
 
-                        ArrayList<Gene> curr = Functions.computeAllIntensities(genes,alpha,dataSubSamp,target,partialCorr,normalize,false);
+                        ArrayList<Gene> curr = Functions.computeAllIntensities(genes,alpha,dataSubSamp,target,partialCorr,normalize,false,1);
                         long time = System.nanoTime();
                         //PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,PrefDiv.findTopKIntensity(curr,topK),dissimilarity,alp,dataSubSamp,true);
                         //p.setCluster(true);
@@ -506,7 +506,7 @@ public class RunPrefDiv {
         lastGeneSet = stableSet(geneCount);
         System.out.println("Top K Genes: " + lastGeneSet);
 
-        ArrayList<Gene> curr = Functions.computeAllIntensities(genes,alpha,data,target,partialCorr,normalize,false);
+        ArrayList<Gene> curr = Functions.computeAllIntensities(genes,alpha,data,target,partialCorr,normalize,false,1);
         Collections.sort(curr,Gene.IntensityComparator);
         PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,dissimilarity,alpha,data,approxCorrelations,partialCorr);
         //PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,PrefDiv.findTopKIntensity(curr,topK),dissimilarity,alpha,data,approxCorrelations,partialCorr);
@@ -769,7 +769,7 @@ public class RunPrefDiv {
 
                         DataSet dataSubSamp = data.subsetRows(subs[s]);
 
-                        ArrayList<Gene> curr = Functions.computeAllIntensities(genes,alp,dataSubSamp,target,partialCorr,normalize,false);
+                        ArrayList<Gene> curr = Functions.computeAllIntensities(genes,alp,dataSubSamp,target,partialCorr,normalize,false,1);
                         long time = System.nanoTime();
                         //PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,PrefDiv.findTopKIntensity(curr,topK),dissimilarity,alp,dataSubSamp,true);
                         //p.setCluster(true);
@@ -813,7 +813,7 @@ public class RunPrefDiv {
         final int chunk = 1000;
 
         pool.invoke(new StabilityAction(chunk, 0, subs.length));
-        ArrayList<Gene> curr = Functions.computeAllIntensities(genes,alp,data,target,partialCorr,normalize,false);
+        ArrayList<Gene> curr = Functions.computeAllIntensities(genes,alp,data,target,partialCorr,normalize,false,1);
         Collections.sort(curr,Gene.IntensityComparator);
         PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,dissimilarity,alp,data,approxCorrelations,partialCorr);
         //PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,PrefDiv.findTopKIntensity(curr,topK),dissimilarity,alp,data,approxCorrelations,partialCorr);

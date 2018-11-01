@@ -1,6 +1,7 @@
 package edu.pitt.csb.Pref_Div;
 import edu.cmu.tetrad.data.*;
 import edu.cmu.tetrad.graph.Node;
+import edu.cmu.tetrad.search.IndTestCorrelationT;
 import edu.cmu.tetrad.search.IndTestFisherZ;
 import edu.cmu.tetrad.search.IndTestPartialCorrelation;
 import edu.cmu.tetrad.search.IndependenceTest;
@@ -60,8 +61,11 @@ public class Functions
     //Input: List of Genes, only the symbol needs to be filled in
     //Input: DataSet d, a dataset on which to compute correlations
     //Input: partialCorr, whether or not partialcorrelations given the rest of the genes should be computed instead of univariate corrs
+    //Input: pvals, report as rank percetnage instead of correlation itself
+    //Input: threshold, shrink all correlations with significance > threshold to 0
+    //Input: normalize, should we do NPN normalization?
     //Output: A float [] with all of the gene-gene correlations
-    public static float [] computeAllCorrelations(ArrayList<Gene> items, DataSet d,boolean partialCorr, boolean pvals)
+    public static float [] computeAllCorrelations(ArrayList<Gene> items, DataSet d,boolean partialCorr,boolean normalize, boolean pvals,double threshold)
     {
         TetradMatrix c = null;
         if(partialCorr)
@@ -78,20 +82,28 @@ public class Functions
         int total = (items.size()*(items.size()-1))/2;
         float [] corrs = new float[total];
         long time = System.nanoTime();
+        IndTestCorrelationT ind = new IndTestCorrelationT(d,0.05);
         for(int i = 0; i < items.size();i++)
         {
+            Node one = d.getVariable(i);
             double [] curr = temp[mapping.get(i)];
             int index = Functions.getIndex(i,i+1,items.size());
             for(int j = i+1;j < items.size();j++)
             {
+                Node two = d.getVariable(j);
                 if(partialCorr)
                 {
                     int x = mapping.get(i);
                     int y = mapping.get(j);
                     corrs[index] = (float)(-1*c.get(x,y)/(c.get(x,x)*c.get(y,y)));
                 }
-                else
-                    corrs[index] = (float)Math.abs(StatUtils.correlation(curr, temp[mapping.get(j)]));
+                else {
+                    ind.isIndependent(one,two);
+                    if(ind.getPValue()>threshold)
+                        corrs[index] = 0;
+                    else
+                        corrs[index] = (float) Math.abs(StatUtils.correlation(curr, temp[mapping.get(j)]));
+                }
                 index++;
             }
 
@@ -100,7 +112,8 @@ public class Functions
         time = System.nanoTime()-time;
        // System.out.print("Non paranormal Normalization...");
         //time = System.nanoTime();
-        corrs = NPN(corrs,true);
+        if(normalize)
+            corrs = NPN(corrs,true);
         if(pvals)
             corrs = getPVals(corrs);
 
@@ -158,7 +171,7 @@ public class Functions
 
     //Compute intensities for all genes according to the appropriate method depending upon mixed or cont-cont interaction types
     //Requires that theory intensity is specified a priori for each gene object in g1
-    public static ArrayList<Gene> computeAllIntensities(ArrayList<Gene> g1, double a, DataSet data, String target,boolean usePc,boolean normalize,boolean pvals)
+    public static ArrayList<Gene> computeAllIntensities(ArrayList<Gene> g1, double a, DataSet data, String target,boolean usePc,boolean normalize,boolean pvals,double threshold)
     {
         if(target==null || target.equals(""))
         {
@@ -174,21 +187,30 @@ public class Functions
 
 
         int y = data.getColumn(data.getVariable(target));
+        Node one = data.getVariable(target);
         double[][] temp = data.getDoubleData().transpose().toArray();
         TetradMatrix c = null;
         if(usePc && cont) {
             c = new CovarianceMatrix(data).getMatrix();
             c = c.ginverse();
         }
+        IndTestCorrelationT ind = new IndTestCorrelationT(data,0.05);
         float [] corrs = new float[g1.size()];
         for(int i = 0; i < g1.size();i++) {
+            Node two = data.getVariable(g1.get(i).symbol);
             if(usePc && cont)//Use Partial Correlation
             {
                 int x = data.getColumn(data.getVariable(g1.get(i).symbol));
                 corrs[i] = (float)(-1*c.get(x,y)/Math.sqrt(c.get(x,x)*c.get(y,y)));
             }
             else if(cont) //Use Correlation
-                corrs[i] = (float)Math.abs(StatUtils.correlation(temp[y], temp[data.getColumn(data.getVariable(g1.get(i).symbol))]));
+            {
+                ind.isIndependent(one,two);
+                if(ind.getPValue()>threshold)
+                    corrs[i] = 0;
+                else
+                    corrs[i] = (float) Math.abs(StatUtils.correlation(temp[y], temp[data.getColumn(data.getVariable(g1.get(i).symbol))]));
+            }
             else //Use Mutual Information
                 corrs[i] = (float) mixedMI(temp[data.getColumn(data.getVariable(i))],temp[y],numCats);
         }
@@ -996,19 +1018,13 @@ public class Functions
             try{
                 float[] result = new float[length];
                 BufferedReader b = new BufferedReader(new FileReader(theoryFile));
-                for (int i = 0; i < length; i++) {
+                int index = 0;
+                for (int i = 0; i < numGenes; i++) {
                     String [] line = b.readLine().split("\t");
-                    float[] theories = new float[line.length];
-                    for (int j = 0; j < line.length ; j++)
-                        theories[j] = Float.parseFloat(line[j]);
-
-                  //JUST USING THE MEAN AS THE FINAL VALUE
-                    float mean = 0;
-                    for (int j = 0; j < theories.length; j++) {
-                        if (theories[j] != -1)
-                            mean += theories[j];
+                    for (int j = i+1; j < line.length ; j++) {
+                        result[index] = Float.parseFloat(line[j]);
+                        index++;
                     }
-                    result[i] = mean;
                 }
                 return result;
             }
@@ -1018,7 +1034,7 @@ public class Functions
                 e.printStackTrace();
                 return null;
             }
-        }
+        } //TODO Normalize is assuming one file with all theory sources
         else {
             try {
                 BufferedReader b = new BufferedReader(new FileReader(theoryFile));

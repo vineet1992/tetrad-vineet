@@ -33,11 +33,11 @@ public class PriorPrediction {
     {
 
 
-        String target = "IgG_Ratio";
-        String priorDir = "priors";
-        String dataFile = "Highest_Variance_Data_No_DP_Cont.txt";
+        String target = "Response";
+        String priorDir = "Priors";
+        String dataFile = "Data_For_Prediction.txt";
         int numLambdas = 10;
-        boolean loocv = false;
+        boolean loocv = true;
         int ns = 5;
         double lamLow = 0.1;
         double lamHigh = 0.9;
@@ -68,6 +68,7 @@ public class PriorPrediction {
             }
         }
 
+
         double [] initLambdas = new double[numLambdas];
         for(int i = 0; i < initLambdas.length;i++)
         {
@@ -76,6 +77,9 @@ public class PriorPrediction {
 
         String runName = target + "_" + priorDir;
         DataSet data = MixedUtils.loadDataSet2(dataFile);
+
+        if(loocv)
+            ns = data.getNumRows();
 
         File f = new File("Predictions_" + runName);
         if(!f.exists())
@@ -118,7 +122,8 @@ public class PriorPrediction {
             }
             DataSet temp = data.subsetRows(rows);
             int [][] samps = runPriors.genSubs(temp,ns,loocv);
-            mgmPriors p = new mgmPriors(ns,initLambdas,data,priors,samps,true);
+            ns = samps.length;
+            mgmPriors p = new mgmPriors(ns,initLambdas,temp,priors,samps,true);
             System.out.println("Running piMGM");
             Graph out = p.runPriors();
             IndependenceTest ind = new IndTestMultinomialAJ(temp,0.05);

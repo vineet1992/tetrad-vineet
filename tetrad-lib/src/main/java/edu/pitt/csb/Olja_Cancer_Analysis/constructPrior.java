@@ -16,53 +16,57 @@ import java.util.Map;
  * Created by vinee_000 on 7/27/2018.
  */
 public class constructPrior {
-    private static String priorDir = "C:/Users/vinee_000/Documents/CS Academic Stuff/Graduate/Current Projects/Olja_Cancer_Trials/RNA-Seq-Data/piMGM Analysis/Prediction_RNA_Seq/";
+    private static String priorDir = "C:/Users/vinee_000/Documents/CS Academic Stuff/Graduate/Current Projects/Olja_Cancer_Trials/RNA-Seq-October-2018/";
     public static void main(String[] args) throws Exception {
 
 
         boolean mSig = true;
         boolean string = true;
         boolean geneList = false;
-        String dataset = "All_Data.txt";
-
-        DataSet data = MixedUtils.loadDataSet2(dataset);
-        HashMap<String,Integer> map = null;
-        DoubleMatrix2D prior = null;
-        if(string) {
-            //CONSTRUCT STRING PRIOR
-            System.out.print("Reading gene protein map...");
-            HashMap<String, String> gp = readGeneProtein(); //Maps from ensembl_protein_id to gene symbol
-            System.out.println("Done");
-            System.out.print("Getting scores from STRING...");
-            map = getScores(gp);//maps from Gene,Gene to score
-            System.out.println("Done");
-            gp = null;
+        for(int i = 1; i <= 5;i++) {
 
 
-            System.out.print("Constructing prior from map and data...");
-            prior = makePrior(map, data);
-            System.out.println("Done");
-            outputPrior(prior, data, "string_prior_Disc.txt");
+            String dataset = "Train_Prediction_" + i + ".txt";
+
+            DataSet data = MixedUtils.loadDataSet2(dataset);
+            HashMap<String, Integer> map = null;
+            DoubleMatrix2D prior = null;
+            if (string) {
+                //CONSTRUCT STRING PRIOR
+                System.out.print("Reading gene protein map...");
+                HashMap<String, String> gp = readGeneProtein(); //Maps from ensembl_protein_id to gene symbol
+                System.out.println("Done");
+                System.out.print("Getting scores from STRING...");
+                map = getScores(gp);//maps from Gene,Gene to score
+                System.out.println("Done");
+                gp = null;
+
+
+                System.out.print("Constructing prior from map and data...");
+                prior = makePrior(map, data);
+                System.out.println("Done");
+                outputPrior(prior, data, "string_prior_" + i + ".txt");
+            }
+
+            //CONSTRUCT MSIGDB PRIOR
+            if (mSig) {
+                System.out.print("Constructing MSig HashMap...");
+                HashMap<String, Double> map2 = readMSig();
+                System.out.println("Done");
+                System.out.print("Constructing prior for MSig...");
+                prior = makePriorMSig(map2, data);
+                System.out.println("Done");
+                outputPrior(prior, data, "M_Sig_prior_" + i + ".txt");
+            }
+            if (geneList) {
+                System.out.print("Constructing prior for gene list...");
+                prior = makePriorGeneList(data);
+                System.out.println("Done");
+                outputPrior(prior, data, "Gene_List.txt");
+
+            }
+
         }
-
-        //CONSTRUCT MSIGDB PRIOR
-        if(mSig) {
-            System.out.print("Constructing MSig HashMap...");
-            HashMap<String, Double> map2 = readMSig();
-            System.out.println("Done");
-            System.out.print("Constructing prior for MSig...");
-            prior = makePriorMSig(map2, data);
-            System.out.println("Done");
-            outputPrior(prior, data, "M_Sig_prior_Disc.txt");
-        }
-if(geneList) {
-    System.out.print("Constructing prior for gene list...");
-    prior = makePriorGeneList(data);
-    System.out.println("Done");
-    outputPrior(prior, data, "Gene_List_Disc.txt");
-
-}
-
     }
 
     public static DoubleMatrix2D makePriorGeneList(DataSet data)throws Exception
