@@ -32,6 +32,7 @@ import edu.cmu.tetrad.graph.Node;
 import edu.cmu.tetrad.performance.PerformanceTests;
 import edu.cmu.tetrad.search.IndependenceTest;
 import edu.cmu.tetrad.search.PcStable;
+import edu.pitt.csb.Priors.runPriors;
 
 import java.io.*;
 import java.util.Arrays;
@@ -159,6 +160,12 @@ public class ExampleMixedSearch {
                     }
                 }
 
+            }
+
+
+            if(!d.isMixed())
+            {
+                runPriors.addDummy(d);
             }
             if(runSteps)
             {

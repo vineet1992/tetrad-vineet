@@ -162,14 +162,7 @@ public class runPriors {
         if(d.isContinuous())
         {
             System.out.print("Data is only continuous, adding a discrete variable...");
-            Random rand = new Random();
-            DiscreteVariable temp= new DiscreteVariable("Dummy",2);
-            d.addVariable(temp);
-            int column = d.getColumn(d.getVariable(temp.getName()));
-            for(int i = 0; i < d.getNumRows();i++)
-            {
-                d.setInt(i,column,rand.nextInt(temp.getNumCategories()));
-            }
+            addDummy(d);
             System.out.println("Done");
             addedDummy = true;
         }
@@ -283,6 +276,17 @@ public class runPriors {
     }
 
 
+    public static void addDummy(DataSet d)
+    {
+        Random rand = new Random();
+        DiscreteVariable temp= new DiscreteVariable("Dummy",2);
+        d.addVariable(temp);
+        int column = d.getColumn(d.getVariable(temp.getName()));
+        for(int i = 0; i < d.getNumRows();i++)
+        {
+            d.setInt(i,column,rand.nextInt(temp.getNumCategories()));
+        }
+    }
 
     public static int [][] genSubs(DataSet d, int ns, boolean loocv)
     {
