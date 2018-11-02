@@ -25,7 +25,7 @@ public class PrefExperiment
 		double threshold = 0.1;
 		int numParams = -1;
 		int numRadii = 10;
-		int K = 20;
+		int K = 10;
 		double rLow = 0.01;
 		double rHigh = 0.3;
 		double tLow = 0.01;
@@ -219,6 +219,8 @@ public class PrefExperiment
 		ArrayList<Gene> output = ppd.selectGenes(bootstrap,ns,intensityFile,diss,useGraph);
 		Map<Gene,List<Gene>> map = ppd.getLastCluster();
 
+		System.out.println(map);
+
 		printOutput(output,map,directory);
 
 
@@ -232,9 +234,11 @@ public class PrefExperiment
 			for (int i = 0; i < top.size(); i++) {
 				out.print(top.get(i) + "\t");
 				List<Gene> list = map.get(top.get(i));
-				for (int j = 0; j < list.size(); j++) {
-					out.print(list.get(j) + "\t");
+				if(list!=null) {
+					for (int j = 0; j < list.size(); j++) {
+						out.print(list.get(j) + "\t");
 
+					}
 				}
 				out.println();
 

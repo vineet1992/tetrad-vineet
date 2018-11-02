@@ -26,9 +26,9 @@ public class PiPrefDiv {
     private double lowRadii = 0.01; //Low range of radius values to test
     private double highRadii = 0.99; //High range of radius values to test
     private int numRadii = 40; //Number of radius values to test
-    private int numThreshold = 40; //Number of top-K values to test
-    private double lowThreshold = 0.01; //Low range of top-K values to test
-    private double highThreshold = 0.2; //High range of top-K values to test
+    private int numThreshold = 40; //Number of Threshold values to test
+    private double lowThreshold = 0.01; //Low range of threshold values to test
+    private double highThreshold = 0.2; //High range of threshold values to test
     private int [][] subsamples; //subsamples for repeated Pref-Div
     private double normalEpsilon = 0.5;//Range around which to get probability for theta with prior information
     private int numGenes;//number of total variables in the data
@@ -349,13 +349,14 @@ public class PiPrefDiv {
         //Run Pref-Div with optimal parameters
 
 
-        //TODO use best threshold in here too
         RunPrefDiv rpd = new RunPrefDiv(means,meanGenes,data,target,LOOCV);
+        rpd.setPThreshold(bestThreshold);
         rpd.setRadius(bestRadii);
         rpd.setTopK(K);
         rpd.setAccuracy(0);
         rpd.setNumAlphas(numThreshold);
         rpd.setNS(subsamples.length);
+        rpd.setNumFolds(subsamples.length);
         rpd.setCausalGraph(useCausalGraph);
         rpd.useStabilitySelection();
 

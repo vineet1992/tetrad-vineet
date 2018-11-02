@@ -515,7 +515,6 @@ public class simulatePrefDivData {
                 if (subs != null)
                     r.setSubs(subs);
                 r.useStabilitySelection();
-                r.setApproxCorrelations(false);
                 r.setClusterStability(clusterStability);
                 r.setRadius(radius);
                 r.setAccuracy(accuracy);

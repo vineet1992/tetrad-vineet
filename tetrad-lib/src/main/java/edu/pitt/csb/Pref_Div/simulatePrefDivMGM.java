@@ -522,7 +522,6 @@ public class simulatePrefDivMGM {
 
                 if (subs != null)
                     r.setSubs(subs);
-                r.setApproxCorrelations(false);
                 r.setClusterStability(clusterStability);
                 r.setRadius(radius);
                 r.setAccuracy(accuracy);

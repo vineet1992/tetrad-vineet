@@ -56,6 +56,21 @@ public class PrefDiv {
     	this.computeCorrs = computeAllCorrs;
     }
 
+    //Constructor for already computed data intensity and dissimilarity but using theory as well
+    public PrefDiv(ArrayList<Gene> items, int topK, double accuracy, double radius, float[] corrs, float [] dissim, double alpha) {
+        this.partialCorr = false;
+        this.corrMat = corrs;
+        this.computeCorrs = false;
+        this.corrsGiven = true;
+        this.topK = topK;
+        this.accuracy = accuracy;
+        this.radius = radius;
+        this.items = items;
+        this.result = new ArrayList<Gene>();
+        this.theoryMat = dissim;
+        this.alpha = alpha;
+
+    }
     //Constructor when only using data
 	public PrefDiv(ArrayList<Gene> items, int topK, double accuracy, double radius, float[] corrs) {
 		this.partialCorr = false;
@@ -397,7 +412,7 @@ public class PrefDiv {
         if(theoryMat[Functions.getIndex(i,j,items.size())]==-1)
             return c;
         else
-            return c*alpha + theoryMat[Functions.getIndex(i,j,items.size())]*(1-alpha);
+            return c*alpha + (1-theoryMat[Functions.getIndex(i,j,items.size())])*(1-alpha);
     }
 
 
