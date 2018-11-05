@@ -38,6 +38,7 @@ public class PiPrefDiv {
     private Map<Gene,List<Gene>> lastCluster;//The last set of clusters from the run of selectGenes()
     private boolean verbose = false; //Should we print full debugging information?
     private int K = 5; //Number of genes to select
+    private boolean clusterByCorrs = true;//Do we use all correlations to cluster the genes or standard Pref-Div?
 
     //Constructor that uses default parameters for both initial parameter ranges
     public PiPrefDiv(DataSet data, String target,int K)
@@ -92,6 +93,8 @@ public class PiPrefDiv {
         this.K = K;
     }
 
+
+    public void setSubsamples(int[][] subs){this.subsamples = subs;}
     public Map<Gene,List<Gene>> getLastCluster()
     {
         return lastCluster;
@@ -146,7 +149,7 @@ public class PiPrefDiv {
         System.out.print("Generating subsamples...");
         if(subsamples==null)
         {
-            subsamples = genSubsamples(boot,numSamples);
+            subsamples = genSubsamples(boot,numSamples,data,LOOCV);
         }
         System.out.println("Done");
 
@@ -359,6 +362,8 @@ public class PiPrefDiv {
         rpd.setNumFolds(subsamples.length);
         rpd.setCausalGraph(useCausalGraph);
         rpd.useStabilitySelection();
+        if(clusterByCorrs)
+            rpd.clusterByCorrs();
 
         ArrayList<Gene> top = rpd.runPD();
         HashMap<Gene,List<Gene>> map = rpd.getClusters();
@@ -728,7 +733,7 @@ public class PiPrefDiv {
                     temp = Functions.computeAllIntensities(temp,1,currData,target,false,false,false,initThreshold[j]);
                     Collections.sort(temp,Gene.IntensityComparator);
                     PrefDiv pd = new PrefDiv(temp,K,0,initRadii[i], corrs);
-                    pd.setCluster(true);
+                    pd.setCluster(clusterByCorrs);
                     ArrayList<Gene> topGenes = pd.diverset();
                     addFoundGenes(topGenes,curr);
                     addGeneConnections(corrs,curr,initRadii[i]);
@@ -807,7 +812,7 @@ public class PiPrefDiv {
     //Input: bootstrap ( should we bootstrap to generate samples or should we use subsampling)
     //Input: numSamples (number of samples to test)
     //Output: an array of integers specifying the samples that will be used in the repeated Pref-Div runs
-    private int [][] genSubsamples(boolean bootstrap, int numSamples)
+    public static int [][] genSubsamples(boolean bootstrap, int numSamples,DataSet data,boolean LOOCV)
     {
         if(bootstrap) {
             return DataUtils.getBootstrapIndices(data,data.getNumRows(),numSamples);

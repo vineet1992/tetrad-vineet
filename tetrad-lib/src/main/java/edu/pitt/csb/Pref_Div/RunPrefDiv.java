@@ -13,10 +13,7 @@ import edu.cmu.tetrad.graph.Node;
 import edu.cmu.tetrad.regression.*;
 import edu.cmu.tetrad.util.ForkJoinPoolInstance;
 import edu.cmu.tetrad.util.StatUtils;
-import edu.pitt.csb.mgm.IndTestMultinomialAJ;
-import edu.pitt.csb.mgm.MGM;
-import edu.pitt.csb.mgm.MixedUtils;
-import edu.pitt.csb.mgm.STEPS;
+import edu.pitt.csb.mgm.*;
 import edu.pitt.csb.stability.CrossValidationSets;
 import edu.pitt.csb.stability.DataGraphSearch;
 import edu.pitt.csb.stability.StabilityUtils;
@@ -36,6 +33,10 @@ import static org.apache.commons.collections4.CollectionUtils.union;
  TODO Switch to median accuracy instead of mean for cross validation?
  */
 public class RunPrefDiv {
+
+    public enum ClusterType{
+        PCA,MEAN,MEDIAN,NONE
+    }
 
     private DataSet data;
     private Random rand;
@@ -73,6 +74,9 @@ public class RunPrefDiv {
     private boolean useStabilitySelection = false; //Should we use stability selection to determine alpha?
     private boolean useCausalGraph = false; //Should we use a causal graph when determining predictive neighbors for cross-validation
     private boolean usePThreshold = false;//Should we use a p-value threshold to shrink insignificant p-value correlations to 0
+    private boolean clusterByCorrs = false; //Should we cluster purely by significant correlations instead of using Pref-Div
+    private ClusterType clusterType; //Which clustering method should we use (Options are PCA, Median, Mean, None)
+
 
     public RunPrefDiv(float [] dissimilarity, ArrayList<Gene> genes, DataSet data,String target,boolean leaveOneOut)
     {
@@ -139,7 +143,9 @@ public class RunPrefDiv {
     public void usePartialCorrelation(boolean pc){partialCorr = pc;}
     public void useStabilitySelection(){useStabilitySelection = true;}
     public void setCausalGraph(boolean cg){useCausalGraph = cg;}
+    public void clusterByCorrs(){clusterByCorrs=true;}
     public void setB(int B){this.B = B;}
+    public void setClusterType(ClusterType c){clusterType = c;}
 
     public ArrayList<Gene> runPD()
     {
@@ -176,6 +182,7 @@ public class RunPrefDiv {
             System.out.println("Running stability selection version of Pref-Div");
 
             List<List<Gene>> allGenes = new ArrayList<List<Gene>>();
+            List<HashMap<Gene,List<Gene>>> allClusters = new ArrayList<>();
             double [][] accuracies = new double[alphas.length][numFolds];
             double [][] stabilities = new double[alphas.length][numFolds];
             int [][] trainSubs = new int[1][1];
@@ -320,6 +327,7 @@ public class RunPrefDiv {
                 ArrayList<Gene> genes = lastGeneSet;
                 System.out.println("Gene Set for " + alphas[i] + ": " + genes);
                 allGenes.add(genes);
+                allClusters.add(lastClusters);
 
                 if (stabPS != null) {
                     if (includeAccuracy) {
@@ -345,6 +353,7 @@ public class RunPrefDiv {
             }
             System.out.println();
             lastGeneSet = (ArrayList<Gene>)allGenes.get(maxAlpha);
+            lastClusters = allClusters.get(maxAlpha);
 
 
         }
@@ -464,7 +473,7 @@ public class RunPrefDiv {
 
                         DataSet dataSubSamp = train.subsetRows(allInds[s/2][s%2]);
 
-                        ArrayList<Gene> curr = new ArrayList<Gene>();
+                        ArrayList<Gene> curr;
                         if(usePThreshold)
                         {
                             curr = Functions.computeAllIntensities(genes,alpha,dataSubSamp,target,partialCorr,false,false,pThresh);
@@ -494,7 +503,7 @@ public class RunPrefDiv {
                            p = new PrefDiv(curr,topK,accuracy,radius,dissimilarity,alpha,dataSubSamp,false,partialCorr);
                         }
                         //PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,PrefDiv.findTopKIntensity(curr,topK),dissimilarity,alpha,dataSubSamp,approxCorrelations,partialCorr);
-                        p.setCluster(true);
+                        p.setCluster(clusterByCorrs);
                         ArrayList<Gene> result = p.diverset();
                         allClusters.add(p.clusters);
 
@@ -542,7 +551,7 @@ public class RunPrefDiv {
             Collections.sort(curr,Gene.IntensityComparator);
             float[] corrs = Functions.computeAllCorrelations(curr,data,false,false,false,pThresh);
             PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,corrs);
-            p.setCluster(true);
+            p.setCluster(clusterByCorrs);
             p.diverset();
             lastClusters = p.clusters;
         }
@@ -552,7 +561,7 @@ public class RunPrefDiv {
             Collections.sort(curr,Gene.IntensityComparator);
             PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,dissimilarity,alpha,data,false,partialCorr);
             //PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,PrefDiv.findTopKIntensity(curr,topK),dissimilarity,alpha,data,approxCorrelations,partialCorr);
-            p.setCluster(true);
+            p.setCluster(clusterByCorrs);
             p.diverset();
             lastClusters = p.clusters;
 
@@ -825,7 +834,7 @@ public class RunPrefDiv {
                         Collections.sort(curr,Gene.IntensityComparator);
                         PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,dissimilarity,alp,dataSubSamp,false,partialCorr);
                         //PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,PrefDiv.findTopKIntensity(curr,topK),dissimilarity,alp,dataSubSamp,approxCorrelations,partialCorr);
-                        p.setCluster(true);
+                        p.setCluster(clusterByCorrs);
                         ArrayList<Gene> result = p.diverset();
                         allClusters.add(p.clusters);
                         time = System.nanoTime()-time;
@@ -861,7 +870,7 @@ public class RunPrefDiv {
         Collections.sort(curr,Gene.IntensityComparator);
         PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,dissimilarity,alp,data,true,partialCorr);
         //PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,PrefDiv.findTopKIntensity(curr,topK),dissimilarity,alp,data,approxCorrelations,partialCorr);
-        p.setCluster(true);
+        p.setCluster(clusterByCorrs);
         lastGeneSet = p.diverset();
         lastClusters = p.clusters;
 

@@ -25,11 +25,11 @@ public class PrefExperiment
 		double threshold = 0.1;
 		int numParams = -1;
 		int numRadii = 10;
-		int K = 10;
-		double rLow = 0.01;
-		double rHigh = 0.3;
-		double tLow = 0.01;
-		double tHigh = 0.1;
+		int K = 50;
+		double rLow = 0.1;
+		double rHigh = 0.8;
+		double tLow = 0.0001;
+		double tHigh = 0.2;
 		int numThreshold = 10;
 		boolean normalizeFiles = false;
 		boolean loocv = false;
@@ -40,6 +40,7 @@ public class PrefExperiment
 		String intensityFile = "";
 		String directory = ".";
 		String dissimilarityDir = "";
+
 
 		String outputFile = "";
 		String clusterFile = "";

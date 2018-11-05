@@ -28,7 +28,8 @@ public class PrefDiv {
    private double alpha;
    private int preSampleSize = 5000;
    private DataSet data;
-   private boolean clustering = false;
+   private boolean clustering = false; //Are we clustering the top genes with near neighbors?
+   private boolean clusterByCorrs = false;//Should we use all correlations to cluster instead of only high intensity genes?
    private boolean computeCorrs;
    private boolean corrsGiven;
    private boolean partialCorr;
@@ -95,10 +96,15 @@ public class PrefDiv {
     {
         this.preSampleSize = ss;
     }
-    public void setCluster(boolean clust)
+
+
+    //Sets up so that we are clustering with Pref-Div
+    //Input: cluster -> whether or not we cluster using all correlations or just using the standard Pref-Div approach
+    public void setCluster(boolean cluster)
     {
-        clustering = clust;
+        clustering = true;
         clusters = new HashMap<Gene,List<Gene>>();
+        clusterByCorrs = cluster;
     }
 	public static double findTopKIntensity(ArrayList<Gene> record, int topK){
 		double result = 0;
@@ -228,10 +234,34 @@ public class PrefDiv {
         }
         for(int i = 0; i < toRemove.size();i++)
             clusters.remove(toRemove.get(i));
+
+        if(clusterByCorrs)
+        {
+            addAllToClusters();
+        }
         time = System.nanoTime()-time;
        // System.out.println("Acutal Pref-Div Time: " + time/Math.pow(10,9));
         return result;
    
+    }
+
+
+    //Add all significantly correlated genes to each key in the hashmap
+    private void addAllToClusters()
+    {
+        for(Gene g:clusters.keySet())
+        {
+            List<Gene>list = new ArrayList<Gene>();
+
+            for(int i = 0; i < items.size();i++)
+            {
+                if(g.ID!=items.get(i).ID && distance(g,items.get(i))<radius)
+                {
+                    list.add(items.get(i));
+                }
+            }
+            clusters.put(g,list);
+        }
     }
 
     //Identify lower intensity genes to be removed from input, since another similar gene is already in input
@@ -387,7 +417,8 @@ public class PrefDiv {
     	}
     	return true;
     }
-    
+
+
     public double distance(Gene gene1, Gene gene2) {
 
         int i = gene1.ID;

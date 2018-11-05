@@ -28,8 +28,8 @@ import java.util.*;
 public class simulatePrefDivData {
 
     public static void main(String [] args) {
-        int numRuns = 25;
-        int numGenes = 1000;
+        int numRuns = 20;
+        int numGenes = 200;
         int sampleSize = 200;
 
         int ns = 20; //number of subsamples

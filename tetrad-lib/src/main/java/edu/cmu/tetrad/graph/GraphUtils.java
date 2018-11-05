@@ -291,7 +291,6 @@ public final class GraphUtils {
      * whether or not there should be connections between components (later, for now assume no)
      *
 **/
-    //TODO Fix edge cases, don't let a component have less than 0 edges or something
     public static Graph randomGraphForwardEdgesClusters(int numNodes, int numComponents,
                                                         int numConnectedComponents,int numEdges,boolean evenDistribution,
                                                         boolean connected, int maxDegree, int maxIndegree, int maxOutdegree)
@@ -300,11 +299,11 @@ public final class GraphUtils {
         clusters = new HashMap<>();
         int []nodesPerGraph = new int[numComponents];
         int []edgesPerGraph = new int[numComponents];
-        if(evenDistribution) {
+        if(evenDistribution) { //Evenly distribute nodes and edges among clusters, this works fine
             int ng = (numNodes - 1) / numComponents; //Don't include target variable in this calculation
             int effectiveEdges = numEdges - numConnectedComponents; //Remove those edges that are necessary to connect to the target
-            int eg = effectiveEdges / numComponents;
-            int extraNodes = (numNodes - 1) % numComponents;
+            int eg = effectiveEdges / numComponents; //Number of edges per component
+            int extraNodes = (numNodes - 1) % numComponents; //Fix uneven division problems to get the specified number of edges exactly
             int extraEdges = effectiveEdges % numComponents;
             for (int i = 0; i < numComponents; i++) {
                 if (extraNodes != 0) {
@@ -317,6 +316,12 @@ public final class GraphUtils {
                     extraEdges--;
                 } else
                     edgesPerGraph[i] = eg;
+
+                if(edgesPerGraph[i] >= (nodesPerGraph[i]*(nodesPerGraph[i]-1)/2))
+                {
+                    System.err.println("Too many edges to evenly distribute amongst pathways...");
+                    System.exit(-1);
+                }
             }
         }else
         {
@@ -330,8 +335,10 @@ public final class GraphUtils {
                 nodesPerGraph[i] = (int)n_nodes.sample();
                 while(nodesPerGraph[i] < 0)
                     nodesPerGraph[i] = (int) n_nodes.sample();
+
+                int maxEdges = nodesPerGraph[i]*(nodesPerGraph[i]-1)/2;
                 edgesPerGraph[i] = (int)n_edges.sample();
-                while(edgesPerGraph[i] < 0)
+                while(edgesPerGraph[i] < 0 || edgesPerGraph[i] >= maxEdges)
                     edgesPerGraph[i] = (int) n_edges.sample();
             }
         }
