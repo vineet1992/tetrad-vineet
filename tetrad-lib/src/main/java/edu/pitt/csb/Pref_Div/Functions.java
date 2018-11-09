@@ -596,7 +596,7 @@ public class Functions
     {
         try {
             BufferedReader b = new BufferedReader(new FileReader(file));
-            int numSources = b.readLine().split("\t").length - 1;
+            int numSources = b.readLine().split("\t").length-1;
             int ng = 0;
             while (b.ready()) {
                 b.readLine();
@@ -1010,7 +1010,7 @@ public class Functions
     //Input: Theory similarity file, setup as a matrix where rows and columns are variables
     //Output:float [] representation of this matrix, where float[i] can be converted to matrix[j,k] using a standard row-order conversion
     //Optional input: Normalize- should the floats be put through an NPN normalization
-    public static float [] loadTheoryMatrix(String theoryFile, boolean normalize)
+    public static float [] loadTheoryMatrix(String theoryFile, boolean normalize,int numGenes)
     {
         int length = numGenes*(numGenes-1)/2;
         if(!normalize)

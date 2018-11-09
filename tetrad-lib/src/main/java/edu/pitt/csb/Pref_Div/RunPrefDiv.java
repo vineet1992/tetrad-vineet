@@ -18,6 +18,9 @@ import edu.pitt.csb.stability.CrossValidationSets;
 import edu.pitt.csb.stability.DataGraphSearch;
 import edu.pitt.csb.stability.StabilityUtils;
 import org.apache.commons.math3.analysis.function.Logistic;
+import org.apache.commons.math3.linear.MatrixUtils;
+import org.apache.commons.math3.linear.RealMatrix;
+import org.apache.commons.math3.stat.correlation.Covariance;
 
 import java.io.PrintStream;
 import java.util.*;
@@ -224,13 +227,22 @@ public class RunPrefDiv {
                         trainSubs = StabilityUtils.subSampleNoReplacement(train.getNumRows(),b,numSubs);
                     }
 
-                    //Run Stability Pref-Div
+                    /*** Run Pref-Div with Stability Selection ***/
                     System.out.println("Running CPSS for alpha " + alphas[i] + ", and cv fold: " + j);
                     double stab = pdCPSS(alphas[i],train);
                     ArrayList<Gene> genes = lastGeneSet;
                     System.out.println(genes);
                     List<Node> cols = new ArrayList<Node>();
                     List<Node> dNeighbors = new ArrayList<Node>();
+
+
+                    /**Use summarization method specified along with selected genes to subset down to a dataset for causal analysis or straight prediciton**/
+                    //DataSet [] summarized = summarize(train,test,genes,lastClusters,clusterType);
+
+
+                    /***Construct Regression Dataset to test this value of alpha***/
+
+
                     if(useCausalGraph)
                     {
                         //Create a dataset with only those variables selected by PD
@@ -399,6 +411,29 @@ public class RunPrefDiv {
 
     }
 
+
+    private DataSet[] summarize(DataSet train,DataSet test, ArrayList<Gene> genes, Map<Gene,List<Gene>> clusters, ClusterType type)
+    {
+
+        if(type==ClusterType.NONE)
+        {
+
+        }
+        if(type==ClusterType.PCA)
+        {
+            /***Produce one column at a time via subsetting by genes in cluster i and then running PCA on the resulting matrix and taking dimension 1***/
+
+            RealMatrix realMatrix = MatrixUtils.createRealMatrix(train.getDoubleData().toArray());
+
+//create covariance matrix of points, then find eigen vectors
+//see https://stats.stackexchange.com/questions/2691/making-sense-of-principal-component-analysis-eigenvectors-eigenvalues
+
+            Covariance covariance = new Covariance(realMatrix);
+            RealMatrix covarianceMatrix = covariance.getCovarianceMatrix();
+            EigenDecomposition ed = new EigenDecomposition(covarianceMatrix);
+        }
+        return null;
+    }
 
     //TODO Use all genes significantly correlated to those selected as clusters
     //Compute PCA or Median or whatever of selected genes
@@ -883,7 +918,7 @@ public class RunPrefDiv {
     }
 
 
-    private void addToGeneList(HashMap<Gene,List<Gene>> map, List<List<Gene>> one)
+    private static void addToGeneList(HashMap<Gene,List<Gene>> map, List<List<Gene>> one)
     {
         for(Gene g: map.keySet())
         {
@@ -898,7 +933,7 @@ public class RunPrefDiv {
         }
     }
 
-    private double[][] computeCostMatrix(List<List<Gene>> one, List<List<Gene>> two)
+    private static double[][] computeCostMatrix(List<List<Gene>> one, List<List<Gene>> two)
     {
         double [][] costs = new double[one.size()][two.size()];
         for(int i = 0; i < one.size();i++)
@@ -910,7 +945,7 @@ public class RunPrefDiv {
         }
         return costs;
     }
-    private double [][] normalizedCosts(double[][]costs)
+    private static double [][] normalizedCosts(double[][]costs)
     {
         double sum = 0;
         for(int i = 0; i < costs.length;i++)
@@ -964,6 +999,31 @@ public class RunPrefDiv {
 
         return sim/count;
     }
+
+    public static double clusterSim(Map<Gene,List<Gene>> m1, Map<Gene,List<Gene>> m2)
+    {
+        List<List<Gene>> one = new ArrayList<List<Gene>>();
+        Map<Gene,List<Gene>> map = m1;
+        addToGeneList((HashMap<Gene,List<Gene>>)map,one);
+
+        List<List<Gene>> two = new ArrayList<List<Gene>>();
+        map = m2;
+        addToGeneList((HashMap<Gene,List<Gene>>)map,two);
+
+        double [][] costs = computeCostMatrix(one,two);
+        HungarianAlgorithm ha = new HungarianAlgorithm(costs);
+
+
+        int [] result = ha.execute();
+        costs = normalizedCosts(costs);
+        double sim = 0;
+        for(int k = 0; k < result.length;k++)
+        {
+            sim+=costs[k][result[k]];
+        }
+        return sim;
+    }
+
 
     private double tanimotoSim(List<List<Gene>> allGenes)
     {

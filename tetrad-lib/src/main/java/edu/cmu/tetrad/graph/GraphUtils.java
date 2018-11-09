@@ -291,6 +291,8 @@ public final class GraphUtils {
      * whether or not there should be connections between components (later, for now assume no)
      *
 **/
+
+    //TODO Something is fishy about this method
     public static Graph randomGraphForwardEdgesClusters(int numNodes, int numComponents,
                                                         int numConnectedComponents,int numEdges,boolean evenDistribution,
                                                         boolean connected, int maxDegree, int maxIndegree, int maxOutdegree)

@@ -20,6 +20,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.PrintStream;
+import java.text.DecimalFormat;
 import java.util.*;
 
 /**
@@ -30,6 +31,8 @@ public class justSimulatePrefDiv {
 
     public static double [] reliableParams = new double[]{0.7,1.0,0.0,0.3}; //True Low, True High, False Low, False High
     public static double [] unreliableParams = new double[]{0.0,1.0,0.0,1.0}; //True Low, True High, False Low, False High
+    public static double amountLimit = 0.5; //Specifies the total percentage of prior information that can be given by a single source
+    public static Random rand = new Random();
 
     public static void main(String [] args) {
         int numRuns = 20;
@@ -47,10 +50,11 @@ public class justSimulatePrefDiv {
         int numComponents = 10; //How many components do we have for cluster simulation?
         int minTargetParents = 5; //How many true parents of the target are there?
         boolean noiseRandom = true; //Should the priors have random amounts of reliability?
-        boolean amountRandom = false; //Should the priors have a random amount of prior knowledge?
-        double intensityNoise = 0.5;
+
+
+        boolean amountRandom = true; //Should the priors have a random amount of prior knowledge?
         boolean targetContinuous = true; //Is the target variable continuous?
-        boolean evenDistribution = false; //Is the distribution of nodes in each cluster even?
+        boolean evenDistribution = true; //Is the distribution of nodes in each cluster even?
         int numCategories = 4; //number of categories for discrete variables
 
 
@@ -205,22 +209,22 @@ public class justSimulatePrefDiv {
             System.out.print("Generating Intensity File...");
             //Consistent ordering is whatever is returned by g.getNodes() (ignoring the target variable)
             File priorFile = null;
-            priorFile = new File("Priors/Prior_" + numGenes + "_" + sampleSize + "_" + minTargetParents + "_" + intensityNoise + "_" + numPriors + "_"  + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountPrior + "_" + j + "_intensity.txt");
+            priorFile = new File("Priors/Prior_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_"  + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" +  j + "_intensity.txt");
+            File iFile = new File("Reliabilities_I_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + j + ".txt");
             if (!priorFile.exists()) {
-                generateIntensity(priorFile, g, target, numPriors, numReliable, amountPrior);
+                generateIntensity(priorFile,iFile, g, target, numPriors, numReliable, amountPrior,amountRandom,noiseRandom);
             }
-            String intenseFile = priorFile.getAbsolutePath();
             System.out.println("Done");
             //Use this if prior file exists Make sure intensity is at the end
             String[] disFiles = new String[numPriors];
             try {
-                PrintStream out2 = new PrintStream("Reliabilities_D_" + numGenes + "_" + sampleSize + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + j + ".txt");
+                PrintStream out2 = new PrintStream("Reliabilities_D_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + j + ".txt");
                 for (int k = 0; k < numPriors; k++) {
                     System.out.print("Generating Dissimilarity File #" + k + "...");
-                    disFiles[k] = "Priors/Prior_" + numGenes + "_" + sampleSize + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + k + "_" + j +  "_dissimilarity.txt";
+                    disFiles[k] = "Priors/Prior_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + k + "_" + j +  "_dissimilarity.txt";
                     File f = new File(disFiles[k]);
                     if (!f.exists()) {
-                        double reli = generateDissimilarity(f, g, target, numReliable, amountPrior, k);
+                        double reli = generateDissimilarity(f, g, target, numReliable, amountPrior, amountRandom,noiseRandom,k);
                         out2.println(reli);
                         out2.flush();
                         System.out.println("Done");
@@ -331,61 +335,78 @@ public class justSimulatePrefDiv {
 
 
 
-    public static double generateDissimilarity(File prior, Graph g, String target, int numReliable,double amountPrior, int k)
+    public static double generateDissimilarity(File prior, Graph g, String target, int numReliable,double amountPrior, boolean amountRandom, boolean noiseRandom, int k)
     {
-        Random rand = new Random();
         List<Node> allNodes = g.getNodes();
+        double[][] dissim = new double[allNodes.size()-1][allNodes.size()-1];
+        int row = 0;
         double reliability = 0;
         int counts = 0;
+        double amount = amountPrior;
+                if(amountRandom)
+                {
+                    amount = rand.nextDouble()*amountLimit;
+                }
+        if(noiseRandom)
+        {
+            reliableParams[0] = rand.nextDouble()*0.8+0.2;
+            reliableParams[3] = rand.nextDouble()*0.8;
+        }
         try {
-            PrintStream out = new PrintStream(prior);
 
             for(int i = 0; i < allNodes.size();i++)
             {
                 Node curr = allNodes.get(i);
                 if(curr.getName().equals(target))
                     continue;
-                for(int j = i+1; j < allNodes.size();j++)
-                {
+                int col = 0;
+                for(int j = 0; j < allNodes.size();j++) {
                     Node curr2 = allNodes.get(j);
-                    if(curr2.getName().equals(target))
+                    if (curr2.getName().equals(target))
                         continue;
                     //Currently reliable priors give information about true neighbors in the range [0.6,1] and false neighbors in the range [0,0.5]
-                    if(k < numReliable)
+                    if (i == j) {
+                        dissim[row][col] = -1;
+                    } else if (i > j)
+                    {
+                        dissim[row][col] = dissim[col][row];
+                    }
+                    else if(k < numReliable)
                     {
                         if(g.getEdge(curr,curr2)!=null)
                         {
-                            if(rand.nextDouble()<amountPrior)
+                            if(rand.nextDouble()<amount)
                             {
                                 double val = rand.nextDouble()*(reliableParams[1]-reliableParams[0])+reliableParams[0];
-                                out.println(val);
+                                dissim[row][col] = val;
                                 reliability+=val;
                                 counts++;
                             }
                             else
                             {
-                                out.println("-1");
+                                dissim[row][col] = -1;
+                                dissim[col][row] = -1;
                             }
                         }
                         else
                         {
-                            if(rand.nextDouble()<amountPrior)
+                            if(rand.nextDouble()<amount)
                             {
                                 double val = rand.nextDouble()*(reliableParams[3]-reliableParams[2]) + reliableParams[2];
-                                out.println(val);
+                                dissim[row][col] = val;
                                 reliability-= val;
                                 counts++;
                             }
                             else
                             {
-                                out.println("-1");
+                                dissim[row][col] = -1;
                             }
                         }
                     }
                     //This prior is unreliable, needs to give bad information
                     else
                     {
-                        if(rand.nextDouble()<amountPrior)
+                        if(rand.nextDouble()<amount)
                         {
                             double val = -1;
                             if(g.getEdge(curr,curr2)!=null)
@@ -401,17 +422,44 @@ public class justSimulatePrefDiv {
 
 
                             }
-                            out.println(val);
+                            dissim[row][col] = val;
                             counts++;
                         }
                         else
                         {
-                            out.println("-1");
+                            dissim[row][col] = -1;
                         }
                     }
+                    col++;
                 }
+                row++;
             }
             reliability /= counts;
+
+
+            PrintStream out = new PrintStream(prior);
+            DecimalFormat df = new DecimalFormat("#.#####");
+            for(int i = 0; i < dissim.length;i++)
+            {
+                for(int j = 0; j < dissim[i].length;j++)
+                {
+                    if(dissim[i][j]==-1)
+                    {
+                        if (j == dissim[i].length - 1)
+                            out.print("-1");
+                        else
+                            out.print("-1" + "\t");
+                    }
+                    else {
+                        if (j == dissim[i].length - 1)
+                            out.print(df.format(dissim[i][j]));
+                        else
+                            out.print(df.format(dissim[i][j]) + "\t");
+                    }
+                }
+                out.println();
+            }
+
             out.flush();
             out.close();
             return reliability;
@@ -427,29 +475,50 @@ public class justSimulatePrefDiv {
         return -1;
     }
 
-    public static void generateIntensity(File prior, Graph g, String target, int numPriors, int numReliable,double amountPrior)
+    public static void generateIntensity(File prior,File intense, Graph g, String target, int numPriors, int numReliable,double amountPrior, boolean amountRandom,boolean noiseRandom)
     {
-        Random rand = new Random();
         List<Node> neighbors = g.getAdjacentNodes(g.getNode(target));
         List<Node> allNodes = g.getNodes();
         double [] reliability = new double[numPriors];
         int [] counts = new int[numPriors];
+        double [] amount = new double[numPriors];
+        for(int i = 0; i < numPriors;i++)
+        {
+            amount[i] = amountPrior;
+            if(amountRandom)
+                amount[i] = rand.nextDouble()*amountLimit;
+        }
+
         try {
             PrintStream out = new PrintStream(prior);
-            PrintStream out2 = new PrintStream("Reliabilities_I_" + prior.getName());
+            out.print("Gene\t");
+            for(int i = 0; i < numPriors;i++)
+            {
+                out.print("Prior_" + i + "\t");
+            }
+            out.println();
+            PrintStream out2 = new PrintStream(intense);
 
             for(int i = 0; i < allNodes.size();i++)
             {
                 Node curr = allNodes.get(i);
+                if(curr.getName().equals(target))
+                    continue;
+                out.print(allNodes.get(i).getName()+"\t");
                for(int j = 0; j < numPriors;j++)
                {
 
+                   if(noiseRandom)
+                   {
+                       reliableParams[0] = rand.nextDouble()*0.8+0.2;
+                       reliableParams[3] = rand.nextDouble()*0.8;
+                   }
                    //Currently reliable priors give information about true neighbors in the range [0.6,1] and false neighbors in the range [0,0.5]
                    if(j < numReliable)
                    {
                        if(neighbors.contains(curr))
                        {
-                           if(rand.nextDouble()<amountPrior)
+                           if(rand.nextDouble()<amount[j])
                            {
                                double val = rand.nextDouble()*(reliableParams[1]-reliableParams[0])+reliableParams[0];
                                out.print(val + "\t");
@@ -463,7 +532,7 @@ public class justSimulatePrefDiv {
                        }
                        else
                        {
-                           if(rand.nextDouble()<amountPrior)
+                           if(rand.nextDouble()<amount[j])
                            {
                                double val = rand.nextDouble()*(reliableParams[3]-reliableParams[2]) + reliableParams[2];
                                out.print(val + "\t");
@@ -479,7 +548,7 @@ public class justSimulatePrefDiv {
                    //This prior is unreliable, needs to give bad information
                    else
                    {
-                       if(rand.nextDouble()<amountPrior)
+                       if(rand.nextDouble()<amount[j])
                        {
                            double val = -1;
                            if(neighbors.contains(curr))

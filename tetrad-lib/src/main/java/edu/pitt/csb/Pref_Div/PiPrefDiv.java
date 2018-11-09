@@ -3,9 +3,12 @@ package edu.pitt.csb.Pref_Div;
 import cern.colt.matrix.impl.SparseDoubleMatrix2D;
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.data.DataUtils;
+import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.search.IndTestFisherZ;
+import edu.cmu.tetrad.util.ForkJoinPoolInstance;
 import edu.cmu.tetrad.util.TetradMatrix;
 import edu.pitt.csb.Priors.mgmPriors;
+import edu.pitt.csb.mgm.MGM;
 import edu.pitt.csb.stability.StabilityUtils;
 import org.apache.commons.math3.distribution.BinomialDistribution;
 import org.apache.commons.math3.distribution.NormalDistribution;
@@ -13,6 +16,8 @@ import org.apache.commons.math3.distribution.NormalDistribution;
 import java.io.File;
 import java.io.PrintStream;
 import java.util.*;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.RecursiveAction;
 
 /**
  * Created by vinee_000 on 10/19/2018.
@@ -39,6 +44,12 @@ public class PiPrefDiv {
     private boolean verbose = false; //Should we print full debugging information?
     private int K = 5; //Number of genes to select
     private boolean clusterByCorrs = true;//Do we use all correlations to cluster the genes or standard Pref-Div?
+    private double [] lastIntensityWeights;
+    private double [] lastSimilarityWeights;
+    private boolean outputScores; //Should we output parameter scores to file?
+    private PrintStream scoreStream; //Printstream to output parameter scores to file
+    private double lastRadius; //Last Radius chosen via best score
+    private double lastThreshold; //Last threshold chosen via best score
 
     //Constructor that uses default parameters for both initial parameter ranges
     public PiPrefDiv(DataSet data, String target,int K)
@@ -53,7 +64,7 @@ public class PiPrefDiv {
 
 
     //Constructor that specifies the same number of parameters for radius and k
-    public PiPrefDiv(DataSet data, String target, int numParams, int K)
+    public PiPrefDiv(DataSet data, String target, int K,int numParams)
     {
         this.K = K;
         this.numGenes = data.getNumColumns()-1;
@@ -67,7 +78,7 @@ public class PiPrefDiv {
 
 
     //Construct with number of radii and k parameters to test
-    public PiPrefDiv(DataSet data, String target, int numRadii, int numThreshold, int K)
+    public PiPrefDiv(DataSet data, String target,int K, int numRadii, int numThreshold)
     {
         this.K = K;
         this.data = data;
@@ -81,7 +92,7 @@ public class PiPrefDiv {
 
 
     //Constructor with initial ranges both specified
-    public PiPrefDiv(DataSet data, String target, double [] radii, double [] threshold,int K)
+    public PiPrefDiv(DataSet data, String target, int K, double [] radii, double [] threshold)
     {
         this.data = data;
         this.numGenes = data.getNumColumns()-1;
@@ -99,6 +110,13 @@ public class PiPrefDiv {
     {
         return lastCluster;
     }
+    public double[] getLastIntensityWeights(){return lastIntensityWeights;}
+    public double[] getLastSimilarityWeights(){return lastSimilarityWeights;}
+    public double getLastRadius(){return lastRadius;}
+    public double getLastThreshold(){return lastThreshold;}
+    public void setOutputScores(PrintStream out){outputScores=true; scoreStream=out;}
+
+
 
     //Setter for whether or not to do leave-one-out cross validation
     public void setLOOCV(boolean loocv)
@@ -112,6 +130,14 @@ public class PiPrefDiv {
         verbose = true;
     }
 
+    public double[] getTestedRadii()
+    {
+        return initRadii;
+    }
+    public double[] getTestedThresholds()
+    {
+        return initThreshold;
+    }
     //Create default radius of similarity range to examine
     private double[] initRadiiDefault()
     {
@@ -137,6 +163,47 @@ public class PiPrefDiv {
         return topK;
     }
 
+
+
+    public double [][] evaluatePriors(boolean boot, int numSamples,String iFile, String [] dFile,boolean useCausalGraph)
+    {
+        //Generate subsamples of the data
+        System.out.print("Generating subsamples...");
+        if(subsamples==null)
+        {
+            subsamples = genSubsamples(boot,numSamples,data,LOOCV);
+        }
+        System.out.println("Done");
+
+        //Compute stability of each gene selection and each gene-gene relationship
+        System.out.print("Computing stability across radii and threshold values...");
+        int[][][] clusts = computeStabs(); //i -> Radii, j -> TopK, k -> geneID
+        System.out.println("Done");
+
+        int [] sums = getFullCounts(clusts);
+        System.out.println(Arrays.toString(sums));
+
+        System.out.print("Computing intensity weights...");
+        //Compute intensity weights
+        double [] intWeights = getIntensityWeights(sums,iFile);
+        System.out.println("Done");
+        if(verbose)
+        {
+            //TODO get header from iFile to attach source to weights
+            System.out.println("Intensity weights are: " + Arrays.toString(intWeights));
+        }
+
+        System.out.print("Computing similarity weights...");
+        //Compute similarity weights for each prior knowledge source
+        double [] simWeights = getSimilarityWeights(sums,dFile);
+
+        double[][] allWeights = new double[2][];
+        allWeights[0] = intTao;
+        System.out.println("Intensity Tao: " + Arrays.toString(allWeights[0]));
+        allWeights[1] = simTao;
+        System.out.println("Similarity Tao: " + Arrays.toString(allWeights[1]));
+        return allWeights;
+    }
     //Full procedure to select genes based on prior information Pref-Div
     //Input: boot (should we do bootstrapping (true) or subsampling (false))
     //Input: numSamples (number of samples to subsample or bootstrap)
@@ -164,6 +231,7 @@ public class PiPrefDiv {
         System.out.print("Computing intensity weights...");
         //Compute intensity weights
         double [] intWeights = getIntensityWeights(sums,iFile);
+        lastIntensityWeights = intWeights;
         System.out.println("Done");
         if(verbose)
         {
@@ -219,6 +287,22 @@ public class PiPrefDiv {
                 }
                 out.flush();
                 out.close();
+
+
+                if(outputScores)
+                {
+                    for (int i = 0; i < initThreshold.length; i++)
+                        scoreStream.print(initThreshold[i] + "\t");
+                    scoreStream.println();
+                    for (int i = 0; i < scoresInt.length; i++) {
+                        scoreStream.print(initRadii[i] + "\t");
+                        for (int j = 0; j < scoresInt[i].length; j++) {
+                            scoreStream.print(scoresInt[i][j] + "\t");
+                        }
+                        scoreStream.println();
+                    }
+                    scoreStream.flush();
+                }
             }catch(Exception e)
             {
                 System.err.println("Couldn't write scores to file");
@@ -238,6 +322,7 @@ public class PiPrefDiv {
         System.out.print("Computing similarity weights...");
         //Compute similarity weights for each prior knowledge source
         double [] simWeights = getSimilarityWeights(sums,dFile);
+        lastSimilarityWeights = simWeights;
         System.out.println("Done");
         if(verbose)
         {
@@ -247,7 +332,7 @@ public class PiPrefDiv {
 
         System.out.print("Computing scores for similarities...");
         //Load each prior knowledge source, weighted by reliability
-        float [] meanDis = loadTheoryFiles(dFile,simWeights);
+        float [] meanDis = loadTheoryFiles(dFile,simWeights,numGenes);
 
 
         //Get variance of mixture distribution for each edge
@@ -282,6 +367,22 @@ public class PiPrefDiv {
                     System.out.println();
                     out.println();
                 }
+
+                    if(outputScores)
+                    {
+                        for (int i = 0; i < initThreshold.length; i++)
+                            scoreStream.print(initThreshold[i] + "\t");
+                        scoreStream.println();
+                        for (int i = 0; i < scoresSim.length; i++) {
+                            scoreStream.print(initRadii[i] + "\t");
+                            for (int j = 0; j < scoresSim[i].length; j++) {
+                                scoreStream.print(scoresSim[i][j] + "\t");
+                            }
+                            scoreStream.println();
+                        }
+                        scoreStream.flush();
+                        scoreStream.close();
+                    }
                 out.flush();
                 out.close();
             }catch(Exception e)
@@ -317,6 +418,9 @@ public class PiPrefDiv {
                 }
                 out.flush();
                 out.close();
+
+
+
             }catch(Exception e)
             {
                 System.err.println("Couldn't write scores to file");
@@ -329,6 +433,8 @@ public class PiPrefDiv {
 
         double bestRadii = initRadii[inds[0]];
         double bestThreshold = initThreshold[inds[1]];
+        lastRadius = bestRadii;
+        lastThreshold = bestThreshold;
         System.out.println("Done");
 
         if(verbose)
@@ -352,7 +458,7 @@ public class PiPrefDiv {
         //Run Pref-Div with optimal parameters
 
 
-        RunPrefDiv rpd = new RunPrefDiv(means,meanGenes,data,target,LOOCV);
+        RunPrefDiv rpd = new RunPrefDiv(meanDis,meanGenes,data,target,LOOCV);
         rpd.setPThreshold(bestThreshold);
         rpd.setRadius(bestRadii);
         rpd.setTopK(K);
@@ -570,7 +676,7 @@ public class PiPrefDiv {
         float [] totalWeight = new float[mean.length];
         for(int j = 0; j < dFile.length;j++)
         {
-            float [] prior = Functions.loadTheoryMatrix(dFile[j],false);
+            float [] prior = Functions.loadTheoryMatrix(dFile[j],false,numGenes);
             for(int i = 0; i < mean.length;i++)
             {
                 if(prior[i]>0) {
@@ -643,7 +749,7 @@ public class PiPrefDiv {
         for(int i = 0; i < dFile.length;i++)
         {
             float [][] temp = new float[1][(numGenes*(numGenes-1)/2)];
-            temp[0] = Functions.loadTheoryMatrix(dFile[i],false);
+            temp[0] = Functions.loadTheoryMatrix(dFile[i],false,numGenes);
 
             getPhi(temp[0],subsamples.length);
             tao[i] = getTao(temp,sums)[0];
@@ -677,6 +783,7 @@ public class PiPrefDiv {
     }
 
 
+    //TODO if no intensity priors given by a source, then NA is reported, need to deal with this
     private double [] getTao(float[][]phi, int[]counts)
     {
         double [] tao = new double[phi.length];
@@ -705,9 +812,80 @@ public class PiPrefDiv {
     }
 
     //Load Gene Data from the specified intensity file
-    private ArrayList<Gene> loadGenes(String iFile,double[]iWeights)
+    public static ArrayList<Gene> loadGenes(String iFile,double[]iWeights)
     {
         return Functions.loadGeneData(iFile,false,iWeights);
+    }
+
+
+
+    private int[][][] computeStabsParallel()
+    {
+        final ArrayList<Gene> temp = createGenes();
+        final int[][][] result = new int[initRadii.length][initThreshold.length][numGenes + (numGenes)*(numGenes-1)/2];
+
+
+        final ForkJoinPool pool = ForkJoinPoolInstance.getInstance().getPool();
+
+        class StabilityAction extends RecursiveAction {
+            private int chunk;
+            private int from;
+            private int to;
+            private int k;
+
+            public StabilityAction(int chunk, int k, int from, int to){
+                this.chunk = chunk;
+                this.from = from;
+                this.to = to;
+                this.k = k;
+            }
+
+
+            @Override
+            protected void compute(){
+                if (to - from <= chunk) {
+                    for (int s = from; s < to; s++) {
+
+                        int j = s/initRadii.length;
+                        int i = s%initThreshold.length;
+                        if(verbose)
+                            System.out.println("Computing Edge Probability for run " + s + " out of " + initRadii.length*initThreshold.length + ", Subsample: " + k );
+
+                        DataSet currData = data.subsetRows(subsamples[k]);
+                        float [] corrs = Functions.computeAllCorrelations(temp,currData,false,false,false,initThreshold[j]);
+                        ArrayList<Gene> temp2 = Functions.computeAllIntensities(temp,1,currData,target,false,false,false,initThreshold[j]);
+                        Collections.sort(temp2,Gene.IntensityComparator);
+                        PrefDiv pd = new PrefDiv(temp2,K,0,initRadii[i], corrs);
+                        pd.setCluster(clusterByCorrs);
+                        ArrayList<Gene> topGenes = pd.diverset();
+                        addFoundGenes(topGenes,result[j][i]);
+                        addGeneConnections(corrs,result[j][i],initRadii[i]);
+                    }
+
+                    return;
+                } else {
+                    List<StabilityAction> tasks = new ArrayList<>();
+
+                    final int mid = (to + from) / 2;
+
+                    tasks.add(new StabilityAction(chunk, k,from, mid));
+                    tasks.add(new StabilityAction(chunk, k,mid, to));
+
+                    invokeAll(tasks);
+
+                    return;
+                }
+            }
+        }
+
+        final int chunk = 2;
+
+        for(int k = 0; k < subsamples.length;k++)
+        {
+            pool.invoke(new StabilityAction(chunk, k,0, initRadii.length*initThreshold.length));
+        }
+
+        return result;
     }
 
 
@@ -769,7 +947,7 @@ public class PiPrefDiv {
     private ArrayList<Gene> createGenes()
     {
         ArrayList<Gene> gList = new ArrayList<Gene>();
-        for(int i = 0; i < numGenes;i++)
+        for(int i = 0; i < data.getNumColumns();i++)
         {
             if(data.getVariable(i).getName().equals(target))
                 continue;
@@ -781,13 +959,13 @@ public class PiPrefDiv {
     }
 
     //Give an array of filenames for all theory files, load each one into a row of the matrix to get all theory information in a single matrix
-    private float[] loadTheoryFiles(String [] dFile, double [] weights)
+    public static float[] loadTheoryFiles(String [] dFile, double [] weights, int numGenes)
     {
         float [] result = new float[numGenes*(numGenes-1)/2];
         float [] totalWeight = new float[result.length];
         for(int i = 0; i < dFile.length;i++)
         {
-            float [] temp = Functions.loadTheoryMatrix(dFile[i],false);
+            float [] temp = Functions.loadTheoryMatrix(dFile[i],false,numGenes);
             for(int j = 0; j < temp.length;j++)
             {
                 if(temp[j]>0)

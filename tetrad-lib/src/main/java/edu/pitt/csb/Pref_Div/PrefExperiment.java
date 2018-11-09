@@ -201,7 +201,7 @@ public class PrefExperiment
 		}
 
 
-			ppd = new PiPrefDiv(data,target,initRadii,initThreshold,K);
+			ppd = new PiPrefDiv(data,target,K,initRadii,initThreshold);
 
 
 		if(bootstrap)
