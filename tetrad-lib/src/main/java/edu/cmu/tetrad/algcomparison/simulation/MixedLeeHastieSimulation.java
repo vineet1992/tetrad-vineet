@@ -99,6 +99,7 @@ public class MixedLeeHastieSimulation implements Simulation {
         }
         for (int i = 0; i < parameters.getInt("numRuns"); i++) {
             DataSet dataSet = simulateClustered(graph, parameters,parameters.getInt("targetContinuous"));
+            dataSet = DataUtils.standardizeData(dataSet);
             dataSets.add(dataSet);
         }
         return GraphUtils.clusters;
@@ -183,7 +184,7 @@ public class MixedLeeHastieSimulation implements Simulation {
         }
             Graph graph = MixedUtils.makeMixedGraph(dag, nd);
 
-            GeneralizedSemPm pm = MixedUtils.GaussianCategoricalPm(graph, "Split(-1.5,-.5,.5,1.5)");
+            GeneralizedSemPm pm = MixedUtils.GaussianCategoricalPm(graph, "Split(-2,-.05,.05,2)");
             GeneralizedSemIm im = MixedUtils.GaussianCategoricalIm(pm);
 
             instModel = im;

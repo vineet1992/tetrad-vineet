@@ -28,7 +28,6 @@ import java.util.List;
 public class simulateData {
     public static void main(String [] args)throws Exception {
 
-
        int numVariables = 50; //Number of variables in the dataset/graph
         int sampleSize = 1000; //Sample size of the dataset
         int numRuns = 100; //Number of dataset/graph pairs to generate

@@ -7,6 +7,7 @@ public class Gene
     public Gene(int d)
     {
         ID = d;
+        theoryIntensity = -1;
     }
    /* public String toString()
     {

@@ -1,6 +1,9 @@
 package edu.pitt.csb.Pref_Div;
 
 import edu.cmu.tetrad.data.DataSet;
+import edu.cmu.tetrad.graph.EdgeListGraph;
+import edu.cmu.tetrad.graph.Graph;
+import edu.cmu.tetrad.graph.GraphUtils;
 import edu.cmu.tetrad.search.Fges;
 import edu.cmu.tetrad.util.StatUtils;
 import javafx.collections.transformation.SortedList;
@@ -147,6 +150,7 @@ public class PrefDiv {
         if (this.items.size() % this.topK != 0){
             setNum++;
         }
+
         ArrayList<Gene> temp = new ArrayList<Gene>();
         //Outside while loop? For loop here
         for (int i = 0; i < setNum; i++){
@@ -429,7 +433,8 @@ public class PrefDiv {
             i = j;
             j = temp;
         }
-        float c = corrMat[Functions.getIndex(i,j,items.size())];
+        int index = Functions.getIndex(i,j,items.size());
+        float c = corrMat[index];
         if(!computeCorrs && !corrsGiven)
         {
             if(c==0.0f)

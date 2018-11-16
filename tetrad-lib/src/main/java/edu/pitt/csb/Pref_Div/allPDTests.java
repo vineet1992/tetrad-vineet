@@ -6,16 +6,16 @@ import edu.cmu.tetrad.graph.GraphUtils;
 import edu.cmu.tetrad.graph.Node;
 import edu.cmu.tetrad.regression.RegressionDataset;
 import edu.cmu.tetrad.regression.RegressionResult;
+import edu.cmu.tetrad.util.ForkJoinPoolInstance;
 import edu.pitt.csb.mgm.MixedUtils;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.PrintStream;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.RecursiveAction;
 
 /**
  * The Purpose of this class is to produce the first figure for the experiments section of the Pref-Div Paper
@@ -23,290 +23,347 @@ import java.util.Map;
  */
 public class allPDTests {
 
+
+
+    static int numRuns = 2;
+    static int numGenes = 9;
+
+    static boolean boot = false; //Should we use bootstrap samples for PiPrefDiv
+    static boolean loocv = false; //Should we use leave-one-out CV for PiPrefDiv
+    static boolean useCausalGraph = false; //Are we selecting genes to then use a causal graph to find connections or direct selection?
+    static int numSamples = 20; //Number of bootstrap/sub-sampled samples to use
+    static int numParams = 10;//Number of parameters to sweep over
+    static boolean noiseRandom = true;//Is the reliability range of reliable and unreliable priors set randomly?
+    static int numFolds = 5; //Number of Folds for CV to pick alpha
+
+
+    static int numPriors = 2; //Number of prior knowledge sources
+    static int numReliable = 1; //Number of reliable sources
+    static int numComponents = 3; //How many components do we have for cluster simulation?
+    static int minTargetParents = 2; //How many true parents of the target are there?
+    static boolean amountRandom = true; //Should the priors have a random amount of prior knowledge?
+    static boolean targetContinuous = true; //Is the target variable continuous?
+    static boolean evenDistribution = true; //Is the distribution of nodes in each cluster even?
+    static int numCategories = 4; //number of categories for discrete variables
+    static boolean stabilitySelection = false; //Should stability selection be used within Pref-Div?
+    static int sampleSize = 200;
+    static double amountPrior = 0.6;
+    static int[][] subs;
+    static boolean parallel = false; //Should we run the experiment with parallel processing?
     public static void main(String [] args) {
 
+            //TODO Delete these loops and make this argument acceptable friendly
 
-        int experiment = 0; //0 -> prior evaluation, 1 -> Accuracy of chosen parameters vs Optimal, 2-> Comparing different summarization methods for clustered genes
-        //3 -> Evaluating how good cross validation is to select alpha parameters, 4-> Sensitivity analysis on number of folds, number of subsamples, number of parameters, ss, numvars, etc.
+        //TODO Run with random amount of prior when i get back
+        int [] ss = new int[]{200,1000};
+        double [] ap = new double[] {0.1};
 
+     //   for(int iii = 0; iii < ss.length;iii++) {
+       //     for (int jjj = 0; jjj < ap.length; jjj++) {
 
-        int numRuns = 20;
-        int numGenes = 200;
-        int sampleSize = 200;
-        double amountPrior = 0.6;//percentage of edges to have prior knowledge for
-        boolean boot = false; //Should we use bootstrap samples for PiPrefDiv
-        boolean loocv = false; //Should we use leave-one-out CV for PiPrefDiv
-        boolean useCausalGraph = false; //Are we selecting genes to then use a causal graph to find connections or direct selection?
-        int numSamples = 20; //Number of bootstrap/sub-sampled samples to use
-        int numParams = 10;//Number of parameters to sweep over
-        boolean noiseRandom = true;//Is the reliability range of reliable and unreliable priors set randomly?
-
+                int experiment = 1; //0 -> prior evaluation, 1 -> Accuracy of chosen parameters vs Optimal, 2-> Comparing different summarization methods for clustered genes
+                //3 -> Evaluating how good cross validation is to select alpha parameters,4-> Accuracy in increasing unreliability of prior knowledge,
+                // 5-> Sensitivity analysis on number of folds, number of subsamples, number of parameters, ss, numvars, etc.
+        //        sampleSize = ss[iii];
+         //       amountPrior = ap[jjj];//percentage of edges to have prior knowledge for
 
 
-        int numPriors = 10; //Number of prior knowledge sources
-        int numReliable = 5; //Number of reliable sources
-        int numComponents = 10; //How many components do we have for cluster simulation?
-        int minTargetParents = 5; //How many true parents of the target are there?
-        boolean amountRandom = false; //Should the priors have a random amount of prior knowledge?
-        boolean targetContinuous = true; //Is the target variable continuous?
-        boolean evenDistribution = true; //Is the distribution of nodes in each cluster even?
-        int numCategories = 4; //number of categories for discrete variables
+                String[] types = new String[]{"FS", "Prediction", "Cluster"}; //Help to create file header for experiment 1
+                String[] starts = new String[]{"Best_Radius", "Best_Threshold", "Best_Accuracy", "Pred_Accuracy"}; //More help
+                RunPrefDiv.ClusterType[] allTypes = RunPrefDiv.ClusterType.values();
 
-        String [] types = new String[]{"FS","Prediction","Cluster"}; //Help to create file header for experiment 1
-        String [] starts = new String[]{"Best_Radius","Best_Threshold","Best_Accuracy","Pred_Accuracy"}; //More help
+                File rFile = new File("Results");
+                if (!rFile.isDirectory())
+                    rFile.mkdir();
 
-
-        File rFile = new File("Results");
-        if (!rFile.isDirectory())
-            rFile.mkdir();
-
-        try {
-            String start = "Prior_Evaluation_";
-            if(experiment==1)
-            {
-                start = "Parameter_Accuracy_";
-            }
-            PrintStream out = new PrintStream("Results/" + start + numGenes + "_" + sampleSize + "_" + numRuns + "_" + numPriors + "_" + amountPrior + "_" + amountRandom + "_" + boot + "_" + loocv + "_"  + evenDistribution + "_" + targetContinuous + "_" + useCausalGraph +  "_" + numReliable + "_" + numComponents + "_" + minTargetParents + "_" + numParams + ".txt");
-
-            if(experiment==0)
-            {
-                out.println("Run\tAmount_Prior\tReliable?\tIntensity?\tPredicted_Weight\tActual_Reliability");
-            }
-            else if(experiment==1)
-            {
-                out.print("Run\tPredicted_Radius\tPredicted_Threshold");
-
-                for(int i = 0; i < types.length;i++)
-                {
-                    for(int j = 0; j < starts.length;j++)
-                    {
-                        out.print(starts[j] + "_" + types[i] + "\t");
-                    }
-                }
-                out.println();
-            }
-            for (int j = 0; j < numRuns; j++) {
-                HashMap<String, Integer> clusters = new HashMap<String, Integer>();
-
-                System.out.print("Loading graph and data for run " + j + "...");
-                Graph g = null;
-                DataSet d = null;
-                File graphFile = new File("Graphs/Graph_" + numGenes + "_" + minTargetParents + "_" + numComponents + "_" + evenDistribution + "_" + j + ".txt");
-                if (graphFile.exists())
-                    g = GraphUtils.loadGraphTxt(graphFile);
-                else {
-                    System.err.println("Couldn't find graph file with these parameters, please double check");
-                }
-                File dataFile = null;
-                dataFile = new File("Data/Dataset_" + numGenes + "_" + sampleSize + "_" + minTargetParents + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + j + ".txt");
                 try {
-                    if (dataFile.exists())
-                        d = MixedUtils.loadDataSet2(dataFile.getAbsolutePath());
-                    else {
-                        System.err.println("Could not load data with specified parameters, please double check");
-                        System.exit(-1);
+                    String start = "Prior_Evaluation_";
+                    if (experiment == 1) {
+                        start = "Parameter_Accuracy_";
                     }
-                } catch (Exception e) {
-                    System.err.println("Unable to load dataset");
-                    System.exit(-1);
-                }
-                System.out.println("Done");
+                    PrintStream out = new PrintStream("Results/" + start + numGenes + "_" + sampleSize + "_" + numRuns + "_" + numPriors + "_" + amountPrior + "_" + amountRandom + "_" + boot + "_" + loocv + "_" + evenDistribution + "_" + targetContinuous + "_" + useCausalGraph + "_" + numReliable + "_" + numComponents + "_" + minTargetParents + "_" + numParams + "_" + stabilitySelection + ".txt");
 
+                    if (experiment == 0) {
+                        out.println("Run\tAmount_Prior\tReliable?\tIntensity?\tPredicted_Weight\tActual_Reliability");
+                    } else if (experiment == 1) {
+                        out.print("Run\tPredicted_Radius\tPredicted_Threshold");
 
-                System.out.print("Loading clusters for run " + j + "...");
-                File clusterFile = null;
-                clusterFile = new File("Clusters/Cluster_" + numGenes + "_" + minTargetParents + "_" + numComponents + "_" + evenDistribution + "_" + j + ".txt");
-                if (clusterFile.exists()) {
-                    clusters = new HashMap<String, Integer>();
-                    try {
-                        BufferedReader bTemp = new BufferedReader(new FileReader(clusterFile));
-                        while (bTemp.ready()) {
-                            String[] line = bTemp.readLine().split("\t");
-                            clusters.put(line[0], Integer.parseInt(line[1]));
-                        }
-                    } catch (Exception e) {
-                        System.err.println("Couldn't load clusters from file");
-                        e.printStackTrace();
-                        System.exit(-1);
-                    }
-
-                } else {
-                    System.err.println("Could not load cluster file with specified parameters");
-                    System.exit(-1);
-                }
-                System.out.println("Done");
-
-
-                File subsFile = null;
-                subsFile = new File("Subsamples/Subsample_" + numGenes + "_" + sampleSize + "_" + minTargetParents + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + boot + "_" + numSamples + "_" + loocv + "_" + j + ".txt");
-                int[][] subs = null;
-                if (subsFile.exists()) {
-                    try {
-                        BufferedReader b = new BufferedReader(new FileReader(subsFile));
-                        int lineCount = 0;
-                        while (b.ready()) {
-                            b.readLine();
-                            lineCount++;
-                        }
-                        subs = new int[lineCount][];
-                        b = new BufferedReader(new FileReader(subsFile));
-                        lineCount = 0;
-                        while (b.ready()) {
-                            String[] line = b.readLine().split("\t");
-                            subs[lineCount] = new int[line.length];
-                            for (int x = 0; x < line.length; x++) {
-                                subs[lineCount][x] = Integer.parseInt(line[x]);
+                        for (int i = 0; i < types.length; i++) {
+                            for (int j = 0; j < starts.length; j++) {
+                                out.print(starts[j] + "_" + types[i] + "\t");
                             }
-                            lineCount++;
                         }
-                        b.close();
-                    } catch (Exception e) {
-                        System.err.println("Unable to load subsamples");
-                        e.printStackTrace();
-                        System.exit(-1);
+                        out.println();
                     }
-                } else {
-                    System.err.println("Could not load subsamples file with specifieid parameters, please double check");
+                    else if(experiment==2)
+                    {
+                        out.print("Run\t");
+                        for (int i = 0; i < types.length; i++) {
+                            for (int j = 0; j < starts.length; j++) {
+                                out.print(allTypes[j].name() + "_" + types[i] + "\t");
+                            }
+                        }
+                        out.println();
+                    }
+                    for (int j = 0; j < numRuns; j++) {
+                        HashMap<String, Integer> clusters = new HashMap<String, Integer>();
+
+                        System.out.print("Loading graph and data for run " + j + "...");
+                        Graph g = null;
+                        DataSet d = null;
+                        File graphFile = new File("Graphs/Graph_" + numGenes + "_" + minTargetParents + "_" + numComponents + "_" + evenDistribution + "_" + j + ".txt");
+                        if (graphFile.exists())
+                            g = GraphUtils.loadGraphTxt(graphFile);
+                        else {
+                            System.err.println("Couldn't find graph file with these parameters, please double check");
+                        }
+                        File dataFile = null;
+                        dataFile = new File("Data/Dataset_" + numGenes + "_" + sampleSize + "_" + minTargetParents + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + j + ".txt");
+                        try {
+                            if (dataFile.exists())
+                                d = MixedUtils.loadDataSet2(dataFile.getAbsolutePath());
+                            else {
+                                System.err.println("Could not load data with specified parameters, please double check");
+                                System.exit(-1);
+                            }
+                        } catch (Exception e) {
+                            System.err.println("Unable to load dataset");
+                            System.exit(-1);
+                        }
+                        System.out.println("Done");
+
+
+                        System.out.print("Loading clusters for run " + j + "...");
+                        File clusterFile = null;
+                        clusterFile = new File("Clusters/Cluster_" + numGenes + "_" + minTargetParents + "_" + numComponents + "_" + evenDistribution + "_" + j + ".txt");
+                        if (clusterFile.exists()) {
+                            clusters = new HashMap<String, Integer>();
+                            try {
+                                BufferedReader bTemp = new BufferedReader(new FileReader(clusterFile));
+                                while (bTemp.ready()) {
+                                    String[] line = bTemp.readLine().split("\t");
+                                    clusters.put(line[0], Integer.parseInt(line[1]));
+                                }
+                            } catch (Exception e) {
+                                System.err.println("Couldn't load clusters from file");
+                                e.printStackTrace();
+                                System.exit(-1);
+                            }
+
+                        } else {
+                            System.err.println("Could not load cluster file with specified parameters");
+                            System.exit(-1);
+                        }
+                        System.out.println("Done");
+
+
+                        File subsFile = null;
+                        if (experiment == 0)
+                            subsFile = new File("Subsamples/Subsample_" + numGenes + "_" + sampleSize + "_" + minTargetParents + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + boot + "_" + numSamples + "_" + loocv + "_" + j + ".txt");
+                        else
+                            subsFile = new File("Subsamples/Subsample_Train_" + numGenes + "_" + sampleSize + "_" + minTargetParents + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + boot + "_" + numSamples + "_" + loocv + "_" + j + ".txt");
+
+                        subs = null;
+                        if (subsFile.exists()) {
+                            try {
+                                BufferedReader b = new BufferedReader(new FileReader(subsFile));
+                                int lineCount = 0;
+                                while (b.ready()) {
+                                    b.readLine();
+                                    lineCount++;
+                                }
+                                subs = new int[lineCount][];
+                                b = new BufferedReader(new FileReader(subsFile));
+                                lineCount = 0;
+                                while (b.ready()) {
+                                    String[] line = b.readLine().split("\t");
+                                    subs[lineCount] = new int[line.length];
+                                    for (int x = 0; x < line.length; x++) {
+                                        subs[lineCount][x] = Integer.parseInt(line[x]);
+                                    }
+                                    lineCount++;
+                                }
+                                b.close();
+                            } catch (Exception e) {
+                                System.err.println("Unable to load subsamples");
+                                e.printStackTrace();
+                                System.exit(-1);
+                            }
+                        } else if (experiment == 0) {
+                            System.err.println("Could not load subsamples file with specified parameters, please double check");
+                        }
+
+
+                        /***LOAD PRIOR KNOWLEDGE FILES***/
+                        String priorIntensity = "Priors/Prior_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + j + "_intensity.txt";
+                        String[] dFile = new String[numPriors];
+                        for (int k = 0; k < numPriors; k++) {
+                            dFile[k] = "Priors/Prior_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + k + "_" + j + "_dissimilarity.txt";
+                        }
+
+
+                        /***RUN PI PREF DIV***/
+                        DataSet toRun = d;
+                        DataSet test = d;
+                        if (experiment == 1) {
+                            /***Load Train-test split***/
+                            int trainLength = (int) (d.getNumRows() * 0.9);
+                            int[] trainInds = new int[trainLength];
+                            for (int i = 0; i < trainLength; i++) {
+                                trainInds[i] = i;
+                            }
+                            toRun = d.subsetRows(trainInds);
+                            test.removeRows(trainInds);
+                        }
+
+                        PiPrefDiv p = new PiPrefDiv(toRun, "Target", minTargetParents, numParams);
+                        p.setSubsamples(subs);
+                        p.setVerbose();
+                        p.setUseStabilitySelection(stabilitySelection);
+                        p.setParallel(false);//TODO CHANGE BACK
+
+
+                        String dir = "Results/Detailed_Score_Evaluation/";
+                        File f = new File(dir);
+                        if (experiment == 1) {
+                            if (!f.exists())
+                                f.mkdir();
+                            p.setOutputScores(new PrintStream(dir + "Parameter_Scores_" + j + ".txt"));
+                        }
+
+
+                        if (experiment == 0) //Evaluate prior knowledge
+                        {
+                            /***LOAD RELIABILITY SCORES***/
+                            File rd = new File("Reliabilities_D_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + j + ".txt");
+                            File ri = new File("Reliabilities_I_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + j + ".txt");
+                            double[] reliDis = new double[numPriors];
+                            double[] reliInt = new double[numPriors];
+                            BufferedReader b = new BufferedReader(new FileReader(rd));
+                            BufferedReader b2 = new BufferedReader(new FileReader(ri));
+
+                            for (int i = 0; i < numPriors; i++) {
+                                reliDis[i] = Double.parseDouble(b.readLine());
+                                reliInt[i] = Double.parseDouble(b2.readLine());
+                            }
+                            b.close();
+                            b2.close();
+                            long time = System.nanoTime();
+                            double[][] weights = p.evaluatePriors(boot, numSamples, priorIntensity, dFile, useCausalGraph);
+
+                            time = System.nanoTime() - time;
+                            System.out.println("Took " + time / Math.pow(10, 9) + " seconds");
+                            /***PRINT RESULTS TO FILE***/
+                            for (int i = 0; i < numPriors; i++) {
+                                out.println(j + "\t" + getAmountPrior(priorIntensity, i) / ((double) g.getNumNodes() - 1) + "\t" + (i < numReliable) + "\tT\t" + weights[0][i] + "\t" + reliInt[i]);
+                            }
+                            for (int i = 0; i < numPriors; i++) {
+                                out.println(j + "\t" + (double) (getAmountPrior(dFile[i])) / (g.getNumNodes() * (g.getNumNodes() - 1) / 2) + "\t" + (i < numReliable) + "\tF\t" + weights[1][i] + "\t" + reliDis[i]);
+                            }
+                        } else if (experiment == 1) //Evaluate Parameter accuracy
+                        {
+                            System.out.println(toRun);
+                            System.out.println(test);
+                            ArrayList<Gene> selected = p.selectGenes(boot, numSamples, priorIntensity, dFile, useCausalGraph);
+                            System.out.println("Selected Genes: " + selected);
+                            System.out.println(g.getAdjacentNodes(g.getNode("Target")));
+                            Map<Gene, List<Gene>> lastCluster = p.getLastCluster();
+                            System.out.println("Cluster: " + lastCluster);
+                            double clustAccuracy = getClusterAccuracy(lastCluster, clusters, numComponents);
+                            double featAccuracy = -1;
+                            if (minTargetParents == g.getAdjacentNodes(g.getNode("Target")).size()) {
+                                //Correct amount of selections so use accuracy
+                                featAccuracy = getFeatAccuracy(selected, g, "Target", "ACC");
+
+                            } else {
+                                //Incorrect amount of selected variables so use F1
+                                featAccuracy = getFeatAccuracy(selected, g, "Target", "F1");
+                            }
+                            double predAccuracy = getAccuracy(toRun, test, selected);
+                            System.out.println("Run #"  + j + ": Prediction=" + predAccuracy + ", Features=" + featAccuracy + ", Cluster=" + clustAccuracy);
+
+                            double[] radii = p.getTestedRadii();
+                            double[] thresholds = p.getTestedThresholds();
+
+                            double[] intWeights = p.getLastIntensityWeights();
+                            double[] simWeights = p.getLastSimilarityWeights();
+
+                            ArrayList<Gene> meanGenes = PiPrefDiv.loadGenes(priorIntensity, intWeights);
+                            float[] meanDis = PiPrefDiv.loadTheoryFiles(dFile, simWeights, numGenes);
+                            //Use the weights from PiPrefDiv, we are interested in determining how good param selection is given that weights are good
+                            //Because experiment 1 demonstrated that weights are good
+
+                            RunPrefDiv rpd = new RunPrefDiv(meanDis, meanGenes, toRun, "Target", loocv);
+
+                            rpd.setTopK(minTargetParents);
+                            rpd.setAccuracy(0);
+                            rpd.setNumAlphas(numParams);
+                            rpd.setNS(subs.length);
+                            rpd.setNumFolds(numFolds);
+                            rpd.setCausalGraph(useCausalGraph);
+                            rpd.useStabilitySelection(stabilitySelection);
+                            rpd.useCrossValidation(true);
+                            rpd.clusterByCorrs();
+                            rpd.setClusterType(RunPrefDiv.ClusterType.NONE);
+
+
+                            double[][][] results;
+                            //for every radii and threshold combination, give the three accuracies
+                            if(!parallel)
+                                results = getBestParams(radii, thresholds, numComponents, rpd, clusters, g, toRun, test); //Feature Select, Cluster Acc, Prediction Acc
+                            else
+                                results = getBestParamsPar(radii,thresholds,numComponents,clusters,g,toRun,test,meanGenes,meanDis);
+
+                            out.print(j + "\t" + p.getLastRadius() + "\t" + p.getLastThreshold() + "\t");
+
+                            //print out results to file
+                            printResults(results, out, radii, thresholds, new double[]{featAccuracy, predAccuracy, clustAccuracy});
+
+                            printDetailedScores(results, new PrintStream(dir + "Detailed_Results_" + j));
+
+
+                            //Roll through all tested radii,threshold combos and RunPrefDiv directly to get accuracies
+                        }
+                        else if(experiment==2) {
+                            for (int i = 0; i < allTypes.length;i++)
+                            {
+                                p.setClusterType(allTypes[i]);
+                                ArrayList<Gene> selected = p.selectGenes(boot, numSamples, priorIntensity, dFile, useCausalGraph);
+                                Map<Gene, List<Gene>> lastCluster = p.getLastCluster();
+                                DataSet summarized = p.getSummarizedData();
+                                DataSet summarizedTest = RunPrefDiv.summarizeData(test,selected,lastCluster,allTypes[i]);
+                                double clustAccuracy = getClusterAccuracy(lastCluster, clusters, numComponents);
+                                double featAccuracy = -1;
+                                if (minTargetParents == g.getAdjacentNodes(g.getNode("Target")).size()) {
+                                    //Correct amount of selections so use accuracy
+                                    featAccuracy = getFeatAccuracy(selected, g, "Target", "ACC");
+
+                                } else {
+                                    //Incorrect amount of selected variables so use F1
+                                    featAccuracy = getFeatAccuracy(selected, g, "Target", "F1");
+                                }
+                                double predAccuracy = getAccuracy(summarized, summarizedTest, null);
+
+                                out.print(featAccuracy + "\t" + predAccuracy + "\t" + clustAccuracy + "\t");
+
+
+
+                            }
+                            out.println();
+                        }
+
+                        out.flush();
+
+                    }
+                    out.close();
+
+                } catch (Exception e) {
+                    System.err.println("Error with printstream");
+                    e.printStackTrace();
                     System.exit(-1);
                 }
-
-
-                /***LOAD PRIOR KNOWLEDGE FILES***/
-                String priorIntensity = "Priors/Prior_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_"  + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" +  noiseRandom + "_" +  j + "_intensity.txt";
-                String[] dFile = new String[numPriors];
-                for (int k = 0; k < numPriors; k++) {
-                    dFile[k] = "Priors/Prior_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_"  + noiseRandom + "_" + k + "_" + j +  "_dissimilarity.txt";
-                }
-
-                /***LOAD RELIABILITY SCORES***/
-                File rd = new File("Reliabilities_D_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_"  + j + ".txt");
-                File ri = new File("Reliabilities_I_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + j + ".txt");
-                double [] reliDis = new double[numPriors];
-                double [] reliInt = new double[numPriors];
-                BufferedReader b = new BufferedReader(new FileReader(rd));
-                BufferedReader b2 = new BufferedReader(new FileReader(ri));
-
-                for(int i = 0; i < numPriors;i++)
-                {
-                    reliDis[i] = Double.parseDouble(b.readLine());
-                    reliInt[i] = Double.parseDouble(b2.readLine());
-                }
-                b.close();
-                b2.close();
-
-
-
-                /***RUN PI PREF DIV***/
-                DataSet toRun = d;
-                DataSet test = d;
-                if(experiment==1)
-                {
-                    int trainLength = (int)(toRun.getNumRows()*0.9);
-                    int testLength = toRun.getNumRows()-trainLength;
-                    int [] trainInds = new int[trainLength];
-                    for(int i = 0; i < trainLength;i++)
-                    {
-                        trainInds[i] = i;
-                    }
-                    toRun = d.subsetRows(trainInds);
-                    test.removeCols(trainInds);
-                }
-
-                PiPrefDiv p = new PiPrefDiv(toRun, "Target", minTargetParents,numParams);
-                p.setSubsamples(subs);
-                p.setVerbose();
-                File f = new File("Results/Detailed_Score_Evaluation/");
-                if(experiment==1)
-                {
-                    if(!f.exists())
-                        f.mkdir();
-                    p.setOutputScores(new PrintStream(f.getName() + "Parameter_Scores_" + j + ".txt"));
-                }
-
-
-                if(experiment==0) //Evaluate prior knowledge
-                {
-                    double[][] weights = p.evaluatePriors(boot, numSamples, priorIntensity, dFile, useCausalGraph);
-
-                    /***PRINT RESULTS TO FILE***/
-                    for (int i = 0; i < numPriors; i++) {
-                        out.println(j + "\t" + getAmountPrior(priorIntensity, i) / ((double) g.getNumNodes() - 1) + "\t" + (i < numReliable) + "\tT\t" + weights[0][i] + "\t" + reliInt[i]);
-                    }
-                    for (int i = 0; i < numPriors; i++) {
-                        out.println(j + "\t" + (double) (getAmountPrior(dFile[i])) / (g.getNumNodes() * (g.getNumNodes() - 1) / 2) + "\t" + (i < numReliable) + "\tF\t" + weights[1][i] + "\t" + reliDis[i]);
-                    }
-                }
-                else if(experiment==1) //Evaluate Parameter accuracy
-                {
-                    ArrayList<Gene> selected = p.selectGenes(boot,numSamples,priorIntensity,dFile,useCausalGraph);
-                    Map<Gene,List<Gene>> lastCluster = p.getLastCluster();
-                    double clustAccuracy = getClusterAccuracy(lastCluster,clusters,numComponents);
-                    double featAccuracy = -1;
-                    if(minTargetParents==g.getAdjacentNodes(g.getNode("Target")).size())
-                    {
-                        //Correct amount of selections so use accuracy
-                        featAccuracy = getFeatAccuracy(selected,g,"Target","ACC");
-
-                    }
-                    else
-                    {
-                        //Incorrect amount of selected variables so use F1
-                        featAccuracy = getFeatAccuracy(selected,g,"Target","F1");
-
-                    }
-                    double predAccuracy = getAccuracy(toRun,test,selected);
-
-                    double [] radii = p.getTestedRadii();
-                    double [] thresholds = p.getTestedThresholds();
-
-                    double [] intWeights = p.getLastIntensityWeights();
-                    double [] simWeights = p.getLastSimilarityWeights();
-
-                    ArrayList<Gene> meanGenes = PiPrefDiv.loadGenes(priorIntensity,intWeights);
-                    float [] meanDis = PiPrefDiv.loadTheoryFiles(dFile,simWeights,numGenes);
-                    //Use the weights from PiPrefDiv, we are interested in determining how good param selection is given that weights are good
-                    //Because experiment 1 demonstrated that weights are good
-
-                    RunPrefDiv rpd = new RunPrefDiv(meanDis,meanGenes,toRun,"Target",loocv);
-
-                    rpd.setTopK(minTargetParents);
-                    rpd.setAccuracy(0);
-                    rpd.setNumAlphas(numParams);
-                    rpd.setNS(subs.length);
-                    rpd.setNumFolds(subs.length);
-                    rpd.setCausalGraph(useCausalGraph);
-                    rpd.useStabilitySelection();
-                    rpd.clusterByCorrs();
-
-
-                    //for every radii and threshold combination, give the three accuracies
-                     double[][][] results = getBestParams(radii,thresholds,rpd,clusters,g,toRun,test); //Feature Select, Cluster Acc, Prediciton Acc
-
-
-
-                    out.print(j + "\t" + p.getLastRadius() + "\t" + p.getLastThreshold());
-
-                    //print out results to file
-                    printResults(results, out,radii,thresholds,new double[]{featAccuracy,predAccuracy,clustAccuracy});
-
-                    printDetailedScores(results,new PrintStream(f.getName() + "Detailed_Results_" + j));
-
-
-
-                    //Roll through all tested radii,threshold combos and RunPrefDiv directly to get accuracies
-                }
-
-                out.flush();
-
-            }
-            out.close();
-        }
-        catch(Exception e)
-        {
-            System.err.println("Error with printstream");
-            e.printStackTrace();
-            System.exit(-1);
-        }
+     //       }
+      //  }
     }
 
     public static void printDetailedScores(double[][][]results, PrintStream out)
@@ -332,6 +389,7 @@ public class allPDTests {
         /**Feature Selection Results Printing**/
         double[] bestRadii = new double[3];
         double []maxValue = new double[3];
+        maxValue[1] = Double.MAX_VALUE;
         double [] bestThreshold = new double[3];
         for(int i = 0; i < results.length;i++)
         {
@@ -339,7 +397,7 @@ public class allPDTests {
             {
                 for(int k = 0; k < 3;k++)
                 {
-                    if(results[i][j][k]>maxValue[k])
+                    if((k!=1 && results[i][j][k]>maxValue[k]) || (k==1 && results[i][j][k] < maxValue[k]))
                     {
                         maxValue[k] = results[i][j][k];
                         bestRadii[k] = radii[i];
@@ -357,7 +415,91 @@ public class allPDTests {
         }
     }
 
-    public static double[][][] getBestParams(double [] radii, double [] threshold, RunPrefDiv rpd, Map<String,Integer> clusters,Graph g, DataSet toRun,DataSet test)
+
+    public static double[][][] getBestParamsPar(final double[] radii, final double[] threshold, final int numComponents, final Map<String,Integer>clusters, final Graph g, final DataSet toRun,final DataSet test,final ArrayList<Gene> meanGenes,final float[] meanDis)
+    {
+        final double[][][] result = new double[radii.length][threshold.length][3];
+        final ForkJoinPool pool = ForkJoinPoolInstance.getInstance().getPool();
+
+        class StabilityAction extends RecursiveAction {
+            private int chunk;
+            private int from;
+            private int to;
+
+            public StabilityAction(int chunk, int from, int to){
+                this.chunk = chunk;
+                this.from = from;
+                this.to = to;
+            }
+
+
+            private synchronized void addAccuracy(List<Gene>selected,Map<Gene,List<Gene>> lastCluster,int i,int j)
+            {
+                result[i][j][2] = getClusterAccuracy(lastCluster,clusters,numComponents);
+
+                String type = "F1";
+                if(selected.size()==g.getAdjacentNodes(g.getNode("Target")).size())
+                    type = "ACC";
+                result[i][j][0] = getFeatAccuracy(selected,g,"Target",type);
+                result[i][j][1] = getAccuracy(toRun,test,selected);
+            }
+
+            @Override
+            protected void compute(){
+                if (to - from <= chunk) {
+                    for (int s = from; s < to; s++) {
+                        try {
+                            RunPrefDiv rpd = new RunPrefDiv(meanDis, meanGenes, toRun, "Target", loocv);
+
+                            rpd.setTopK(minTargetParents);
+                            rpd.setAccuracy(0);
+                            rpd.setNumAlphas(numParams);
+                            rpd.setNS(subs.length);
+                            rpd.setNumFolds(numFolds);
+                            rpd.setCausalGraph(useCausalGraph);
+                            rpd.useStabilitySelection(stabilitySelection);
+                            rpd.useCrossValidation(true);
+                            rpd.clusterByCorrs();
+                            int i = s / radii.length;
+                            int j = s % threshold.length;
+                            rpd.setRadius(radii[i]);
+                            rpd.setThreshold(threshold[j]);
+                            List<Gene> selected = rpd.runPD();
+                            Map<Gene,List<Gene>> lastCluster = rpd.getClusters();
+                            addAccuracy(selected,lastCluster,i,j);
+
+
+                        }catch(Exception e)
+                        {
+                            e.printStackTrace();
+                            System.exit(-2);
+                        }
+                    }
+
+                    return;
+                } else {
+                    List<StabilityAction> tasks = new ArrayList<>();
+
+                    final int mid = (to + from) / 2;
+
+                    tasks.add(new StabilityAction(chunk, from, mid));
+                    tasks.add(new StabilityAction(chunk, mid, to));
+
+                    invokeAll(tasks);
+
+                    return;
+                }
+            }
+        }
+
+        final int chunk = 5;
+        StabilityAction sa = new StabilityAction(chunk,0, radii.length*threshold.length);
+        pool.invoke(sa);
+        return result;
+    }
+    /***TODO Problem with predicted accuracy and maybe feature accuracy ***/
+    /***TODO Why is the accuracy that we have predicted, not represented in any of these entries***/
+    public static double[][][] getBestParams(double [] radii, double [] threshold, int numComponents,RunPrefDiv rpd, Map<String,Integer> clusters,Graph g, DataSet toRun,DataSet test)
     {
         double[][][] result = new double[radii.length][threshold.length][3];
         for(int i = 0; i < radii.length;i++)
@@ -368,7 +510,7 @@ public class allPDTests {
                 rpd.setThreshold(threshold[j]);
                 List<Gene> selected = rpd.runPD();
                 Map<Gene,List<Gene>> lastCluster = rpd.getClusters();
-               result[i][j][2] = getClusterAccuracy(lastCluster,clusters,selected.size());
+               result[i][j][2] = getClusterAccuracy(lastCluster,clusters,numComponents);
 
                 String type = "F1";
                 if(selected.size()==g.getAdjacentNodes(g.getNode("Target")).size())
@@ -376,7 +518,8 @@ public class allPDTests {
                result[i][j][0] = getFeatAccuracy(selected,g,"Target",type);
                 result[i][j][1] = getAccuracy(toRun,test,selected);
 
-
+                System.out.println(selected);
+                System.out.println("Radius: " + radii[i] + ", Threshold: " + threshold[j] + ", Feature: " + result[i][j][0] + ", Prediction: " + result[i][j][1] + ", Cluster: " + result[i][j][2]);
 
             }
         }
@@ -389,14 +532,26 @@ public class allPDTests {
     {
         RegressionDataset rd = new RegressionDataset(train);
         List<Node> regressors = new ArrayList<Node>();
-        for(int i = 0; i < selected.size();i++)
-            regressors.add(train.getVariable(selected.get(i).symbol));
+        if(selected!=null) {
+            for (int i = 0; i < selected.size(); i++)
+                regressors.add(train.getVariable(selected.get(i).symbol));
+        }
+        else
+        {
+            for (int i = 0; i < train.getNumColumns(); i++) {
+                if(train.getVariable(i).getName().equals("Target"))
+                    continue;
+                regressors.add(train.getVariable(selected.get(i).symbol));
+            }
+        }
+
         RegressionResult res = rd.regress(train.getVariable("Target"),regressors);
+        //System.out.println(regressors + "," + Arrays.toString(res.getCoef()) + "," + Arrays.toString(res.getRegressorNames()));
         int [] cols = new int[selected.size()];
 
-        for(int i = 0; i < selected.size();i++)
+        for(int i = 0; i < regressors.size();i++)
         {
-            cols[i] = test.getColumn(test.getVariable(selected.get(i).symbol));
+            cols[i] = test.getColumn(test.getVariable(regressors.get(i).getName()));
         }
         double[]pred = new double[test.getNumRows()];
         double [] actual = new double[test.getNumRows()];
@@ -404,7 +559,7 @@ public class allPDTests {
         {
             double [] x = new double[cols.length];
             for(int j = 0; j < cols.length;j++) {
-                x[j] = test.getDouble(i, j);
+                x[j] = test.getDouble(i, cols[j]);
 
             }
             pred[i] = res.getPredictedValue(x);
@@ -425,7 +580,7 @@ public class allPDTests {
         {
             err += Math.pow(pred[i]-actual[i],2);
         }
-        return Math.sqrt(err);
+        return Math.sqrt(err/pred.length);
     }
 
     //Computes cluster similarity using the Hungarian Algorithm approach

@@ -387,6 +387,7 @@ public class MixedUtils {
     public static GeneralizedSemPm GaussianCategoricalPm(Graph trueGraph, String paramTemplate) throws IllegalStateException{
         return GaussianCategoricalPm(trueGraph,paramTemplate,1,2);///Default values for varLow and varHigh
     }
+
     //generate PM from trueGraph for mixed Gaussian and Categorical variables
     //public static GeneralizedSemPm GaussianCategoricalPm(Graph trueGraph, HashMap<String, Integer> nodeDists, String paramTemplate) throws IllegalStateException{
     public static GeneralizedSemPm GaussianCategoricalPm(Graph trueGraph, String paramTemplate, double varLow, double varHigh) throws IllegalStateException{

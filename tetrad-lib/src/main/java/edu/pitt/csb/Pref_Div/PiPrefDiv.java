@@ -28,12 +28,12 @@ public class PiPrefDiv {
     private String target; //The target variable of interest
     private double [] initRadii; //Initial radius values to test
     private double [] initThreshold; //Initial Top K values to test
-    private double lowRadii = 0.01; //Low range of radius values to test
-    private double highRadii = 0.99; //High range of radius values to test
+    private double lowRadii = 0.001; //Low range of radius values to test
+    private double highRadii = 0.9; //High range of radius values to test
     private int numRadii = 40; //Number of radius values to test
     private int numThreshold = 40; //Number of Threshold values to test
-    private double lowThreshold = 0.01; //Low range of threshold values to test
-    private double highThreshold = 0.2; //High range of threshold values to test
+    private double lowThreshold = 0.0001; //Low range of threshold values to test
+    private double highThreshold = 0.1; //High range of threshold values to test
     private int [][] subsamples; //subsamples for repeated Pref-Div
     private double normalEpsilon = 0.5;//Range around which to get probability for theta with prior information
     private int numGenes;//number of total variables in the data
@@ -50,6 +50,11 @@ public class PiPrefDiv {
     private PrintStream scoreStream; //Printstream to output parameter scores to file
     private double lastRadius; //Last Radius chosen via best score
     private double lastThreshold; //Last threshold chosen via best score
+    private int numFolds; //Number of folds for cross-validation
+    private boolean useStabilitySelection; //Should stability selection be used to select genes in PD?
+    private DataSet summarizedData; //Summarized dataset using clusters as variables
+    private boolean parallel; //Should we compute stabilities in parallel?
+    private RunPrefDiv.ClusterType ctype; //Which clustering method should be used to produce summarized data?
 
     //Constructor that uses default parameters for both initial parameter ranges
     public PiPrefDiv(DataSet data, String target,int K)
@@ -74,6 +79,7 @@ public class PiPrefDiv {
         this.numThreshold = numParams;
         this.initRadii = initRadiiDefault();
         this.initThreshold = initThresholdDefault();
+        this.numFolds = 5;
     }
 
 
@@ -102,6 +108,7 @@ public class PiPrefDiv {
         this.initThreshold = threshold;
         this.numThreshold = threshold.length;
         this.K = K;
+        this.numFolds = 5;
     }
 
 
@@ -115,8 +122,15 @@ public class PiPrefDiv {
     public double getLastRadius(){return lastRadius;}
     public double getLastThreshold(){return lastThreshold;}
     public void setOutputScores(PrintStream out){outputScores=true; scoreStream=out;}
+    public void setUseStabilitySelection(boolean b){useStabilitySelection = b;}
+    public void setParallel(boolean b){parallel = b;}
+    public void setClusterType(RunPrefDiv.ClusterType c){ctype = c;}
+    public DataSet getSummarizedData(){return summarizedData;}
 
 
+
+    //Set numbe of folds
+    public void setNumFolds(int nf){numFolds = nf;}
 
     //Setter for whether or not to do leave-one-out cross validation
     public void setLOOCV(boolean loocv)
@@ -177,7 +191,11 @@ public class PiPrefDiv {
 
         //Compute stability of each gene selection and each gene-gene relationship
         System.out.print("Computing stability across radii and threshold values...");
-        int[][][] clusts = computeStabs(); //i -> Radii, j -> TopK, k -> geneID
+        int[][][] clusts;
+        if(parallel)
+            clusts = computeStabsParallel();
+        else
+            clusts = computeStabs(); //i -> Radii, j -> TopK, k -> geneID
         System.out.println("Done");
 
         int [] sums = getFullCounts(clusts);
@@ -222,8 +240,11 @@ public class PiPrefDiv {
 
         //Compute stability of each gene selection and each gene-gene relationship
         System.out.print("Computing stability across radii and threshold values...");
-        int[][][] clusts = computeStabs(); //i -> Radii, j -> TopK, k -> geneID
-        System.out.println("Done");
+        int[][][] clusts;
+        if(parallel)
+            clusts = computeStabsParallel();
+        else
+            clusts = computeStabs(); //i -> Radii, j -> TopK, k -> geneID        System.out.println("Done");
 
         int [] sums = getFullCounts(clusts);
         System.out.println(Arrays.toString(sums));
@@ -465,14 +486,17 @@ public class PiPrefDiv {
         rpd.setAccuracy(0);
         rpd.setNumAlphas(numThreshold);
         rpd.setNS(subsamples.length);
-        rpd.setNumFolds(subsamples.length);
+        rpd.setNumFolds(numFolds);
         rpd.setCausalGraph(useCausalGraph);
-        rpd.useStabilitySelection();
+        rpd.useStabilitySelection(useStabilitySelection);
+        rpd.useCrossValidation(true);
+        rpd.setClusterType(ctype);
         if(clusterByCorrs)
             rpd.clusterByCorrs();
 
         ArrayList<Gene> top = rpd.runPD();
         HashMap<Gene,List<Gene>> map = rpd.getClusters();
+        summarizedData = rpd.getSummarizedData();
         lastCluster = map;
         System.out.println("Done");
 
@@ -713,8 +737,10 @@ public class PiPrefDiv {
                 double weight = 0;
                 for(int j = 0; j < priors.length;j++)
                 {
-                    sum+=weights[j]*(  tao[j]*tao[j]+Math.pow((genes[i]-priors[j][i])*subsamples.length,2) );
-                    weight+=weights[j];
+                    if(priors[j][i]>=0) {
+                        sum += weights[j] * (tao[j] * tao[j] + Math.pow((genes[i] - priors[j][i]) * subsamples.length, 2));
+                        weight += weights[j];
+                    }
                 }
                 vars[i] = (float)(sum/weight);
 
@@ -819,9 +845,12 @@ public class PiPrefDiv {
 
 
 
+    //TODO creating gene within the stability action class is a waste of memory, can we find a better way to do this?
+    //I'm doing this currently because of synchronization issues when we create genes outside of the method, find a way to make the concurrent modification go away, can't sort at the same time as compute intensities?
+
+
     private int[][][] computeStabsParallel()
     {
-        final ArrayList<Gene> temp = createGenes();
         final int[][][] result = new int[initRadii.length][initThreshold.length][numGenes + (numGenes)*(numGenes-1)/2];
 
 
@@ -839,27 +868,43 @@ public class PiPrefDiv {
                 this.to = to;
                 this.k = k;
             }
+            private synchronized void sort(ArrayList<Gene> temp2)
+            {
+                Collections.sort(temp2,Gene.IntensityComparator);
+            }
+            private synchronized DataSet subset(int [] subs)
+            {
+                return data.subsetRows(subs);
+            }
 
 
             @Override
             protected void compute(){
                 if (to - from <= chunk) {
                     for (int s = from; s < to; s++) {
+                        try {
+                            ArrayList<Gene> temp = createGenes();
+                            int i = s / initRadii.length;
+                            int j = s % initThreshold.length;
+                            //if (verbose)
+                              //  System.out.println("Computing Edge Probability for run " + s + " out of " + initRadii.length * initThreshold.length + ", Subsample: " + k);
 
-                        int j = s/initRadii.length;
-                        int i = s%initThreshold.length;
-                        if(verbose)
-                            System.out.println("Computing Edge Probability for run " + s + " out of " + initRadii.length*initThreshold.length + ", Subsample: " + k );
+                            DataSet currData = subset(subsamples[k]);
+                            float[] corrs = Functions.computeAllCorrelations(temp, currData, false, false, false, initThreshold[j]);
+                            ArrayList<Gene> temp2 = Functions.computeAllIntensities(temp, 1, currData, target, false, false, false, initThreshold[j]);
+                            sort(temp2);
+                            PrefDiv pd = new PrefDiv(temp2, K, 0, initRadii[i], corrs);
+                            pd.setCluster(clusterByCorrs);
+                            ArrayList<Gene> topGenes = pd.diverset();
 
-                        DataSet currData = data.subsetRows(subsamples[k]);
-                        float [] corrs = Functions.computeAllCorrelations(temp,currData,false,false,false,initThreshold[j]);
-                        ArrayList<Gene> temp2 = Functions.computeAllIntensities(temp,1,currData,target,false,false,false,initThreshold[j]);
-                        Collections.sort(temp2,Gene.IntensityComparator);
-                        PrefDiv pd = new PrefDiv(temp2,K,0,initRadii[i], corrs);
-                        pd.setCluster(clusterByCorrs);
-                        ArrayList<Gene> topGenes = pd.diverset();
-                        addFoundGenes(topGenes,result[j][i]);
-                        addGeneConnections(corrs,result[j][i],initRadii[i]);
+                            addFoundGenes(topGenes, result[j][i]);
+                            addGeneConnections(corrs, result[j][i], initRadii[i]);
+                        }catch(Exception e)
+                        {
+                            e.printStackTrace();
+                            System.out.println(s/initRadii.length + "," + (s%initThreshold.length) + "," + k);
+                            System.exit(-2);
+                        }
                     }
 
                     return;
@@ -878,25 +923,25 @@ public class PiPrefDiv {
             }
         }
 
-        final int chunk = 2;
+        final int chunk = 5;
 
         for(int k = 0; k < subsamples.length;k++)
         {
-            pool.invoke(new StabilityAction(chunk, k,0, initRadii.length*initThreshold.length));
+            StabilityAction sa = new StabilityAction(chunk, k,0, initRadii.length*initThreshold.length);
+            pool.invoke(sa);
+            sa.join();
         }
-
         return result;
     }
 
 
-    //Compute the set of pref-div genes and their clusters for each setting of radii, k, and subsample
-    //Output: Array of size radii tested x k values tested x (number of genes + (numGenes*(numGenes-1))/2)
+    /***Compute the set of pref-div genes and their clusters for each setting of radii, k, and subsample
+    //Output: Array of size radii tested x threshold values tested x (number of genes + (numGenes*(numGenes-1))/2)
     //For each 1-D array (the last dimension), the first numGenes boxes are how many times gene i showed up in these subsamples
-    //the rest of the boxes denotes how many times genes i and j were in the same cluster
+    //the rest of the boxes denotes how many times genes i and j were in the same cluster***/
     //TODO Need to parallelize this stability search
     private int[][][] computeStabs()
     {
-        ArrayList<Gene> temp = createGenes();
         int[][][] result = new int[initRadii.length][initThreshold.length][numGenes + (numGenes)*(numGenes-1)/2];
         for(int i = 0; i < initRadii.length;i++)
         {
@@ -905,8 +950,9 @@ public class PiPrefDiv {
                 int [] curr = new int[numGenes+ (numGenes*(numGenes-1)/2)];
                 for(int k = 0; k < subsamples.length;k++)
                 {
-
+                    ArrayList<Gene> temp = createGenes();
                     DataSet currData = data.subsetRows(subsamples[k]);
+
                     float [] corrs = Functions.computeAllCorrelations(temp,currData,false,false,false,initThreshold[j]);
                     temp = Functions.computeAllIntensities(temp,1,currData,target,false,false,false,initThreshold[j]);
                     Collections.sort(temp,Gene.IntensityComparator);
@@ -922,7 +968,7 @@ public class PiPrefDiv {
         return result;
     }
 
-    private void addFoundGenes(ArrayList<Gene> top, int [] curr) {
+    private synchronized void addFoundGenes(ArrayList<Gene> top, int [] curr) {
         for (int i = 0; i < top.size(); i++)
         {
             curr[top.get(i).ID]++;
@@ -930,7 +976,7 @@ public class PiPrefDiv {
 
     }
 
-    private void addGeneConnections(float [] corrs, int [] curr, double radii)
+    private synchronized void addGeneConnections(float [] corrs, int [] curr, double radii)
     {
         for(int i = 0; i < numGenes;i++)
         {
@@ -944,14 +990,16 @@ public class PiPrefDiv {
     }
 
 
-    private ArrayList<Gene> createGenes()
+    private synchronized ArrayList<Gene> createGenes()
     {
         ArrayList<Gene> gList = new ArrayList<Gene>();
+        int ID = 0;
         for(int i = 0; i < data.getNumColumns();i++)
         {
             if(data.getVariable(i).getName().equals(target))
                 continue;
-            Gene g = new Gene(i);
+            Gene g = new Gene(ID);
+            ID++;
             g.symbol = data.getVariable(i).getName();
             gList.add(g);
         }

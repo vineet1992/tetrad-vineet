@@ -85,12 +85,12 @@ public class Functions
         IndTestCorrelationT ind = new IndTestCorrelationT(d,0.05);
         for(int i = 0; i < items.size();i++)
         {
-            Node one = d.getVariable(i);
+            Node one = d.getVariable(mapping.get(i));
             double [] curr = temp[mapping.get(i)];
             int index = Functions.getIndex(i,i+1,items.size());
             for(int j = i+1;j < items.size();j++)
             {
-                Node two = d.getVariable(j);
+                Node two = d.getVariable(mapping.get(j));
                 if(partialCorr)
                 {
                     int x = mapping.get(i);
@@ -218,24 +218,22 @@ public class Functions
             corrs = NPN(corrs,false);
         if(pvals)
             corrs = getPVals(corrs);
-        for(int i = 0; i < g1.size();i++) {
-            try {
-                g1.get(i).foldChange = corrs[i];
-                if (g1.get(i).theoryIntensity == -1)
-                    g1.get(i).intensityValue = g1.get(i).foldChange;
-                else
-                    g1.get(i).intensityValue = g1.get(i).theoryIntensity * (1 - a) + a * g1.get(i).foldChange;
+        for (int i = 0; i < g1.size(); i++) {
+                try {
+                    g1.get(i).foldChange = corrs[i];
+                    if (g1.get(i).theoryIntensity == -1)
+                        g1.get(i).intensityValue = g1.get(i).foldChange;
+                    else
+                        g1.get(i).intensityValue = g1.get(i).theoryIntensity * (1 - a) + a * g1.get(i).foldChange;
+                } catch (Exception e) {
+                    if (g1 != null)
+                        System.out.println(g1.get(i));
+                    if (corrs != null)
+                        System.out.println(corrs.length);
+                    e.printStackTrace();
+                    System.exit(-1);
+                }
             }
-            catch(Exception e)
-            {
-                if(g1!=null)
-                    System.out.println(g1.get(i));
-                if(corrs!=null)
-                    System.out.println(corrs.length);
-                e.printStackTrace();
-                System.exit(-1);
-            }
-        }
             return g1;
 
     }

@@ -35,20 +35,20 @@ public class justSimulatePrefDiv {
     public static Random rand = new Random();
 
     public static void main(String [] args) {
-        int numRuns = 20;
-        int numGenes = 200;
+        int numRuns = 2;
+        int numGenes = 9;
         int sampleSize = 200;
-        double amountPrior = 0.1;//percentage of edges to have prior knowledge for
+        double amountPrior = 0.6;//percentage of edges to have prior knowledge for
         boolean boot = false; //Should we use bootstrap samples for PiPrefDiv
         boolean loocv = false; //Should we use leave-one-out CV for PiPrefDiv
         int numSamples =  20; //Number of bootstrap/sub-sampled samples to use
 
 
 
-        int numPriors = 10; //Number of prior knowledge sources
-        int numReliable = 5; //Number of reliable sources
-        int numComponents = 10; //How many components do we have for cluster simulation?
-        int minTargetParents = 5; //How many true parents of the target are there?
+        int numPriors = 2; //Number of prior knowledge sources
+        int numReliable = 1; //Number of reliable sources
+        int numComponents = 3; //How many components do we have for cluster simulation?
+        int minTargetParents = 2; //How many true parents of the target are there?
         boolean noiseRandom = true; //Should the priors have random amounts of reliability?
 
 
@@ -218,20 +218,28 @@ public class justSimulatePrefDiv {
             //Use this if prior file exists Make sure intensity is at the end
             String[] disFiles = new String[numPriors];
             try {
-                PrintStream out2 = new PrintStream("Reliabilities_D_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + j + ".txt");
-                for (int k = 0; k < numPriors; k++) {
-                    System.out.print("Generating Dissimilarity File #" + k + "...");
-                    disFiles[k] = "Priors/Prior_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + k + "_" + j +  "_dissimilarity.txt";
-                    File f = new File(disFiles[k]);
-                    if (!f.exists()) {
-                        double reli = generateDissimilarity(f, g, target, numReliable, amountPrior, amountRandom,noiseRandom,k);
-                        out2.println(reli);
-                        out2.flush();
-                        System.out.println("Done");
+                File temp = new File("Reliabilities_D_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + j + ".txt");
+                if(!temp.exists()) {
+                    PrintStream out2 = new PrintStream("Reliabilities_D_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + j + ".txt");
+                    for (int k = 0; k < numPriors; k++) {
+
+                        System.out.print("Generating Dissimilarity File #" + k + "...");
+                        disFiles[k] = "Priors/Prior_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + k + "_" + j + "_dissimilarity.txt";
+                        File f = new File(disFiles[k]);
+                        if (!f.exists()) {
+                            double reli = generateDissimilarity(f, g, target, numReliable, amountPrior, amountRandom, noiseRandom, k);
+                            out2.println(reli);
+                            out2.flush();
+                            System.out.println("Done");
+
+                        }
+
+                        //End Generation of Prior Knowledge
                     }
-                    //End Generation of Prior Knowledge
+
+                    out2.close();
+
                 }
-                out2.close();
 
             }
             catch(Exception e) {
@@ -273,6 +281,49 @@ public class justSimulatePrefDiv {
                 {
                     subs = PiPrefDiv.genSubsamples(boot,numSamples,d,loocv);
                 }
+
+
+                System.out.print("Generating training subsamples...");
+            File subsFile2 = new File("Subsamples/Subsample_Train_" + numGenes + "_" + sampleSize + "_" + minTargetParents + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + boot + "_" + numSamples + "_" + loocv + "_" + j + ".txt");
+            int[][] subs2 = null;
+            if (subsFile2.exists()) {
+                try {
+                    BufferedReader b = new BufferedReader(new FileReader(subsFile2));
+                    int lineCount = 0;
+                    while (b.ready()) {
+                        b.readLine();
+                        lineCount++;
+                    }
+                    subs2 = new int[lineCount][];
+                    b = new BufferedReader(new FileReader(subsFile2));
+                    lineCount = 0;
+                    while (b.ready()) {
+                        String[] line = b.readLine().split("\t");
+                        subs2[lineCount] = new int[line.length];
+                        for (int x = 0; x < line.length; x++) {
+                            subs2[lineCount][x] = Integer.parseInt(line[x]);
+                        }
+                        lineCount++;
+                    }
+                    b.close();
+                } catch (Exception e) {
+                    System.err.println("Unable to load training subsamples");
+                    e.printStackTrace();
+                    System.exit(-1);
+                }
+            }
+            else
+            {
+                int trainLength = (int)(d.getNumRows()*0.9);
+                int [] trainInds = new int[trainLength];
+                for(int i = 0; i < trainLength;i++)
+                {
+                    trainInds[i] = i;
+                }
+                DataSet toRun = d.subsetRows(trainInds);
+                subs2 = PiPrefDiv.genSubsamples(boot,numSamples,toRun,loocv);
+            }
+
                 System.out.println("Done");
 /*
                 RunPrefDiv r = new RunPrefDiv(dissimilarity, genes, d, target, false);
@@ -319,6 +370,18 @@ public class justSimulatePrefDiv {
                                 temp.println(subs[i][x]);
                             else
                                 temp.print(subs[i][x] + "\t");
+                        }
+                    }
+                    temp.flush();
+                    temp.close();
+
+                    temp = new PrintStream(subsFile2);
+                    for (int i = 0; i < subs2.length; i++) {
+                        for (int x = 0; x < subs2[i].length; x++) {
+                            if (x == subs2[i].length - 1)
+                                temp.println(subs2[i][x]);
+                            else
+                                temp.print(subs2[i][x] + "\t");
                         }
                     }
                     temp.flush();
