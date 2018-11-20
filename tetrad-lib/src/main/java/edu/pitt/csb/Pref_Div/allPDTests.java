@@ -25,22 +25,22 @@ public class allPDTests {
 
 
 
-    static int numRuns = 2;
-    static int numGenes = 9;
+    static int numRuns = 20;
+    static int numGenes = 200;
 
     static boolean boot = false; //Should we use bootstrap samples for PiPrefDiv
     static boolean loocv = false; //Should we use leave-one-out CV for PiPrefDiv
     static boolean useCausalGraph = false; //Are we selecting genes to then use a causal graph to find connections or direct selection?
     static int numSamples = 20; //Number of bootstrap/sub-sampled samples to use
-    static int numParams = 10;//Number of parameters to sweep over
+    static int numParams = 15;//Number of parameters to sweep over
     static boolean noiseRandom = true;//Is the reliability range of reliable and unreliable priors set randomly?
     static int numFolds = 5; //Number of Folds for CV to pick alpha
 
 
-    static int numPriors = 2; //Number of prior knowledge sources
-    static int numReliable = 1; //Number of reliable sources
-    static int numComponents = 3; //How many components do we have for cluster simulation?
-    static int minTargetParents = 2; //How many true parents of the target are there?
+    static int numPriors = 10; //Number of prior knowledge sources
+    static int numReliable = 5; //Number of reliable sources
+    static int numComponents = 10; //How many components do we have for cluster simulation?
+    static int minTargetParents = 5; //How many true parents of the target are there?
     static boolean amountRandom = true; //Should the priors have a random amount of prior knowledge?
     static boolean targetContinuous = true; //Is the target variable continuous?
     static boolean evenDistribution = true; //Is the distribution of nodes in each cluster even?
@@ -50,6 +50,8 @@ public class allPDTests {
     static double amountPrior = 0.6;
     static int[][] subs;
     static boolean parallel = false; //Should we run the experiment with parallel processing?
+    static boolean partialCorr = false;
+    static boolean pdStability = false;
     public static void main(String [] args) {
 
             //TODO Delete these loops and make this argument acceptable friendly
@@ -58,14 +60,14 @@ public class allPDTests {
         int [] ss = new int[]{200,1000};
         double [] ap = new double[] {0.1};
 
-     //   for(int iii = 0; iii < ss.length;iii++) {
-       //     for (int jjj = 0; jjj < ap.length; jjj++) {
+        for(int iii = 0; iii < ss.length;iii++) {
+            for (int jjj = 0; jjj < ap.length; jjj++) {
 
-                int experiment = 1; //0 -> prior evaluation, 1 -> Accuracy of chosen parameters vs Optimal, 2-> Comparing different summarization methods for clustered genes
+                int experiment = 0; //0 -> prior evaluation, 1 -> Accuracy of chosen parameters vs Optimal, 2-> Comparing different summarization methods for clustered genes
                 //3 -> Evaluating how good cross validation is to select alpha parameters,4-> Accuracy in increasing unreliability of prior knowledge,
                 // 5-> Sensitivity analysis on number of folds, number of subsamples, number of parameters, ss, numvars, etc.
-        //        sampleSize = ss[iii];
-         //       amountPrior = ap[jjj];//percentage of edges to have prior knowledge for
+                sampleSize = ss[iii];
+                amountPrior = ap[jjj];//percentage of edges to have prior knowledge for
 
 
                 String[] types = new String[]{"FS", "Prediction", "Cluster"}; //Help to create file header for experiment 1
@@ -221,6 +223,8 @@ public class allPDTests {
                         p.setVerbose();
                         p.setUseStabilitySelection(stabilitySelection);
                         p.setParallel(false);//TODO CHANGE BACK
+                        p.setPartialCorrs(partialCorr);
+                        p.setPdStability(pdStability);
 
 
                         String dir = "Results/Detailed_Score_Evaluation/";
@@ -362,8 +366,8 @@ public class allPDTests {
                     e.printStackTrace();
                     System.exit(-1);
                 }
-     //       }
-      //  }
+            }
+        }
     }
 
     public static void printDetailedScores(double[][][]results, PrintStream out)

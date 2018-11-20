@@ -450,6 +450,7 @@ public class mgmPriors {
         //Now we need to figure out how to modify MGM to use the 6 lambdas instead of 3
     }
 
+    //TODO Deal with priors that have no information
     public static double[] getAlpha(double[] tao) {
         //HEURISTIC HACK TO ENSURE THAT THERE IS NO ZERO VALUE
         double min = Double.MAX_VALUE;
@@ -1549,7 +1550,7 @@ public class mgmPriors {
 
     }
 
-    private double map(double lambda, double [] init, double [] limit)
+    public static double map(double lambda, double [] init, double [] limit)
     {
         double ogMax = init[init.length-1];
         double ogMin = init[0];
@@ -1558,7 +1559,8 @@ public class mgmPriors {
       return (lamLength/ogLength)*(limit[1]-limit[0]) + limit[0];
 
     }
-    private double [] getLimit(TetradMatrix t) {
+    public static double [] getLimit(TetradMatrix t) {
+        Random rand = new Random();
         ContinuousVariable v = new ContinuousVariable("Lambda");
         ContinuousVariable numEdges = new ContinuousVariable("Edges");
         List<Node> temp = new ArrayList<Node>();

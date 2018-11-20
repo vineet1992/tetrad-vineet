@@ -20,7 +20,7 @@ public class findConnectionsToCognition {
 
     public static void main(String [] args)throws Exception
     {
-        String graphName = "Imaging_Cognitive_Graph_No_DIFFSS_0.05";
+        String graphName = "ISC_Graph_No_DTMT_0.05";
         String graphFile = graphName + ".txt";
         String outFile = graphName + "_" + "Sub_Cognitive.txt";
         String outTableFile = graphName + "_Table.txt";
@@ -30,8 +30,8 @@ public class findConnectionsToCognition {
         Set<Edge> s = g.getEdges();
 
         //String [] cogVars = {"X_A1_5_Chg","X_ALDFR_Chg","X_ASDFR_Chg","FASTotal_Chg","CWI3CSSFinal_Chg","DTMT4_Chg","DIFFSS_Chg"};
-        String [] cogVars = {"X_A1_5_Chg","X_ALDFR_Chg","X_ASDFR_Chg","FASTotal_Chg","CWI3CSSFinal_Chg","DTMT4_Chg"};
-        //String [] cogVars = {"X_A1_5_Chg","X_ALDFR_Chg","X_ASDFR_Chg","FASTotal_Chg","CWI3CSSFinal_Chg","DIFFSS_Chg"};
+        //String [] cogVars = {"X_A1_5_Chg","X_ALDFR_Chg","X_ASDFR_Chg","FASTotal_Chg","CWI3CSSFinal_Chg","DTMT4_Chg"};
+        String [] cogVars = {"X_A1_5_Chg","X_ALDFR_Chg","X_ASDFR_Chg","FASTotal_Chg","CWI3CSSFinal_Chg","DIFFSS_Chg"};
 
         List<Node> temp = new ArrayList<Node>();
         for(String x:cogVars)

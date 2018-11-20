@@ -45,14 +45,14 @@ public class justSimulatePrefDiv {
 
 
 
-        int numPriors = 2; //Number of prior knowledge sources
-        int numReliable = 1; //Number of reliable sources
+        int numPriors = 10; //Number of prior knowledge sources
+        int numReliable = 5; //Number of reliable sources
         int numComponents = 3; //How many components do we have for cluster simulation?
         int minTargetParents = 2; //How many true parents of the target are there?
         boolean noiseRandom = true; //Should the priors have random amounts of reliability?
 
 
-        boolean amountRandom = true; //Should the priors have a random amount of prior knowledge?
+        boolean amountRandom = false; //Should the priors have a random amount of prior knowledge?
         boolean targetContinuous = true; //Is the target variable continuous?
         boolean evenDistribution = true; //Is the distribution of nodes in each cluster even?
         int numCategories = 4; //number of categories for discrete variables
@@ -156,8 +156,12 @@ public class justSimulatePrefDiv {
             else
                 p.setValue("percentDiscreteForMixedSimulation", 100 / (double) numGenes);
             p.setValue("numCategories", numCategories);
-            NormalDistribution n = new NormalDistribution(numGenes * 2, numGenes / 3);
+            NormalDistribution n = new NormalDistribution(numGenes*2 , numGenes / 3);
             int edges = (int)n.sample();
+            int nodesPerCluster = numGenes/numComponents;
+            int limit = nodesPerCluster*(nodesPerCluster-1)/2;
+            while(edges> limit)
+                edges = (int)n.sample();
             System.out.println(edges);
             p.setValue("numEdges", edges);
             p.setValue("numConnectedComponents", minTargetParents);

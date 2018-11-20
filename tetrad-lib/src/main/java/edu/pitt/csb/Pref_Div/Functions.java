@@ -61,7 +61,7 @@ public class Functions
     //Input: List of Genes, only the symbol needs to be filled in
     //Input: DataSet d, a dataset on which to compute correlations
     //Input: partialCorr, whether or not partialcorrelations given the rest of the genes should be computed instead of univariate corrs
-    //Input: pvals, report as rank percetnage instead of correlation itself
+    //Input: pvals, report as independence test p-values instead of correlations
     //Input: threshold, shrink all correlations with significance > threshold to 0
     //Input: normalize, should we do NPN normalization?
     //Output: A float [] with all of the gene-gene correlations
@@ -97,6 +97,11 @@ public class Functions
                     int y = mapping.get(j);
                     corrs[index] = (float)(-1*c.get(x,y)/(c.get(x,x)*c.get(y,y)));
                 }
+                else if(pvals)
+                {
+                    ind.isIndependent(one,two);
+                    corrs[index] = (float) ind.getPValue();
+                }
                 else {
                     ind.isIndependent(one,two);
                     if(ind.getPValue()>threshold)
@@ -114,8 +119,6 @@ public class Functions
         //time = System.nanoTime();
         if(normalize)
             corrs = NPN(corrs,true);
-        if(pvals)
-            corrs = getPVals(corrs);
 
 
 

@@ -32,8 +32,8 @@ public class PiPrefDiv {
     private double highRadii = 0.9; //High range of radius values to test
     private int numRadii = 40; //Number of radius values to test
     private int numThreshold = 40; //Number of Threshold values to test
-    private double lowThreshold = 0.0001; //Low range of threshold values to test
-    private double highThreshold = 0.1; //High range of threshold values to test
+    private double lowThreshold = -10; //Low range of log threshold values to test
+    private double highThreshold = 0; //High range of log threshold values to test
     private int [][] subsamples; //subsamples for repeated Pref-Div
     private double normalEpsilon = 0.5;//Range around which to get probability for theta with prior information
     private int numGenes;//number of total variables in the data
@@ -55,6 +55,8 @@ public class PiPrefDiv {
     private DataSet summarizedData; //Summarized dataset using clusters as variables
     private boolean parallel; //Should we compute stabilities in parallel?
     private RunPrefDiv.ClusterType ctype; //Which clustering method should be used to produce summarized data?
+    private boolean pdStability; //Should we run Pref-Div when computing stabilities or just use correlationa with p-value threshold?
+    private boolean partialCorrs; //Should we use partial correlations?
 
     //Constructor that uses default parameters for both initial parameter ranges
     public PiPrefDiv(DataSet data, String target,int K)
@@ -126,6 +128,8 @@ public class PiPrefDiv {
     public void setParallel(boolean b){parallel = b;}
     public void setClusterType(RunPrefDiv.ClusterType c){ctype = c;}
     public DataSet getSummarizedData(){return summarizedData;}
+    public void setPdStability(boolean p){pdStability = p;}
+    public void setPartialCorrs(boolean pc){partialCorrs = pc;}
 
 
 
@@ -161,6 +165,7 @@ public class PiPrefDiv {
         {
             radii[i] = lowRadii + (highRadii-lowRadii)*i/(double)numRadii;
         }
+
         return radii;
     }
 
@@ -177,6 +182,67 @@ public class PiPrefDiv {
         return topK;
     }
 
+    /***Constricts the testing range of radius and p-value thresholds
+     *
+     * @param init initial range of the parameter
+     * @param data Full Dataset to compute independence tests and p-values
+     * @param threshold Whether or not this is p-value threshold or absolute correlation
+     * @return double [] with a constricted range of the parameter
+     */
+    private double[] constrictRange(double[]init, DataSet data,boolean threshold)
+    {
+        ArrayList<Gene> temp = createGenes();
+        Gene tgt = new Gene(temp.size());
+        tgt.symbol="Target";
+        temp.add(tgt);
+        float [] corrs = Functions.computeAllCorrelations(temp,data,false,false,threshold,1);
+        int [] num = new int[init.length];
+        for(int i = 0; i < init.length;i++)
+        {
+            if(!threshold)
+                num[i] = countLessThan(corrs,init[i]);
+            else
+                num[i] = countPLessThan(corrs,init[i]);
+        }
+
+        TetradMatrix t = new TetradMatrix(init.length,2);
+        for(int i = 0; i < t.rows();i++) {
+
+            t.set(i,0,init[i]);
+            t.set(i,1,num[i]);
+        }
+        double[] limits = mgmPriors.getLimit(t);
+        double [] realLimits = new double[init.length];
+        for(int i = 0; i < init.length;i++)
+            realLimits[i] = mgmPriors.map(init[i],init,limits);
+
+        return realLimits;
+        /***Loop through radii, for each radii, how many edges exist***/
+
+    }
+
+
+    private int countPLessThan(float[] pvals, double t)
+    {
+        int num = 0;
+        for(int i = 0; i < pvals.length;i++)
+        {
+            double curr = Math.log(pvals[i]);
+            if(curr < t)
+                num++;
+        }
+        return num;
+    }
+    private int countLessThan(float [] c, double t)
+    {
+        int result = 0;
+        for(int i = 0; i < c.length;i++)
+        {
+            if(1-c[i] < t)
+                result++;
+        }
+        return result;
+    }
 
 
     public double [][] evaluatePriors(boolean boot, int numSamples,String iFile, String [] dFile,boolean useCausalGraph)
@@ -187,6 +253,11 @@ public class PiPrefDiv {
         {
             subsamples = genSubsamples(boot,numSamples,data,LOOCV);
         }
+        System.out.println("Done");
+
+        System.out.print("Constricting Parameter Range...");
+        initRadii = constrictRange(initRadii,data,false);
+        initThreshold = constrictRange(initThreshold,data,true);
         System.out.println("Done");
 
         //Compute stability of each gene selection and each gene-gene relationship
@@ -238,8 +309,15 @@ public class PiPrefDiv {
         }
         System.out.println("Done");
 
+        //Constrict parameter ranges
+        System.out.print("Constricting Parameter Range...");
+        initRadii = constrictRange(initRadii,data,false);
+        initThreshold = constrictRange(initThreshold,data,true);
+        System.out.println("Done");
+
         //Compute stability of each gene selection and each gene-gene relationship
         System.out.print("Computing stability across radii and threshold values...");
+
         int[][][] clusts;
         if(parallel)
             clusts = computeStabsParallel();
@@ -824,7 +902,10 @@ public class PiPrefDiv {
                     tao[i] += Math.abs(phi[i][j] - counts[j] / (double) (numRadii * numThreshold));
                 }
             }
-            tao[i] /= numPriors;
+            if(numPriors == 0)
+                tao[i] = -1;
+            else
+                tao[i] /= numPriors;
         }
         return tao;
     }
@@ -890,14 +971,20 @@ public class PiPrefDiv {
                               //  System.out.println("Computing Edge Probability for run " + s + " out of " + initRadii.length * initThreshold.length + ", Subsample: " + k);
 
                             DataSet currData = subset(subsamples[k]);
-                            float[] corrs = Functions.computeAllCorrelations(temp, currData, false, false, false, initThreshold[j]);
-                            ArrayList<Gene> temp2 = Functions.computeAllIntensities(temp, 1, currData, target, false, false, false, initThreshold[j]);
+                            float[] corrs = Functions.computeAllCorrelations(temp, currData, partialCorrs, false, false, initThreshold[j]);
+                            ArrayList<Gene> temp2 = Functions.computeAllIntensities(temp, 1, currData, target, partialCorrs, false, false, initThreshold[j]);
                             sort(temp2);
-                            PrefDiv pd = new PrefDiv(temp2, K, 0, initRadii[i], corrs);
-                            pd.setCluster(clusterByCorrs);
-                            ArrayList<Gene> topGenes = pd.diverset();
+                            if(pdStability) {
+                                PrefDiv pd = new PrefDiv(temp2, K, 0, initRadii[i], corrs);
+                                pd.setCluster(clusterByCorrs);
+                                ArrayList<Gene> topGenes = pd.diverset();
 
-                            addFoundGenes(topGenes, result[j][i]);
+                                addFoundGenes(topGenes, result[j][i]);
+                            }
+                            else
+                            {
+                                addFoundGenes(temp2,result[j][i]);
+                            }
                             addGeneConnections(corrs, result[j][i], initRadii[i]);
                         }catch(Exception e)
                         {
@@ -953,13 +1040,19 @@ public class PiPrefDiv {
                     ArrayList<Gene> temp = createGenes();
                     DataSet currData = data.subsetRows(subsamples[k]);
 
-                    float [] corrs = Functions.computeAllCorrelations(temp,currData,false,false,false,initThreshold[j]);
-                    temp = Functions.computeAllIntensities(temp,1,currData,target,false,false,false,initThreshold[j]);
+                    float [] corrs = Functions.computeAllCorrelations(temp,currData,partialCorrs,false,false,Math.exp(initThreshold[j]));
+                    temp = Functions.computeAllIntensities(temp,1,currData,target,partialCorrs,false,false,Math.exp(initThreshold[j]));
                     Collections.sort(temp,Gene.IntensityComparator);
-                    PrefDiv pd = new PrefDiv(temp,K,0,initRadii[i], corrs);
-                    pd.setCluster(clusterByCorrs);
-                    ArrayList<Gene> topGenes = pd.diverset();
-                    addFoundGenes(topGenes,curr);
+                    if (pdStability) {
+                        PrefDiv pd = new PrefDiv(temp,K,0,initRadii[i], corrs);
+                        pd.setCluster(clusterByCorrs);
+                        ArrayList<Gene> topGenes = pd.diverset();
+                        addFoundGenes(topGenes,curr);
+                    }
+                    else
+                    {
+                        addFoundGenes(temp,curr);
+                    }
                     addGeneConnections(corrs,curr,initRadii[i]);
                 }
                 result[i][j] = curr;
@@ -971,7 +1064,8 @@ public class PiPrefDiv {
     private synchronized void addFoundGenes(ArrayList<Gene> top, int [] curr) {
         for (int i = 0; i < top.size(); i++)
         {
-            curr[top.get(i).ID]++;
+            if(top.get(i).intensityValue>0)
+                curr[top.get(i).ID]++;
         }
 
     }
@@ -982,7 +1076,7 @@ public class PiPrefDiv {
         {
             for (int j = i+1; j < numGenes; j++) {
                 int temp = Functions.getIndex(i,j,numGenes);
-                    if(corrs[temp]>radii)
+                    if(1-corrs[temp]<radii) //TODO Is this correct?
                         curr[temp + numGenes]++;
 
             }
