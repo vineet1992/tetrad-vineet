@@ -57,6 +57,7 @@ public class PiPrefDiv {
     private RunPrefDiv.ClusterType ctype; //Which clustering method should be used to produce summarized data?
     private boolean pdStability; //Should we run Pref-Div when computing stabilities or just use correlationa with p-value threshold?
     private boolean partialCorrs; //Should we use partial correlations?
+    private boolean usePriors = false; //Should we use prior information for similarity and intensity at the end after choosing parameters?
 
     //Constructor that uses default parameters for both initial parameter ranges
     public PiPrefDiv(DataSet data, String target,int K)
@@ -130,6 +131,7 @@ public class PiPrefDiv {
     public DataSet getSummarizedData(){return summarizedData;}
     public void setPdStability(boolean p){pdStability = p;}
     public void setPartialCorrs(boolean pc){partialCorrs = pc;}
+    public void setUsePriors(boolean useP){usePriors = useP;}
 
 
 
@@ -191,7 +193,7 @@ public class PiPrefDiv {
      */
     private double[] constrictRange(double[]init, DataSet data,boolean threshold)
     {
-        ArrayList<Gene> temp = createGenes();
+        ArrayList<Gene> temp = createGenes(data,target);
         Gene tgt = new Gene(temp.size());
         tgt.symbol="Target";
         temp.add(tgt);
@@ -557,8 +559,15 @@ public class PiPrefDiv {
         //Run Pref-Div with optimal parameters
 
 
+        ArrayList<Gene> temp = createGenes(data,target);
+
+        if(!usePriors) {
+            meanGenes = Functions.computeAllIntensities(temp, 1, data, target, partialCorrs, false, false, 1);
+            meanDis = Functions.computeAllCorrelations(temp, data, partialCorrs, false, false, 1);
+        }
+
         RunPrefDiv rpd = new RunPrefDiv(meanDis,meanGenes,data,target,LOOCV);
-        rpd.setPThreshold(bestThreshold);
+        rpd.setPThreshold(Math.exp(bestThreshold));
         rpd.setRadius(bestRadii);
         rpd.setTopK(K);
         rpd.setAccuracy(0);
@@ -585,6 +594,9 @@ public class PiPrefDiv {
         }
         return top;
     }
+
+
+
 
     private int[] getMaxScore(double [][] avg)
     {
@@ -964,7 +976,7 @@ public class PiPrefDiv {
                 if (to - from <= chunk) {
                     for (int s = from; s < to; s++) {
                         try {
-                            ArrayList<Gene> temp = createGenes();
+                            ArrayList<Gene> temp = createGenes(data,target);
                             int i = s / initRadii.length;
                             int j = s % initThreshold.length;
                             //if (verbose)
@@ -1037,7 +1049,7 @@ public class PiPrefDiv {
                 int [] curr = new int[numGenes+ (numGenes*(numGenes-1)/2)];
                 for(int k = 0; k < subsamples.length;k++)
                 {
-                    ArrayList<Gene> temp = createGenes();
+                    ArrayList<Gene> temp = createGenes(data,target);
                     DataSet currData = data.subsetRows(subsamples[k]);
 
                     float [] corrs = Functions.computeAllCorrelations(temp,currData,partialCorrs,false,false,Math.exp(initThreshold[j]));
@@ -1084,7 +1096,7 @@ public class PiPrefDiv {
     }
 
 
-    private synchronized ArrayList<Gene> createGenes()
+    public static synchronized ArrayList<Gene> createGenes(DataSet data, String target)
     {
         ArrayList<Gene> gList = new ArrayList<Gene>();
         int ID = 0;

@@ -25,8 +25,8 @@ public class allPDTests {
 
 
 
-    static int numRuns = 20;
-    static int numGenes = 200;
+    static int numRuns = 2;
+    static int numGenes = 9;
 
     static boolean boot = false; //Should we use bootstrap samples for PiPrefDiv
     static boolean loocv = false; //Should we use leave-one-out CV for PiPrefDiv
@@ -39,9 +39,9 @@ public class allPDTests {
 
     static int numPriors = 10; //Number of prior knowledge sources
     static int numReliable = 5; //Number of reliable sources
-    static int numComponents = 10; //How many components do we have for cluster simulation?
-    static int minTargetParents = 5; //How many true parents of the target are there?
-    static boolean amountRandom = true; //Should the priors have a random amount of prior knowledge?
+    static int numComponents = 3; //How many components do we have for cluster simulation?
+    static int minTargetParents = 2; //How many true parents of the target are there?
+    static boolean amountRandom = false; //Should the priors have a random amount of prior knowledge?
     static boolean targetContinuous = true; //Is the target variable continuous?
     static boolean evenDistribution = true; //Is the distribution of nodes in each cluster even?
     static int numCategories = 4; //number of categories for discrete variables
@@ -57,13 +57,13 @@ public class allPDTests {
             //TODO Delete these loops and make this argument acceptable friendly
 
         //TODO Run with random amount of prior when i get back
-        int [] ss = new int[]{200,1000};
-        double [] ap = new double[] {0.1};
+        int [] ss = new int[]{200};
+        double [] ap = new double[] {0.6};
 
         for(int iii = 0; iii < ss.length;iii++) {
             for (int jjj = 0; jjj < ap.length; jjj++) {
 
-                int experiment = 0; //0 -> prior evaluation, 1 -> Accuracy of chosen parameters vs Optimal, 2-> Comparing different summarization methods for clustered genes
+                int experiment = 1; //0 -> prior evaluation, 1 -> Accuracy of chosen parameters vs Optimal, 2-> Comparing different summarization methods for clustered genes
                 //3 -> Evaluating how good cross validation is to select alpha parameters,4-> Accuracy in increasing unreliability of prior knowledge,
                 // 5-> Sensitivity analysis on number of folds, number of subsamples, number of parameters, ss, numvars, etc.
                 sampleSize = ss[iii];
@@ -88,7 +88,7 @@ public class allPDTests {
                     if (experiment == 0) {
                         out.println("Run\tAmount_Prior\tReliable?\tIntensity?\tPredicted_Weight\tActual_Reliability");
                     } else if (experiment == 1) {
-                        out.print("Run\tPredicted_Radius\tPredicted_Threshold");
+                        out.print("Run\tPredicted_Radius\tPredicted_Threshold\t");
 
                         for (int i = 0; i < types.length; i++) {
                             for (int j = 0; j < starts.length; j++) {
@@ -292,8 +292,11 @@ public class allPDTests {
                             double[] intWeights = p.getLastIntensityWeights();
                             double[] simWeights = p.getLastSimilarityWeights();
 
-                            ArrayList<Gene> meanGenes = PiPrefDiv.loadGenes(priorIntensity, intWeights);
-                            float[] meanDis = PiPrefDiv.loadTheoryFiles(dFile, simWeights, numGenes);
+
+
+                            ArrayList<Gene> meanGenes = PiPrefDiv.createGenes(d,"Target");
+                            meanGenes = Functions.computeAllIntensities(meanGenes,1,d,"Target",partialCorr,false,false,1);
+                            float[] meanDis = Functions.computeAllCorrelations(meanGenes,d,partialCorr,false,false,1);
                             //Use the weights from PiPrefDiv, we are interested in determining how good param selection is given that weights are good
                             //Because experiment 1 demonstrated that weights are good
 
@@ -467,7 +470,7 @@ public class allPDTests {
                             int i = s / radii.length;
                             int j = s % threshold.length;
                             rpd.setRadius(radii[i]);
-                            rpd.setThreshold(threshold[j]);
+                            rpd.setPThreshold(Math.exp(threshold[j]));
                             List<Gene> selected = rpd.runPD();
                             Map<Gene,List<Gene>> lastCluster = rpd.getClusters();
                             addAccuracy(selected,lastCluster,i,j);
@@ -501,8 +504,6 @@ public class allPDTests {
         pool.invoke(sa);
         return result;
     }
-    /***TODO Problem with predicted accuracy and maybe feature accuracy ***/
-    /***TODO Why is the accuracy that we have predicted, not represented in any of these entries***/
     public static double[][][] getBestParams(double [] radii, double [] threshold, int numComponents,RunPrefDiv rpd, Map<String,Integer> clusters,Graph g, DataSet toRun,DataSet test)
     {
         double[][][] result = new double[radii.length][threshold.length][3];
@@ -511,7 +512,7 @@ public class allPDTests {
             for(int j =0 ; j < threshold.length;j++)
             {
                 rpd.setRadius(radii[i]);
-                rpd.setThreshold(threshold[j]);
+                rpd.setPThreshold(Math.exp(threshold[j]));
                 List<Gene> selected = rpd.runPD();
                 Map<Gene,List<Gene>> lastCluster = rpd.getClusters();
                result[i][j][2] = getClusterAccuracy(lastCluster,clusters,numComponents);

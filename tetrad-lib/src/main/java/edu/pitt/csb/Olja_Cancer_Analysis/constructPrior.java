@@ -23,11 +23,9 @@ public class constructPrior {
         boolean mSig = true;
         boolean string = true;
         boolean geneList = false;
-        for(int i = 1; i <= 5;i++) {
+        //for(int i = 1; i <= 5;i++) {
 
-
-            String dataset = "Train_Prediction_" + i + ".txt";
-
+            String dataset = "Highest_Variance_Data_Continuous_Prediction.txt";
             DataSet data = MixedUtils.loadDataSet2(dataset);
             HashMap<String, Integer> map = null;
             DoubleMatrix2D prior = null;
@@ -45,7 +43,8 @@ public class constructPrior {
                 System.out.print("Constructing prior from map and data...");
                 prior = makePrior(map, data);
                 System.out.println("Done");
-                outputPrior(prior, data, "string_prior_" + i + ".txt");
+                //outputPrior(prior, data, "string_prior_" + i + ".txt");
+                outputPrior(prior, data, "string_prior_baseline.txt");
             }
 
             //CONSTRUCT MSIGDB PRIOR
@@ -56,17 +55,19 @@ public class constructPrior {
                 System.out.print("Constructing prior for MSig...");
                 prior = makePriorMSig(map2, data);
                 System.out.println("Done");
-                outputPrior(prior, data, "M_Sig_prior_" + i + ".txt");
+                //outputPrior(prior, data, "M_Sig_prior_" + i + ".txt");
+                outputPrior(prior, data, "M_Sig_prior_baseline.txt");
+
             }
             if (geneList) {
                 System.out.print("Constructing prior for gene list...");
                 prior = makePriorGeneList(data);
                 System.out.println("Done");
-                outputPrior(prior, data, "Gene_List.txt");
+                outputPrior(prior, data, "Gene_List_With_Mayo.txt");
 
             }
 
-        }
+      //  }
     }
 
     public static DoubleMatrix2D makePriorGeneList(DataSet data)throws Exception

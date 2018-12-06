@@ -33,14 +33,16 @@ public class PriorPrediction {
     {
 
 
-        String target = "Response";
-        String priorDir = "Priors";
-        String dataFile = "Data_For_Prediction.txt";
+        String target = "IgG_Ratio";
+        String priorDir = "Priors_All";
+        String dataFile = "Highest_Variance_Prediction_Data_No_Mayo.txt";
         int numLambdas = 10;
         boolean loocv = true;
         int ns = 5;
         double lamLow = 0.1;
         double lamHigh = 0.9;
+        int start = 0;
+        int end = 5;
 
         int index = 0;
         while(index < args.length) {
@@ -64,6 +66,14 @@ public class PriorPrediction {
                 index+=2;
             } else if (args[index].equals("-dataFile")) {
                 dataFile = args[index + 1];
+                index += 2;
+            }
+            else if (args[index].equals("-start")) {
+                start = Integer.parseInt(args[index + 1]);
+                index += 2;
+            }
+            else if (args[index].equals("-end")) {
+                end = Integer.parseInt(args[index + 1]);
                 index += 2;
             }
         }
@@ -107,7 +117,9 @@ public class PriorPrediction {
         PrintStream pi2 = new PrintStream(f.getName() + "/Features.txt");
         pi1.println("Run\tPrediction_piMGM\tPrediction_CPC_MB\tPrediction_CPC\tActual");
         pi2.println("Run\tFeatures_piMGM\tFeatures_CPC_MB\tFeatures_CPC");
-        for(int i = 0; i < data.getNumRows();i++)
+        if(end==-1)
+            end = data.getNumRows();
+        for(int i = start; i < end;i++)
         {
             System.out.println("Running CV set " + i + " out of " + data.getNumRows());
             int [] rows = new int[data.getNumRows()-1];
@@ -184,6 +196,7 @@ public class PriorPrediction {
 
     public static double getRegressionResult(List<Node> neighbors,DataSet small, DataSet full, int row, String target)
     {
+        //DO NOT ALLOW DISCRETE VARIABLES (MAYO-FINN)
         List<Node> temp = new ArrayList<Node>();
         for (Node n : neighbors) {
             if(!(small.getVariable(n.getName())instanceof DiscreteVariable))
