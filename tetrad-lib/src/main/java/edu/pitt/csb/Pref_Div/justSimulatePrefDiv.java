@@ -35,10 +35,10 @@ public class justSimulatePrefDiv {
     public static Random rand = new Random();
 
     public static void main(String [] args) {
-        int numRuns = 2;
-        int numGenes = 9;
-        int sampleSize = 200;
-        double amountPrior = 0.6;//percentage of edges to have prior knowledge for
+        int numRuns = 20;
+        int numGenes = 300;
+        int sampleSize = 1000;
+        double amountPrior = 0.3;//percentage of edges to have prior knowledge for
         boolean boot = false; //Should we use bootstrap samples for PiPrefDiv
         boolean loocv = false; //Should we use leave-one-out CV for PiPrefDiv
         int numSamples =  20; //Number of bootstrap/sub-sampled samples to use
@@ -47,8 +47,8 @@ public class justSimulatePrefDiv {
 
         int numPriors = 10; //Number of prior knowledge sources
         int numReliable = 5; //Number of reliable sources
-        int numComponents = 3; //How many components do we have for cluster simulation?
-        int minTargetParents = 2; //How many true parents of the target are there?
+        int numComponents = 20; //How many components do we have for cluster simulation?
+        int minTargetParents = 10; //How many true parents of the target are there?
         boolean noiseRandom = true; //Should the priors have random amounts of reliability?
 
 

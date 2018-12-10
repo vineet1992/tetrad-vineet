@@ -57,6 +57,12 @@ public class RunPrefDiv {
     private double lambdaHigh = 0.95; //Lambda high limit for MGM StEPS
     private double g = 0.05; //Stability threshold
     private double pThresh = 0.05; //p-value threshold
+    private double pThreshWP = 0.05; //p-value threshold for those which we have prior information (only if separate params is true)
+    private double radiusWP = 0.5; //Radius for those which we have prior information (only if separate params is true)
+
+    private boolean [] withPrior; //Says which edges we have prior information for
+
+    private boolean separateParams = false; //Do we treat edges where we have prior information differently?
     private ArrayList<Gene> lastGeneSet;
     private HashMap<Gene,List<Gene>> lastClusters;
     private String target; //Target variable
@@ -95,11 +101,25 @@ public class RunPrefDiv {
         this.clusterType = ClusterType.NONE;
     }
 
+
+    public void setWithPrior(boolean [] wp)
+    {
+        withPrior = wp;
+        separateParams = true;
+    }
+    public void setAllParams(double radius, double radiusWP, double pThresh, double pThreshWP)
+    {
+        this.radius = radius;
+        this.radiusWP = radiusWP;
+        this.pThresh = pThresh;
+        this.pThreshWP = pThreshWP;
+    }
+
+
     public int [][] getSubs()
     {
         return subs;
     }
-
     public double[][]getLastStabilities(){return lastStepsStabilities;}
     public void setSubs(int [][] subs){this.subs = subs;}
     public HashMap<Gene,List<Gene>> getClusters()
@@ -721,7 +741,10 @@ public class RunPrefDiv {
                         ArrayList<Gene> curr;
                         if(usePThreshold)
                         {
-                            curr = Functions.computeAllIntensities(genes,alpha,dataSubSamp,target,partialCorr,false,false,pThresh);
+                            if(separateParams)
+                                curr = Functions.computeAllIntensities(genes,alpha,dataSubSamp,target,partialCorr,pThresh,pThreshWP,withPrior);
+                            else
+                                curr = Functions.computeAllIntensities(genes,alpha,dataSubSamp,target,partialCorr,false,false,pThresh);
                         }
                         else
                         {
@@ -739,8 +762,15 @@ public class RunPrefDiv {
                         PrefDiv p;
                         if(usePThreshold)
                         {
-                            float [] corrs = Functions.computeAllCorrelations(curr,dataSubSamp,partialCorr,false,false,pThresh);
-                            p = new PrefDiv(curr,topK,accuracy,radius, corrs);
+                            if(separateParams)
+                            {
+                                float[] corrs = Functions.computeAllCorrelations(curr, dataSubSamp, partialCorr, pThresh,pThreshWP,withPrior);
+                                p = new PrefDiv(curr, topK, accuracy, radius, radiusWP,withPrior,corrs);
+                            }
+                            else {
+                                float[] corrs = Functions.computeAllCorrelations(curr, dataSubSamp, partialCorr, false, false, pThresh);
+                                p = new PrefDiv(curr, topK, accuracy, radius, corrs);
+                            }
 
                         }
                         else
@@ -792,10 +822,23 @@ public class RunPrefDiv {
 
         if(usePThreshold)
         {
-            ArrayList<Gene> curr = Functions.computeAllIntensities(genes,alpha,train,target,partialCorr,false,false,pThresh);
+            ArrayList<Gene> curr;
+            if(separateParams)
+                curr = Functions.computeAllIntensities(genes,alpha,train,target,partialCorr,pThresh,pThreshWP,withPrior);
+            else
+                curr = Functions.computeAllIntensities(genes,alpha,train,target,partialCorr,false,false,pThresh);
             Collections.sort(curr,Gene.IntensityComparator);
-            float[] corrs = Functions.computeAllCorrelations(curr,train,false,false,false,pThresh);
-            PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,corrs);
+            float [] corrs;
+            if(separateParams)
+                corrs = Functions.computeAllCorrelations(curr,train,false,pThresh,pThreshWP,withPrior);
+            else
+                corrs = Functions.computeAllCorrelations(curr,train,false,false,false,pThresh);
+
+            PrefDiv p;
+            if(separateParams)
+                p = new PrefDiv(curr,topK,accuracy,radius,radiusWP,withPrior,corrs);
+            else
+                p = new PrefDiv(curr,topK,accuracy,radius,corrs);
             p.setCluster(clusterByCorrs);
             p.diverset();
             lastClusters = p.clusters;
@@ -829,13 +872,26 @@ public class RunPrefDiv {
     private double runPD(final double alpha, final DataSet train)
     {
 
-        //System.out.println("Running regular version of Pref-Div without subsampling...");
+            //System.out.println("Running regular version of Pref-Div without subsampling...");
         if(usePThreshold)
         {
-            ArrayList<Gene> curr = Functions.computeAllIntensities(genes,alpha,train,target,partialCorr,false,false,pThresh);
+            ArrayList<Gene> curr;
+            if(separateParams)
+                curr = Functions.computeAllIntensities(genes,alpha,train,target,partialCorr,pThresh,pThreshWP,withPrior);
+            else
+                curr = Functions.computeAllIntensities(genes,alpha,train,target,partialCorr,false,false,pThresh);
             Collections.sort(curr,Gene.IntensityComparator);
-            float[] corrs = Functions.computeAllCorrelations(curr,train,false,false,false,pThresh);
-            PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,corrs);
+            float [] corrs;
+            if(separateParams)
+                corrs = Functions.computeAllCorrelations(curr,train,false,pThresh,pThreshWP,withPrior);
+            else
+                corrs = Functions.computeAllCorrelations(curr,train,false,false,false,pThresh);
+
+            PrefDiv p;
+            if(separateParams)
+                p = new PrefDiv(curr,topK,accuracy,radius,radiusWP,withPrior,corrs);
+            else
+                p = new PrefDiv(curr,topK,accuracy,radius,corrs);
             p.setCluster(clusterByCorrs);
             lastGeneSet = p.diverset();
             lastClusters = p.clusters;
@@ -1167,7 +1223,6 @@ public class RunPrefDiv {
     {
         for(Gene g: map.keySet())
         {
-            String sym = g.symbol;
             ArrayList<Gene> temp = new ArrayList<Gene>();
             temp.add(g);
             if(map.get(g)!=null) {

@@ -58,6 +58,9 @@ public class PiPrefDiv {
     private boolean pdStability; //Should we run Pref-Div when computing stabilities or just use correlationa with p-value threshold?
     private boolean partialCorrs; //Should we use partial correlations?
     private boolean usePriors = false; //Should we use prior information for similarity and intensity at the end after choosing parameters?
+    private boolean separateParams; //Should we use separate parameters for with/without prior information
+    private boolean [] iPriors; //Contains which features have prior intensity information
+    private boolean [] dPriors; //Contains which features have prior dissimiliarty information
 
     //Constructor that uses default parameters for both initial parameter ranges
     public PiPrefDiv(DataSet data, String target,int K)
@@ -132,6 +135,7 @@ public class PiPrefDiv {
     public void setPdStability(boolean p){pdStability = p;}
     public void setPartialCorrs(boolean pc){partialCorrs = pc;}
     public void setUsePriors(boolean useP){usePriors = useP;}
+    public void useSeparateParams(){separateParams = true;}
 
 
 
@@ -249,6 +253,7 @@ public class PiPrefDiv {
 
     public double [][] evaluatePriors(boolean boot, int numSamples,String iFile, String [] dFile,boolean useCausalGraph)
     {
+
         //Generate subsamples of the data
         System.out.print("Generating subsamples...");
         if(subsamples==null)
@@ -295,13 +300,23 @@ public class PiPrefDiv {
         System.out.println("Similarity Tao: " + Arrays.toString(allWeights[1]));
         return allWeights;
     }
-    //Full procedure to select genes based on prior information Pref-Div
+
+
+    //TODO Fix up version where we use separate parameters Complete getScoresSeparate and getMaxScoreSeparate then need to address Pref-Div with Priors
+    /***Full procedure to select genes based on prior information Pref-Div
     //Input: boot (should we do bootstrapping (true) or subsampling (false))
     //Input: numSamples (number of samples to subsample or bootstrap)
     //Input: path to theory Intensity File -> iFile (should have a header)
-    //Input: path to theory Dissimilarity File -> dFile (no header or rownames for these files)
+    //Input: path to theory Dissimilarity File -> dFile (no header or rownames for these files)****/
     public ArrayList<Gene> selectGenes(boolean boot, int numSamples, String iFile, String [] dFile,boolean useCausalGraph)
     {
+
+
+        if(separateParams)
+        {
+            iPriors = new boolean[numGenes];
+            dPriors = new boolean[numGenes*(numGenes-1)/2];
+        }
 
         //Generate subsamples of the data
         System.out.print("Generating subsamples...");
@@ -365,7 +380,12 @@ public class PiPrefDiv {
         System.out.println(Arrays.toString(uPostInt));
         System.out.println(Arrays.toString(varPostInt));
         //Compute posterior probabilities and stability of each gene, synthesize these results into a score for each parameter setting
-        double[][] scoresInt = getScores(clusts,uPostInt,varPostInt); //i -> radii, j -> topK
+
+        double[][] scoresInt;
+        if(separateParams)
+            scoresInt = getScoresSeparate(clusts,uPostInt,varPostInt);
+        else
+            scoresInt = getScores(clusts,uPostInt,varPostInt); //i -> radii, j -> topK
         System.out.println("Done");
 
         if(verbose)
@@ -446,7 +466,11 @@ public class PiPrefDiv {
         float [] varPost = getVarPosterior(clusts, varDis);
 
         //Compute posterior probabilities and stability of each gene, synthesize these results into a score for each parameter setting
-        double[][] scoresSim = getScores(clusts,uPost,varPost); //i -> radii, j -> topK
+        double[][] scoresSim;
+        if(separateParams)
+            scoresSim = getScoresSeparate(clusts,uPost,varPost);
+        else
+            scoresSim = getScores(clusts,uPost,varPost); //i -> radii, j -> topK
         System.out.println("Done");
 
 
@@ -531,9 +555,20 @@ public class PiPrefDiv {
 
         int[]inds = getMaxScore(avgScore);
 
+        if(separateParams)
+            inds = getMaxScoreSeparate(avgScore);
+
+
 
         double bestRadii = initRadii[inds[0]];
         double bestThreshold = initThreshold[inds[1]];
+        double bestRadiiNP = -1;
+        double bestThresholdNP = -1;
+        if(separateParams)
+        {
+            bestRadiiNP = initRadii[inds[2]];
+            bestThresholdNP = initThreshold[inds[3]];
+        }
         lastRadius = bestRadii;
         lastThreshold = bestThreshold;
         System.out.println("Done");
@@ -565,10 +600,20 @@ public class PiPrefDiv {
             meanGenes = Functions.computeAllIntensities(temp, 1, data, target, partialCorrs, false, false, 1);
             meanDis = Functions.computeAllCorrelations(temp, data, partialCorrs, false, false, 1);
         }
+        RunPrefDiv rpd;
+        if(separateParams)
+        {
+            rpd = new RunPrefDiv(meanDis,meanGenes,data,target,LOOCV);
+            rpd.setWithPrior(dPriors);
+            rpd.setAllParams(bestRadiiNP,bestRadii,Math.exp(bestThresholdNP),Math.exp(bestThreshold));
+        }
+        else
+        {
+            rpd = new RunPrefDiv(meanDis,meanGenes,data,target,LOOCV);
+            rpd.setPThreshold(Math.exp(bestThreshold));
+            rpd.setRadius(bestRadii);
+        }
 
-        RunPrefDiv rpd = new RunPrefDiv(meanDis,meanGenes,data,target,LOOCV);
-        rpd.setPThreshold(Math.exp(bestThreshold));
-        rpd.setRadius(bestRadii);
         rpd.setTopK(K);
         rpd.setAccuracy(0);
         rpd.setNumAlphas(numThreshold);
@@ -597,6 +642,32 @@ public class PiPrefDiv {
 
 
 
+
+    private int[] getMaxScoreSeparate(double [][] avg)
+    {
+        int [] inds = new int[4];
+        double maxScore = -1;
+        double maxScoreNP = -1;
+        for(int i = 0; i < avg.length/2;i++)
+        {
+            for(int j = 0; j < avg[i].length/2;j++)
+            {
+                if(avg[i][j]>maxScore)
+                {
+                    inds[0] = i;
+                    inds[1] = j;
+                    maxScore = avg[i][j];
+                }
+                if(avg[i+avg.length/2][j+avg[i].length/2]>maxScoreNP)
+                {
+                    inds[2] = i;
+                    inds[3] = j;
+                    maxScoreNP = avg[i+avg.length/2][j+avg[i].length/2];
+                }
+            }
+        }
+        return inds;
+    }
 
     private int[] getMaxScore(double [][] avg)
     {
@@ -678,6 +749,39 @@ public class PiPrefDiv {
         return result;
     }
 
+
+
+    private double[][] getScoresSeparate(int [][][] clusts, float [] uPost, float [] varPost)
+    {
+        int [] sums = getFullCounts(clusts);
+        double [][] score = new double[numRadii*2][numThreshold*2];
+        int offset = 0;
+        if(uPost.length>numGenes)
+            offset = numGenes;
+        for (int i = 0; i < numRadii; i++) {
+            for (int j = 0; j < numThreshold; j++) {
+                for(int g = 0; g < uPost.length;g++) //Loop through each gene
+                {
+                    double G = getG(clusts[i][j][g+offset]); //Clusts[i][j][g] is number of times gene was selected in the subsamples for this parameter setting
+                    if (uPost[g] < 0)//No Prior information, contributes only stability to the score
+                    {
+                        double theta = getTheta(sums[g+offset],clusts[i][j][g+offset]); //sums is the total number of times this gene was selected across all parameter settings
+                        score[i + numRadii][j + numThreshold] += theta*(1-G);
+                    }
+                    else
+                    {
+                        if(varPost[g]<0)
+                            System.out.println(g);
+                        double theta = getTheta(uPost[g],varPost[g],clusts[i][j][g+offset]);
+                        score[i][j]+=theta*(1-G);
+                    }
+                }
+            }
+        }
+
+        normalizeScore(score);
+        return score;
+    }
     private double[][] getScores(int [][][] clusts, float [] uPost, float [] varPost)
     {
         int [] sums = getFullCounts(clusts);
@@ -713,24 +817,52 @@ public class PiPrefDiv {
 
     private void normalizeScore(double [][] score)
     {
-        double max = 0;
-        for(int i = 0; i < score.length;i++)
+        if(separateParams)
         {
-            for(int j = 0; j < score[i].length;j++)
-            {
-                if(score[i][j] > max)
-                    max = score[i][j];
+            double max = 0;
+            for (int i = 0; i < score.length/2; i++) {
+                for (int j = 0; j < score[i].length/2; j++) {
+                    if (score[i][j] > max)
+                        max = score[i][j];
+                }
+            }
+            for (int i = 0; i < score.length/2; i++) {
+                for (int j = 0; j < score[i].length/2; j++) {
+                    score[i][j]/=max;
+                }
+            }
+
+            for (int i = score.length/2; i < score.length; i++) {
+                for (int j = score[i].length/2; j < score[i].length; j++) {
+                    if (score[i][j] > max)
+                        max = score[i][j];
+                }
+            }
+            for (int i = score.length/2; i < score.length; i++) {
+                for (int j = score[i].length/2; j < score[i].length; j++) {
+                    score[i][j]/=max;
+                }
+            }
+
+
+
+        }
+        else {
+
+
+            double max = 0;
+            for (int i = 0; i < score.length; i++) {
+                for (int j = 0; j < score[i].length; j++) {
+                    if (score[i][j] > max)
+                        max = score[i][j];
+                }
+            }
+            for (int i = 0; i < score.length; i++) {
+                for (int j = 0; j < score[i].length; j++) {
+                    score[i][j] /= max;
+                }
             }
         }
-
-        for(int i = 0; i < score.length;i++)
-        {
-            for(int j = 0; j < score[i].length;j++)
-            {
-                score[i][j] /= max;
-            }
-        }
-
     }
 
     //Get posterior variance based on computed counts and variance, modified to work for both intensity and similarity
@@ -866,6 +998,8 @@ public class PiPrefDiv {
         {
             float [][] temp = new float[1][(numGenes*(numGenes-1)/2)];
             temp[0] = Functions.loadTheoryMatrix(dFile[i],false,numGenes);
+            if(separateParams)
+                whichPriors(temp,dPriors);
 
             getPhi(temp[0],subsamples.length);
             tao[i] = getTao(temp,sums)[0];
@@ -881,7 +1015,9 @@ public class PiPrefDiv {
         //Load each intensity source from the iFile
         float [][] sources = Functions.loadIntensityData(iFile,false);
 
-
+        //Identify for which genes we have prior information
+        if(separateParams)
+            whichPriors(sources,iPriors);
         //Compute phi matrix for each source (expected number of appearences of each gene)
         for(int i = 0; i< sources.length;i++)
         {
@@ -896,6 +1032,18 @@ public class PiPrefDiv {
         double [] alpha = mgmPriors.getAlpha(tao);
         return mgmPriors.getWeights(alpha);
 
+    }
+
+    private void whichPriors(float[][]sources,boolean [] prior)
+    {
+        for(int j =0; j < sources[0].length;j++) //Loop through genes
+        {
+            for(int i = 0; i < sources.length;i++) //loop through sources
+            {
+                if(sources[i][j] >= 0)
+                    prior[j] = true;
+            }
+        }
     }
 
 
@@ -921,6 +1069,7 @@ public class PiPrefDiv {
         }
         return tao;
     }
+
     private void getPhi(float[] in, int numSubs)
     {
         for(int i = 0; i < in.length;i++)

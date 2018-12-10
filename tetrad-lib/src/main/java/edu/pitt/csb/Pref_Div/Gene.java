@@ -34,6 +34,7 @@ public class Gene
     double intensityValue;
     double dataIntensity;
     double theoryIntensity;
+    boolean hasPrior;
 
 
     public double compareTo(Gene p) {

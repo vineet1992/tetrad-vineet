@@ -129,6 +129,66 @@ public class Functions
     }
 
 
+
+    public static float [] computeAllCorrelations(ArrayList<Gene> items, DataSet d,boolean partialCorr,double threshold, double thresholdWP, boolean [] withPrior )
+    {
+        TetradMatrix c = null;
+        if(partialCorr)
+        {
+            c = new CovarianceMatrix(d).getMatrix();
+            c = c.ginverse();
+        }
+        HashMap<Integer,Integer> mapping = new HashMap<Integer,Integer>();
+        for(int i = 0; i < items.size();i++)
+        {
+            mapping.put(i,d.getColumn(d.getVariable(items.get(i).symbol)));
+        }
+        double [][]temp = d.getDoubleData().transpose().toArray();
+        int total = (items.size()*(items.size()-1))/2;
+        float [] corrs = new float[total];
+        long time = System.nanoTime();
+        IndTestCorrelationT ind = new IndTestCorrelationT(d,0.05);
+        for(int i = 0; i < items.size();i++)
+        {
+            Node one = d.getVariable(mapping.get(i));
+            double [] curr = temp[mapping.get(i)];
+            int index = Functions.getIndex(i,i+1,items.size());
+            for(int j = i+1;j < items.size();j++)
+            {
+                Node two = d.getVariable(mapping.get(j));
+                if(partialCorr)
+                {
+                    int x = mapping.get(i);
+                    int y = mapping.get(j);
+                    corrs[index] = (float)(-1*c.get(x,y)/(c.get(x,x)*c.get(y,y)));
+                }
+                else {
+                    ind.isIndependent(one,two);
+                    if(ind.getPValue()>threshold && !withPrior[index])
+                        corrs[index] = 0;
+                    else if(ind.getPValue()>thresholdWP && withPrior[index])
+                        corrs[index] = 0;
+                    else
+                        corrs[index] = (float) Math.abs(StatUtils.correlation(curr, temp[mapping.get(j)]));
+                }
+                index++;
+            }
+
+
+        }
+        time = System.nanoTime()-time;
+        // System.out.print("Non paranormal Normalization...");
+        //time = System.nanoTime();
+
+
+
+        //time = System.nanoTime()-time;
+        //System.out.println("Done: " + time/Math.pow(10,9));
+
+        return corrs;
+    }
+
+
     public static float[] getPVals(float [] corrs)
     {
         NormalDistribution n = new NormalDistribution(0,1);
@@ -238,6 +298,75 @@ public class Functions
                 }
             }
             return g1;
+
+    }
+
+
+    public static ArrayList<Gene> computeAllIntensities(ArrayList<Gene> g1, double a, DataSet data, String target,boolean usePc,double threshold, double thresholdWP, boolean [] withPriors)
+    {
+        if(target==null || target.equals(""))
+        {
+            return computeIntensitiesUnsupervised(g1,a,data);
+        }
+        boolean cont = data.getVariable(target) instanceof ContinuousVariable;
+        int numCats = -1;
+        if(!cont) {
+            DataSet temp2 = MixedUtils.getDiscreteData(data);
+            numCats = MixedUtils.getDiscLevels(temp2)[temp2.getColumn(temp2.getVariable(target))];
+        }
+
+
+
+        int y = data.getColumn(data.getVariable(target));
+        Node one = data.getVariable(target);
+        double[][] temp = data.getDoubleData().transpose().toArray();
+        TetradMatrix c = null;
+        if(usePc && cont) {
+            c = new CovarianceMatrix(data).getMatrix();
+            c = c.ginverse();
+        }
+        IndTestCorrelationT ind = new IndTestCorrelationT(data,0.05);
+        float [] corrs = new float[g1.size()];
+        for(int i = 0; i < g1.size();i++) {
+            Node two = data.getVariable(g1.get(i).symbol);
+            if(usePc && cont)//Use Partial Correlation
+            {
+                int x = data.getColumn(data.getVariable(g1.get(i).symbol));
+                corrs[i] = (float)(-1*c.get(x,y)/Math.sqrt(c.get(x,x)*c.get(y,y)));
+            }
+            else if(cont) //Use Correlation
+            {
+                ind.isIndependent(one,two);
+                if(ind.getPValue()>threshold && !withPriors[i])
+                    corrs[i] = 0;
+                else if(ind.getPValue()>thresholdWP && withPriors[i])
+                    corrs[i] = 0;
+                else
+                    corrs[i] = (float) Math.abs(StatUtils.correlation(temp[y], temp[data.getColumn(data.getVariable(g1.get(i).symbol))]));
+            }
+            else //Use Mutual Information
+                corrs[i] = (float) mixedMI(temp[data.getColumn(data.getVariable(i))],temp[y],numCats);
+        }
+        for (int i = 0; i < g1.size(); i++) {
+
+            try {
+
+                g1.get(i).foldChange = corrs[i];
+                if (g1.get(i).theoryIntensity == -1)
+                    g1.get(i).intensityValue = g1.get(i).foldChange;
+                else
+                    g1.get(i).intensityValue = g1.get(i).theoryIntensity * (1 - a) + a * g1.get(i).foldChange;
+                g1.get(i).hasPrior = withPriors[i];
+            } catch (Exception e) {
+                if (g1 != null)
+                    System.out.println(g1.get(i));
+                if (corrs != null)
+                    System.out.println(corrs.length);
+                e.printStackTrace();
+                System.exit(-1);
+            }
+        }
+        return g1;
 
     }
 

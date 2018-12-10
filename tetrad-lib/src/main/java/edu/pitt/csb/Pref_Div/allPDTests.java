@@ -25,8 +25,8 @@ public class allPDTests {
 
 
 
-    static int numRuns = 2;
-    static int numGenes = 9;
+    static int numRuns = 20;
+    static int numGenes = 300;
 
     static boolean boot = false; //Should we use bootstrap samples for PiPrefDiv
     static boolean loocv = false; //Should we use leave-one-out CV for PiPrefDiv
@@ -39,9 +39,9 @@ public class allPDTests {
 
     static int numPriors = 10; //Number of prior knowledge sources
     static int numReliable = 5; //Number of reliable sources
-    static int numComponents = 3; //How many components do we have for cluster simulation?
-    static int minTargetParents = 2; //How many true parents of the target are there?
-    static boolean amountRandom = false; //Should the priors have a random amount of prior knowledge?
+    static int numComponents = 20; //How many components do we have for cluster simulation?
+    static int minTargetParents = 10; //How many true parents of the target are there?
+    static boolean amountRandom = true; //Should the priors have a random amount of prior knowledge?
     static boolean targetContinuous = true; //Is the target variable continuous?
     static boolean evenDistribution = true; //Is the distribution of nodes in each cluster even?
     static int numCategories = 4; //number of categories for discrete variables
@@ -57,7 +57,7 @@ public class allPDTests {
             //TODO Delete these loops and make this argument acceptable friendly
 
         //TODO Run with random amount of prior when i get back
-        int [] ss = new int[]{200};
+        int [] ss = new int[]{200,1000};
         double [] ap = new double[] {0.6};
 
         for(int iii = 0; iii < ss.length;iii++) {
@@ -193,6 +193,9 @@ public class allPDTests {
                             }
                         } else if (experiment == 0) {
                             System.err.println("Could not load subsamples file with specified parameters, please double check");
+                        }else
+                        {
+                            System.out.println("Couldn't load " + subsFile);
                         }
 
 

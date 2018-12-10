@@ -36,6 +36,9 @@ public class PrefDiv {
    private boolean computeCorrs;
    private boolean corrsGiven;
    private boolean partialCorr;
+   private double radiusWP;
+   private boolean [] withPrior;
+   private boolean usingPrior = false;
    private ArrayList<Float> sampledCorrs;
 
    //TODO clustering is fine, need to decide if variables in the same cluster are allowed to be in the Top K together?
@@ -88,6 +91,27 @@ public class PrefDiv {
     	this.result = new ArrayList<Gene>();
     	this.theoryMat = null;
     	this.alpha = 1;
+
+    }
+
+
+
+    //Constructor when only using data
+    public PrefDiv(ArrayList<Gene> items, int topK, double accuracy, double radius, double radiusWP, boolean [] wp, float[] corrs) {
+        this.partialCorr = false;
+        this.corrMat = corrs;
+        this.computeCorrs = false;
+        this.corrsGiven = true;
+        this.topK = topK;
+        this.accuracy = accuracy;
+        this.radius = radius;
+        this.items = items;
+        this.result = new ArrayList<Gene>();
+        this.theoryMat = null;
+        this.alpha = 1;
+        this.radiusWP = radiusWP;
+        this.withPrior = wp;
+        this.usingPrior = true;
 
     }
     //============================================================
@@ -281,7 +305,16 @@ public class PrefDiv {
                 finalOutput.add(coreElement);
                 if (output.size() != 1) {
                     for (int j = i+1; j < output.size(); j++) {
-                        if (distance(output.get(j),coreElement) > radius) {
+
+                        if(usingPrior && withPrior[getIndex(output.get(j),coreElement)] && distance(output.get(j),coreElement) > radiusWP)
+                        {
+                            temp.add(output.get(j));
+                        }
+                        else if(usingPrior && !withPrior[getIndex(output.get(j),coreElement)] && distance(output.get(j),coreElement)>radius)
+                        {
+                            temp.add(output.get(j));
+                        }
+                        else if (!usingPrior && distance(output.get(j),coreElement) > radius) {
                             temp.add(output.get(j));
                         } else {
                             if(clusters.get(coreElement)==null)
@@ -324,7 +357,15 @@ public class PrefDiv {
                     break;
                 } else {
                     for (int j = 0; j < output.size(); j++) {
-                        if (distance(output.get(j),toBeCompare) > radius) {
+                        if(usingPrior && withPrior[getIndex(output.get(j),toBeCompare)] && distance(output.get(j),toBeCompare) > radiusWP)
+                        {
+                            temp.add(output.get(j));
+                        }
+                        else if(usingPrior && !withPrior[getIndex(output.get(j),toBeCompare)] && distance(output.get(j),toBeCompare)>radius)
+                        {
+                            temp.add(output.get(j));
+                        }
+                        else if (distance(output.get(j),toBeCompare) > radius) {
                             temp.add(output.get(j));
                         } else {
                             B.add(output.get(j));
@@ -449,6 +490,18 @@ public class PrefDiv {
             return c;
         else
             return c*alpha + (1-theoryMat[Functions.getIndex(i,j,items.size())])*(1-alpha);
+    }
+    private int getIndex(Gene g1, Gene g2)
+    {
+        int i = g1.ID;
+        int j = g2.ID;
+        if(g1.ID > g2.ID)
+        {
+            int temp = i;
+            i = j;
+            j = temp;
+        }
+        return Functions.getIndex(i,j,items.size());
     }
 
 
