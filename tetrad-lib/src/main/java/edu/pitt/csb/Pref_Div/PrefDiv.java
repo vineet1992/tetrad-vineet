@@ -208,17 +208,18 @@ public class PrefDiv {
         	
             //Add enough marked genes to get to A*k for this iteration
             //TODO Right now we keep this as is, so it could be the case that a gene in a cluster is also a representative gene in the Top K
+            //TODO Read the Pref-Div paper and decide if we need to do this (especially the else)
             int remain = (int)(acc*this.topK) - temp.size();
             if (remain > 0 && B.size() > 0) {	
                 for (int j = 0; j < Math.min(remain,B.size()); j++){
                     result.add(B.get(0));
                     B.remove(0);
                 }
-            }else {
+            }/*else {
                 if(B.size() > 0) {
                     result.add(B.get(0));
                 }
-            }
+            }*/
             
             if (i == 0) {
                 G.addAll(B);

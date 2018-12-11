@@ -59,6 +59,8 @@ public class PiPrefDiv {
     private boolean partialCorrs; //Should we use partial correlations?
     private boolean usePriors = false; //Should we use prior information for similarity and intensity at the end after choosing parameters?
     private boolean separateParams; //Should we use separate parameters for with/without prior information
+    private double lastRadiusWP; //Last Radius WP selected
+    private double lastThresholdWP; //Last Threshold WP selected
     private boolean [] iPriors; //Contains which features have prior intensity information
     private boolean [] dPriors; //Contains which features have prior dissimiliarty information
 
@@ -127,6 +129,8 @@ public class PiPrefDiv {
     public double[] getLastSimilarityWeights(){return lastSimilarityWeights;}
     public double getLastRadius(){return lastRadius;}
     public double getLastThreshold(){return lastThreshold;}
+    public double getLastRadiusWP(){return lastRadiusWP;}
+    public double getLastThresholdWP(){return lastThresholdWP;}
     public void setOutputScores(PrintStream out){outputScores=true; scoreStream=out;}
     public void setUseStabilitySelection(boolean b){useStabilitySelection = b;}
     public void setParallel(boolean b){parallel = b;}
@@ -316,6 +320,7 @@ public class PiPrefDiv {
         {
             iPriors = new boolean[numGenes];
             dPriors = new boolean[numGenes*(numGenes-1)/2];
+            verbose = false; //TODO
         }
 
         //Generate subsamples of the data
@@ -397,10 +402,10 @@ public class PiPrefDiv {
                 out.println();
                 System.out.println("Printing all scores...");
                 for (int i = 0; i < scoresInt.length; i++) {
-                    System.out.print(initRadii[i] + "\t");
-                    out.print(initRadii[i] + "\t");
+                    System.out.print(initRadii[i % initRadii.length] + "\t");
+                    out.print(initRadii[i % initRadii.length] + "\t");
                     for (int j = 0; j < scoresInt[i].length; j++) {
-                        System.out.print(initThreshold[j] + ": " + scoresInt[i][j] + "\t");
+                        System.out.print(initThreshold[j %initThreshold.length] + ": " + scoresInt[i % initRadii.length][j % initThreshold.length] + "\t");
                         out.print(scoresInt[i][j] + "\t");
                     }
                     System.out.println();
@@ -413,10 +418,10 @@ public class PiPrefDiv {
                 if(outputScores)
                 {
                     for (int i = 0; i < initThreshold.length; i++)
-                        scoreStream.print(initThreshold[i] + "\t");
+                        scoreStream.print(initThreshold[i % initThreshold.length] + "\t");
                     scoreStream.println();
                     for (int i = 0; i < scoresInt.length; i++) {
-                        scoreStream.print(initRadii[i] + "\t");
+                        scoreStream.print(initRadii[i % initThreshold.length] + "\t");
                         for (int j = 0; j < scoresInt[i].length; j++) {
                             scoreStream.print(scoresInt[i][j] + "\t");
                         }
@@ -569,8 +574,10 @@ public class PiPrefDiv {
             bestRadiiNP = initRadii[inds[2]];
             bestThresholdNP = initThreshold[inds[3]];
         }
-        lastRadius = bestRadii;
-        lastThreshold = bestThreshold;
+        lastRadius = bestRadiiNP;
+        lastThreshold = bestThresholdNP;
+        lastRadiusWP = bestRadii;
+        lastThresholdWP = bestThreshold;
         System.out.println("Done");
 
         if(verbose)
