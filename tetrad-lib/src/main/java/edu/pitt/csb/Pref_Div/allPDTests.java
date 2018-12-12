@@ -57,7 +57,7 @@ public class allPDTests {
             //TODO Delete these loops and make this argument acceptable friendly
 
         //TODO Run with random amount of prior when i get back
-        int [] ss = new int[]{200,1000};
+        int [] ss = new int[]{200};
         double [] ap = new double[] {0.1,0.3,0.6};
 
         int [] nr = new int[]{1,5,10};
@@ -66,6 +66,7 @@ public class allPDTests {
                 for (int kkk = 0; kkk < nr.length; kkk++) {
 
 
+                    System.out.println("Sample Size: " + ss[iii] + ", Amount Prior: " + ap[jjj] + ", Number Reliable: " + nr[kkk]);
                     int experiment = 2; //0 -> prior evaluation, 1 -> Accuracy of chosen parameters vs Optimal,
                     //2-> Comparing separate prior parameters vs not, 3-> Comparing different summarization methods for clustered genes
 
@@ -111,11 +112,8 @@ public class allPDTests {
                             out.println("Run\tRadius_Both\tThreshold_Both\tBoth_Feat_Accuracy\tBoth_Pred_Accuracy\tBoth_Clust_Accuracy\tRadius_WP\tRadius_NP\tThreshold_WP\tThreshold_NP\tSeparate_Feat_Accuracy\tSeparate_Pred_Accuracy\tSeparate_Clust_Accuracy");
                         } else if (experiment == 3) {
                             out.print("Run\t");
-                            for (int i = 0; i < types.length; i++) {
-                                for (int j = 0; j < starts.length; j++) {
-                                    out.print(allTypes[j].name() + "_" + types[i] + "\t");
-                                }
-                            }
+                            for(int i = 0; i< allTypes.length;i++)
+                                out.print(allTypes[i] + "\t");
                             out.println();
                         }
 
@@ -227,7 +225,7 @@ public class allPDTests {
                             /***RUN PI PREF DIV***/
                             DataSet toRun = d;
                             DataSet test = d;
-                            if (experiment == 1) {
+                            if (experiment >= 1) {
                                 /***Load Train-test split***/
                                 int trainLength = (int) (d.getNumRows() * 0.9);
                                 int[] trainInds = new int[trainLength];
@@ -240,7 +238,7 @@ public class allPDTests {
 
                             PiPrefDiv p = new PiPrefDiv(toRun, "Target", minTargetParents, numParams);
                             p.setSubsamples(subs);
-                            p.setVerbose();
+                            //p.setVerbose();
                             p.setUseStabilitySelection(stabilitySelection);
                             p.setParallel(false);
                             p.setPartialCorrs(partialCorr);
@@ -288,8 +286,7 @@ public class allPDTests {
                             /***Evaluate Parameter Accuracy, by sweeping over potential parameter choices***/
                             else if (experiment == 1) //Evaluate Parameter accuracy
                             {
-                                System.out.println(toRun);
-                                System.out.println(test);
+
                                 ArrayList<Gene> selected = p.selectGenes(boot, numSamples, priorIntensity, dFile, useCausalGraph);
                                 System.out.println("Selected Genes: " + selected);
                                 System.out.println(g.getAdjacentNodes(g.getNode("Target")));
@@ -404,25 +401,15 @@ public class allPDTests {
                             }
                             /***Evaluate different summarization methods***/
                             else if (experiment == 3) {
+                                ArrayList<Gene> selected = p.selectGenes(boot, numSamples, priorIntensity, dFile, useCausalGraph);
+                                Map<Gene, List<Gene>> lastCluster = p.getLastCluster();
                                 for (int i = 0; i < allTypes.length; i++) {
-                                    p.setClusterType(allTypes[i]);
-                                    ArrayList<Gene> selected = p.selectGenes(boot, numSamples, priorIntensity, dFile, useCausalGraph);
-                                    Map<Gene, List<Gene>> lastCluster = p.getLastCluster();
-                                    DataSet summarized = p.getSummarizedData();
-                                    DataSet summarizedTest = RunPrefDiv.summarizeData(test, selected, lastCluster, allTypes[i]);
-                                    double clustAccuracy = getClusterAccuracy(lastCluster, clusters, numComponents);
-                                    double featAccuracy = -1;
-                                    if (minTargetParents == g.getAdjacentNodes(g.getNode("Target")).size()) {
-                                        //Correct amount of selections so use accuracy
-                                        featAccuracy = getFeatAccuracy(selected, g, "Target", "ACC");
 
-                                    } else {
-                                        //Incorrect amount of selected variables so use F1
-                                        featAccuracy = getFeatAccuracy(selected, g, "Target", "F1");
-                                    }
+                                    DataSet summarized = RunPrefDiv.summarizeData(toRun,selected,lastCluster,allTypes[i]);
+                                    DataSet summarizedTest = RunPrefDiv.summarizeData(test, selected, lastCluster, allTypes[i]);
                                     double predAccuracy = getAccuracy(summarized, summarizedTest, null);
 
-                                    out.print(featAccuracy + "\t" + predAccuracy + "\t" + clustAccuracy + "\t");
+                                    out.print(predAccuracy + "\t");
 
 
                                 }
