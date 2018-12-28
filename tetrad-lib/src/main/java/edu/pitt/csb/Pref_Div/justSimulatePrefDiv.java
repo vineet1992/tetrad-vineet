@@ -35,10 +35,10 @@ public class justSimulatePrefDiv {
     public static Random rand = new Random();
 
     public static void main(String [] args) {
-        int numRuns = 20;
-        int numGenes = 300;
-        int sampleSize = 1000;
-        double amountPrior = 0.6;//percentage of edges to have prior knowledge for
+        int numRuns = 1;
+        int numGenes = 10000;
+        int sampleSize = 200;
+        double amountPrior = 0.3;//percentage of edges to have prior knowledge for
         boolean boot = false; //Should we use bootstrap samples for PiPrefDiv
         boolean loocv = false; //Should we use leave-one-out CV for PiPrefDiv
         int numSamples =  20; //Number of bootstrap/sub-sampled samples to use
@@ -46,13 +46,13 @@ public class justSimulatePrefDiv {
 
 
         int numPriors = 10; //Number of prior knowledge sources
-        int numReliable = 1; //Number of reliable sources
-        int numComponents = 20; //How many components do we have for cluster simulation?
-        int minTargetParents = 10; //How many true parents of the target are there?
+        int numReliable = 5; //Number of reliable sources
+        int numComponents = 500; //How many components do we have for cluster simulation?
+        int minTargetParents = 100; //How many true parents of the target are there?
         boolean noiseRandom = true; //Should the priors have random amounts of reliability?
 
 
-        boolean amountRandom = true; //Should the priors have a random amount of prior knowledge?
+        boolean amountRandom = false; //Should the priors have a random amount of prior knowledge?
         boolean targetContinuous = true; //Is the target variable continuous?
         boolean evenDistribution = true; //Is the distribution of nodes in each cluster even?
         int numCategories = 4; //number of categories for discrete variables
@@ -160,8 +160,11 @@ public class justSimulatePrefDiv {
             int edges = (int)n.sample();
             int nodesPerCluster = numGenes/numComponents;
             int limit = nodesPerCluster*(nodesPerCluster-1)/2;
-            while(edges> limit)
-                edges = (int)n.sample();
+            limit *= numComponents;
+            while(edges> limit) {
+                System.out.println(edges);
+                edges = (int) n.sample();
+            }
             System.out.println(edges);
             p.setValue("numEdges", edges);
             p.setValue("numConnectedComponents", minTargetParents);

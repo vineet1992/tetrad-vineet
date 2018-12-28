@@ -58,17 +58,18 @@ public class allPDTests {
 
         //TODO Run with random amount of prior when i get back
         int [] ss = new int[]{200};
-        double [] ap = new double[] {0.1,0.3,0.6};
-
+        double [] ap = new double[] {0.3,0.6};
         int [] nr = new int[]{1,5,10};
         for(int iii = 0; iii < ss.length;iii++) {
             for (int jjj = 0; jjj < ap.length; jjj++) {
                 for (int kkk = 0; kkk < nr.length; kkk++) {
-
+                    if(jjj==0&&kkk<2)
+                        continue;
 
                     System.out.println("Sample Size: " + ss[iii] + ", Amount Prior: " + ap[jjj] + ", Number Reliable: " + nr[kkk]);
-                    int experiment = 2; //0 -> prior evaluation, 1 -> Accuracy of chosen parameters vs Optimal,
+                    int experiment = 4; //0 -> prior evaluation, 1 -> Accuracy of chosen parameters vs Optimal,
                     //2-> Comparing separate prior parameters vs not, 3-> Comparing different summarization methods for clustered genes
+                    //4 -> Runtime profiling
 
                     sampleSize = ss[iii];
                     amountPrior = ap[jjj];//percentage of edges to have prior knowledge for
@@ -95,6 +96,7 @@ public class allPDTests {
                         } else if (experiment == 3) {
                             start = "Summarization_Comparison_";
                         }
+
                         PrintStream out = new PrintStream("Results/" + start + numGenes + "_" + sampleSize + "_" + numRuns + "_" + numPriors + "_" + amountPrior + "_" + amountRandom + "_" + boot + "_" + loocv + "_" + evenDistribution + "_" + targetContinuous + "_" + useCausalGraph + "_" + numReliable + "_" + numComponents + "_" + minTargetParents + "_" + numParams + "_" + stabilitySelection + ".txt");
 
                         if (experiment == 0) {
@@ -116,6 +118,7 @@ public class allPDTests {
                                 out.print(allTypes[i] + "\t");
                             out.println();
                         }
+
 
 
                         /***Main Loop going through numRuns times***/
@@ -254,6 +257,24 @@ public class allPDTests {
                             }
 
 
+                            if(experiment<0) //Current debugging test
+                            {
+                                p.useSeparateParams();
+                                ArrayList<Gene> selected = p.selectGenes(boot, numSamples, priorIntensity, dFile, useCausalGraph);
+                                Map<Gene, List<Gene>> lastCluster = p.getLastCluster();
+                                PiPrefDiv2 p2 = new PiPrefDiv2(toRun,"Target",minTargetParents,numParams);
+                                p2.setSubsamples(subs);
+                                //p.setVerbose();
+                                p2.setUseStabilitySelection(stabilitySelection);
+                                p2.setParallel(false);
+                                p2.setPartialCorrs(partialCorr);
+                                p2.setPdStability(pdStability);
+                                ArrayList<Gene> selected2 = p2.selectGenes(boot,numSamples,priorIntensity,dFile,useCausalGraph);
+                                Map<Gene,List<Gene>> lastCluster2 = p2.getLastCluster();
+                                System.out.println(selected + "\t" + selected2);
+                                System.out.println(lastCluster + "\t" + lastCluster2);
+
+                            }
                             if (experiment == 0) //Evaluate prior knowledge
                             {
                                 /***LOAD RELIABILITY SCORES***/
@@ -401,6 +422,7 @@ public class allPDTests {
                             }
                             /***Evaluate different summarization methods***/
                             else if (experiment == 3) {
+                                out.print(j + "\t");
                                 ArrayList<Gene> selected = p.selectGenes(boot, numSamples, priorIntensity, dFile, useCausalGraph);
                                 Map<Gene, List<Gene>> lastCluster = p.getLastCluster();
                                 for (int i = 0; i < allTypes.length; i++) {
@@ -604,13 +626,13 @@ public class allPDTests {
             for (int i = 0; i < train.getNumColumns(); i++) {
                 if(train.getVariable(i).getName().equals("Target"))
                     continue;
-                regressors.add(train.getVariable(selected.get(i).symbol));
+                regressors.add(train.getVariable(i));
             }
         }
 
         RegressionResult res = rd.regress(train.getVariable("Target"),regressors);
         //System.out.println(regressors + "," + Arrays.toString(res.getCoef()) + "," + Arrays.toString(res.getRegressorNames()));
-        int [] cols = new int[selected.size()];
+        int [] cols = new int[regressors.size()];
 
         for(int i = 0; i < regressors.size();i++)
         {

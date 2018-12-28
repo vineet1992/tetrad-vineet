@@ -78,6 +78,7 @@ public final class IndTestCorrelationT implements IndependenceTest {
      */
     private DataSet dataSet;
 
+
     private PrintStream pValueLogger;
     private Map<Node, Integer> indexMap;
     private Map<String, Node> nameMap;

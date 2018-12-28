@@ -476,6 +476,9 @@ public class RunPrefDiv {
     {
         if(type==ClusterType.NONE)
         {
+            Gene temp = new Gene(-1);
+            temp.symbol="Target";
+            genes.add(temp);
             return subset(dat,genes);
         }
         else
@@ -487,7 +490,8 @@ public class RunPrefDiv {
             List<Node> nodes = new ArrayList<Node>();
             for(Gene g:clusters.keySet()) {
                 List<Gene> currGenes = clusters.get(g);
-                currGenes.add(g);
+                if(!currGenes.contains(g))
+                    currGenes.add(g);
 
                 DataSet temp = subset(dat,(ArrayList<Gene>)currGenes);
 
@@ -507,7 +511,7 @@ public class RunPrefDiv {
                 td[col] = res;
 
                 col++;
-                String name = g.symbol;
+                String name = "";
                 for(Gene x:currGenes)
                     name+= "," + x.symbol;
                 nodes.add(new ContinuousVariable(name));
@@ -517,7 +521,7 @@ public class RunPrefDiv {
 
             for(int i = 0; i < td.length;i++)
             {
-                td[i][td.length-1] = dat.getDouble(i,dat.getColumn(dat.getVariable("Target")));
+                td[i][td[i].length-1] = dat.getDouble(i,dat.getColumn(dat.getVariable("Target")));
             }
             nodes.add(new ContinuousVariable("Target"));
             DataSet finalData = new BoxDataSet(new DoubleDataBox(td),nodes);
@@ -635,27 +639,24 @@ public class RunPrefDiv {
 
     private static double [] PCA(DataSet temp)
     {
-        RealMatrix realMatrix = MatrixUtils.createRealMatrix(temp.getDoubleData().toArray());
+            RealMatrix realMatrix = MatrixUtils.createRealMatrix(temp.getDoubleData().toArray());
 
-        //create covariance matrix of points, then find eigen vectors
-        //see https://stats.stackexchange.com/questions/2691/making-sense-of-principal-component-analysis-eigenvectors-eigenvalues
+            //create covariance matrix of points, then find eigen vectors
+            //see https://stats.stackexchange.com/questions/2691/making-sense-of-principal-component-analysis-eigenvectors-eigenvalues
 
-        Covariance covariance = new Covariance(realMatrix);
-        RealMatrix covarianceMatrix = covariance.getCovarianceMatrix();
-        EigenDecomposition ed = new EigenDecomposition(covarianceMatrix);
-        double[] weights = ed.getEigenvector(0).toArray();
-        double [] result = new double[temp.getNumRows()];
-        for(int i = 0; i < temp.getNumRows();i++)
-        {
-            double res = 0;
-            for(int j = 0; j < temp.getNumColumns();j++)
-            {
-                res+=weights[j]*temp.getDouble(i,j);
+            Covariance covariance = new Covariance(realMatrix);
+            RealMatrix covarianceMatrix = covariance.getCovarianceMatrix();
+            EigenDecomposition ed = new EigenDecomposition(covarianceMatrix);
+            double[] weights = ed.getEigenvector(0).toArray();
+            double[] result = new double[temp.getNumRows()];
+            for (int i = 0; i < temp.getNumRows(); i++) {
+                double res = 0;
+                for (int j = 0; j < temp.getNumColumns(); j++) {
+                    res += weights[j] * temp.getDouble(i, j);
+                }
+                result[i] = res;
             }
-            result[i] = res;
-        }
-        return result;
-
+            return result;
     }
 
 

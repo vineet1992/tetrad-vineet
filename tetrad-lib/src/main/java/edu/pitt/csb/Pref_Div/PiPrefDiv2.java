@@ -21,11 +21,12 @@ import java.util.concurrent.RecursiveAction;
 
 /**
  * Created by vinee_000 on 10/19/2018.
+ * Automatically uses separate params, and uses memory efficient methodology
+ * Need to parallelize correlation testing and correlation computing
  */
 
-//TODO Rewrite this entire class to work without needing clusts (all computations across radii and thresholds must be done in place,
-    //Without storing values for all radii threshold combinations at once
-public class PiPrefDiv {
+
+public class PiPrefDiv2 {
 
     private DataSet data; //The current expression dataset to be analyzed, assumes that all variables are fair game for Pref-Div except the target
     private String target; //The target variable of interest
@@ -60,15 +61,13 @@ public class PiPrefDiv {
     private RunPrefDiv.ClusterType ctype; //Which clustering method should be used to produce summarized data?
     private boolean pdStability; //Should we run Pref-Div when computing stabilities or just use correlationa with p-value threshold?
     private boolean partialCorrs; //Should we use partial correlations?
-    private boolean usePriors = false; //Should we use prior information for similarity and intensity at the end after choosing parameters?
-    private boolean separateParams; //Should we use separate parameters for with/without prior information
     private double lastRadiusWP; //Last Radius WP selected
     private double lastThresholdWP; //Last Threshold WP selected
     private boolean [] iPriors; //Contains which features have prior intensity information
     private boolean [] dPriors; //Contains which features have prior dissimiliarty information
 
     //Constructor that uses default parameters for both initial parameter ranges
-    public PiPrefDiv(DataSet data, String target,int K)
+    public PiPrefDiv2(DataSet data, String target,int K)
     {
         this.K = K;
         this.data = data;
@@ -80,7 +79,7 @@ public class PiPrefDiv {
 
 
     //Constructor that specifies the same number of parameters for radius and k
-    public PiPrefDiv(DataSet data, String target, int K,int numParams)
+    public PiPrefDiv2(DataSet data, String target, int K,int numParams)
     {
         this.K = K;
         this.numGenes = data.getNumColumns()-1;
@@ -95,7 +94,7 @@ public class PiPrefDiv {
 
 
     //Construct with number of radii and k parameters to test
-    public PiPrefDiv(DataSet data, String target,int K, int numRadii, int numThreshold)
+    public PiPrefDiv2(DataSet data, String target,int K, int numRadii, int numThreshold)
     {
         this.K = K;
         this.data = data;
@@ -109,7 +108,7 @@ public class PiPrefDiv {
 
 
     //Constructor with initial ranges both specified
-    public PiPrefDiv(DataSet data, String target, int K, double [] radii, double [] threshold)
+    public PiPrefDiv2(DataSet data, String target, int K, double [] radii, double [] threshold)
     {
         this.data = data;
         this.numGenes = data.getNumColumns()-1;
@@ -141,8 +140,6 @@ public class PiPrefDiv {
     public DataSet getSummarizedData(){return summarizedData;}
     public void setPdStability(boolean p){pdStability = p;}
     public void setPartialCorrs(boolean pc){partialCorrs = pc;}
-    public void setUsePriors(boolean useP){usePriors = useP;}
-    public void useSeparateParams(){separateParams = true;}
 
 
 
@@ -224,6 +221,7 @@ public class PiPrefDiv {
             t.set(i,0,init[i]);
             t.set(i,1,num[i]);
         }
+        System.out.println(t);
         double[] limits = mgmPriors.getLimit(t);
         double [] realLimits = new double[init.length];
         for(int i = 0; i < init.length;i++)
@@ -276,14 +274,8 @@ public class PiPrefDiv {
 
         //Compute stability of each gene selection and each gene-gene relationship
         System.out.print("Computing stability across radii and threshold values...");
-        int[][][] clusts;
-        if(parallel)
-            clusts = computeStabsParallel();
-        else
-            clusts = computeStabs(); //i -> Radii, j -> TopK, k -> geneID
+        int [] sums = computeSums(); //i -> Radii, j -> TopK, k -> geneID
         System.out.println("Done");
-
-        int [] sums = getFullCounts(clusts);
         System.out.println(Arrays.toString(sums));
 
         System.out.print("Computing intensity weights...");
@@ -309,22 +301,17 @@ public class PiPrefDiv {
     }
 
 
-    //TODO Fix up version where we use separate parameters Complete getScoresSeparate and getMaxScoreSeparate then need to address Pref-Div with Priors
     /***Full procedure to select genes based on prior information Pref-Div
-    //Input: boot (should we do bootstrapping (true) or subsampling (false))
-    //Input: numSamples (number of samples to subsample or bootstrap)
-    //Input: path to theory Intensity File -> iFile (should have a header)
-    //Input: path to theory Dissimilarity File -> dFile (no header or rownames for these files)****/
+     //Input: boot (should we do bootstrapping (true) or subsampling (false))
+     //Input: numSamples (number of samples to subsample or bootstrap)
+     //Input: path to theory Intensity File -> iFile (should have a header)
+     //Input: path to theory Dissimilarity File -> dFile (no header or rownames for these files)****/
     public ArrayList<Gene> selectGenes(boolean boot, int numSamples, String iFile, String [] dFile,boolean useCausalGraph)
     {
 
 
-        if(separateParams)
-        {
             iPriors = new boolean[numGenes];
             dPriors = new boolean[numGenes*(numGenes-1)/2];
-            verbose = false; //TODO
-        }
 
         //Generate subsamples of the data
         System.out.print("Generating subsamples...");
@@ -338,200 +325,21 @@ public class PiPrefDiv {
         System.out.print("Constricting Parameter Range...");
         initRadii = constrictRange(initRadii,data,false);
         initThreshold = constrictRange(initThreshold,data,true);
-        System.out.println("Done");
 
+        System.out.println("Done");
 
         //Compute stability of each gene selection and each gene-gene relationship
         System.out.print("Computing stability across radii and threshold values...");
 
-        //TODO memory footprint for clusts is way too high
-        int[][][] clusts;
-        if(parallel)
-            clusts = computeStabsParallel();
-        else
-            clusts = computeStabs(); //i -> Radii, j -> TopK, k -> geneID        System.out.println("Done");
-
-        int [] sums = getFullCounts(clusts);
-        System.out.println(Arrays.toString(sums));
-
-        System.out.print("Computing intensity weights...");
-        //Compute intensity weights
-        double [] intWeights = getIntensityWeights(sums,iFile);
-        lastIntensityWeights = intWeights;
-        System.out.println("Done");
-        if(verbose)
-        {
-            //TODO get header from iFile to attach source to weights
-            System.out.println("Intensity weights are: " + Arrays.toString(intWeights));
-        }
-
-        //Get Mixture Distributions of predicted dissimilarity and intensity from the prior sources
-
-        System.out.print("Loading genes with weighted intensities...");
-        //Load theory intensity file -> for mean intensity from theory
-        ArrayList<Gene> meanGenes = loadGenes(iFile,intWeights);
-        System.out.println("Done");
-        if(verbose)
-        {
-            System.out.println("All Genes: " + meanGenes);
-        }
-
-        float [] means = convertListToMatrix(meanGenes);
-        System.out.println(Arrays.toString(means));
-
-        System.out.print("Computing scores for each radii, k combination from intensities...");
-        //Compute variance of mixture distribution of prior knowledge sources
-        float [] varIntense = getVarMixture(intWeights, intTao, means,iFile);
-
-        //Get posterior distributions of predicted dissimilarity and intensity from prior sources
-        float[] uPostInt = getMeanPosterior(sums, means, varIntense);
-        float [] varPostInt = getVarPosterior(sums, varIntense);
-
-        System.out.println(Arrays.toString(uPostInt));
-        System.out.println(Arrays.toString(varPostInt));
-        //Compute posterior probabilities and stability of each gene, synthesize these results into a score for each parameter setting
-
-        double[][] scoresInt;
-        if(separateParams)
-            scoresInt = getScoresSeparate(clusts,uPostInt,varPostInt);
-        else
-            scoresInt = getScores(clusts,uPostInt,varPostInt); //i -> radii, j -> topK
-        System.out.println("Done");
-
-        if(verbose)
-        {
-            try {
-                PrintStream out = new PrintStream("intensity_table.txt");
-                for (int i = 0; i < initThreshold.length; i++)
-                    out.print(initThreshold[i] + "\t");
-                out.println();
-                System.out.println("Printing all scores...");
-                for (int i = 0; i < scoresInt.length; i++) {
-                    System.out.print(initRadii[i % initRadii.length] + "\t");
-                    out.print(initRadii[i % initRadii.length] + "\t");
-                    for (int j = 0; j < scoresInt[i].length; j++) {
-                        System.out.print(initThreshold[j %initThreshold.length] + ": " + scoresInt[i % initRadii.length][j % initThreshold.length] + "\t");
-                        out.print(scoresInt[i][j] + "\t");
-                    }
-                    System.out.println();
-                    out.println();
-                }
-                out.flush();
-                out.close();
-
-
-                if(outputScores)
-                {
-                    for (int i = 0; i < initThreshold.length; i++)
-                        scoreStream.print(initThreshold[i % initThreshold.length] + "\t");
-                    scoreStream.println();
-                    for (int i = 0; i < scoresInt.length; i++) {
-                        scoreStream.print(initRadii[i % initThreshold.length] + "\t");
-                        for (int j = 0; j < scoresInt[i].length; j++) {
-                            scoreStream.print(scoresInt[i][j] + "\t");
-                        }
-                        scoreStream.println();
-                    }
-                    scoreStream.flush();
-                }
-            }catch(Exception e)
-            {
-                System.err.println("Couldn't write scores to file");
-            }
-        }
-
-        //Set not needed variables to null to save memory
-        uPostInt = null;
-        varPostInt = null;
-        varIntense = null;
-        intWeights = null;
-        intTao = null;
+        double [][][] scores = computeScores(iFile,dFile); //i -> Radii, j -> TopK, k -> geneID        System.out.println("Done");
 
 
 
-
-        System.out.print("Computing similarity weights...");
-        //Compute similarity weights for each prior knowledge source
-        double [] simWeights = getSimilarityWeights(sums,dFile);
-        lastSimilarityWeights = simWeights;
-        System.out.println("Done");
-        if(verbose)
-        {
-            System.out.println("Similarity weights: " + Arrays.toString(simWeights));
-        }
-
-
-        System.out.print("Computing scores for similarities...");
-        //Load each prior knowledge source, weighted by reliability
-        float [] meanDis = loadTheoryFiles(dFile,simWeights,numGenes);
-
-
-        //Get variance of mixture distribution for each edge
-        float [] varDis = getVarMixture(simWeights,simTao,meanDis,dFile);
-
-
-
-        //Get posterior distributions of predicted dissimilarity and intensity from prior sources
-        float[] uPost = getMeanPosterior(sums,meanDis, varDis);
-        float [] varPost = getVarPosterior(sums, varDis);
-
-        //Compute posterior probabilities and stability of each gene, synthesize these results into a score for each parameter setting
-        double[][] scoresSim;
-        if(separateParams)
-            scoresSim = getScoresSeparate(clusts,uPost,varPost);
-        else
-            scoresSim = getScores(clusts,uPost,varPost); //i -> radii, j -> topK
-        System.out.println("Done");
-
-
-        if(verbose)
-        {
-            try {
-                PrintStream out = new PrintStream("similarity_table.txt");
-                for (int i = 0; i < initThreshold.length; i++)
-                    out.print(initThreshold[i] + "\t");
-                out.println();
-                System.out.println("Printing all scores...");
-                for (int i = 0; i < scoresSim.length; i++) {
-                    System.out.print(initRadii[i] + "\t");
-                    out.print(initRadii[i] + "\t");
-                    for (int j = 0; j < scoresSim[i].length; j++) {
-                        System.out.print(initThreshold[j] + ": " + scoresSim[i][j] + "\t");
-                        out.print(scoresSim[i][j] + "\t");
-                    }
-                    System.out.println();
-                    out.println();
-                }
-
-                    if(outputScores)
-                    {
-                        for (int i = 0; i < initThreshold.length; i++)
-                            scoreStream.print(initThreshold[i] + "\t");
-                        scoreStream.println();
-                        for (int i = 0; i < scoresSim.length; i++) {
-                            scoreStream.print(initRadii[i] + "\t");
-                            for (int j = 0; j < scoresSim[i].length; j++) {
-                                scoreStream.print(scoresSim[i][j] + "\t");
-                            }
-                            scoreStream.println();
-                        }
-                        scoreStream.flush();
-                        scoreStream.close();
-                    }
-                out.flush();
-                out.close();
-            }catch(Exception e)
-            {
-                System.err.println("Couldn't write scores to file");
-            }
-        }
-
-        //TODO How to combine scoresInt with scoresSim to get top parameters??
 
 
         System.out.print("Merging scores to get top parameters...");
         //Find best radii and topK values and then Run Pref-Div with cross-validation to get final Output!!
-        double [][] avgScore = getAvgScore(scoresSim,scoresInt);
+        double [][] avgScore = getAvgScore(scores[1],scores[0]);
 
         if(verbose)
         {
@@ -563,22 +371,14 @@ public class PiPrefDiv {
         }
 
 
-        int[]inds = getMaxScore(avgScore);
-
-        if(separateParams)
-            inds = getMaxScoreSeparate(avgScore);
+        int [] inds = getMaxScoreSeparate(avgScore);
 
 
 
         double bestRadii = initRadii[inds[0]];
         double bestThreshold = initThreshold[inds[1]];
-        double bestRadiiNP = -1;
-        double bestThresholdNP = -1;
-        if(separateParams)
-        {
-            bestRadiiNP = initRadii[inds[2]];
-            bestThresholdNP = initThreshold[inds[3]];
-        }
+        double bestRadiiNP = initRadii[inds[2]];
+        double bestThresholdNP = initThreshold[inds[3]];
         lastRadius = bestRadiiNP;
         lastThreshold = bestThresholdNP;
         lastRadiusWP = bestRadii;
@@ -592,13 +392,7 @@ public class PiPrefDiv {
 
 
 
-        //Set not needed variables to null to save memory
-        simWeights = null;
-        varDis = null;
-        uPost = null;
-        varPost = null;
-        scoresSim = null;
-        scoresInt = null;
+
         avgScore = null;
 
 
@@ -607,24 +401,13 @@ public class PiPrefDiv {
 
 
         ArrayList<Gene> temp = createGenes(data,target);
+        ArrayList<Gene> meanGenes = Functions.computeAllIntensities(temp, 1, data, target, partialCorrs, false, false, 1);
+        float [] meanDis = Functions.computeAllCorrelations(temp, data, partialCorrs, false, false, 1);
 
-        if(!usePriors) {
-            meanGenes = Functions.computeAllIntensities(temp, 1, data, target, partialCorrs, false, false, 1);
-            meanDis = Functions.computeAllCorrelations(temp, data, partialCorrs, false, false, 1);
-        }
         RunPrefDiv rpd;
-        if(separateParams)
-        {
-            rpd = new RunPrefDiv(meanDis,meanGenes,data,target,LOOCV);
-            rpd.setWithPrior(dPriors);
-            rpd.setAllParams(bestRadiiNP,bestRadii,Math.exp(bestThresholdNP),Math.exp(bestThreshold));
-        }
-        else
-        {
-            rpd = new RunPrefDiv(meanDis,meanGenes,data,target,LOOCV);
-            rpd.setPThreshold(Math.exp(bestThreshold));
-            rpd.setRadius(bestRadii);
-        }
+        rpd = new RunPrefDiv(meanDis,meanGenes,data,target,LOOCV);
+        rpd.setWithPrior(dPriors);
+        rpd.setAllParams(bestRadiiNP,bestRadii,Math.exp(bestThresholdNP),Math.exp(bestThreshold));
 
         rpd.setTopK(K);
         rpd.setAccuracy(0);
@@ -679,26 +462,6 @@ public class PiPrefDiv {
             }
         }
         return inds;
-    }
-
-    private int[] getMaxScore(double [][] avg)
-    {
-        int x = 0;
-        int y = 0;
-        double maxScore = -1;
-        for(int i = 0; i < avg.length;i++)
-        {
-            for(int j = 0; j < avg[i].length;j++)
-            {
-                if(avg[i][j]>maxScore)
-                {
-                    x = i;
-                    y = j;
-                    maxScore = avg[i][j];
-                }
-            }
-        }
-        return new int[]{x,y};
     }
 
     private double[][] getAvgScore(double [][] s1, double [][] s2)
@@ -762,29 +525,39 @@ public class PiPrefDiv {
     }
 
 
-
-    private double[][] getScoresSeparate(int [][][] clusts, float [] uPost, float [] varPost)
+    /**
+     *
+     * @param sums, Array of number of times each gene and gene-gene pair appeared
+     * @param uPost, Posterior mean for each gene OR each gene-gene pair appearence
+     * @param varPost, Posterior variance for each gene OR each gene-gene pair appearence
+     * @return Scores for each pair of radii, threshold params. Either for intensity or dissimilarity depending upon input
+     */
+    private double[][] getScoresSeparate(int [] sums, float [] uPost, float [] varPost)
     {
-        int [] sums = getFullCounts(clusts);
+        boolean needCorrs = false;
         double [][] score = new double[numRadii*2][numThreshold*2];
         int offset = 0;
-        if(uPost.length>numGenes)
+        if(uPost.length>numGenes) {
             offset = numGenes;
+            needCorrs = true;
+        }
         for (int i = 0; i < numRadii; i++) {
             for (int j = 0; j < numThreshold; j++) {
+                int [] curr = getCounts(i,j,needCorrs);
+
                 for(int g = 0; g < uPost.length;g++) //Loop through each gene
                 {
-                    double G = getG(clusts[i][j][g+offset]); //Clusts[i][j][g] is number of times gene was selected in the subsamples for this parameter setting
+                    double G = getG(curr[g+offset]); //Clusts[i][j][g] is number of times gene was selected in the subsamples for this parameter setting
                     if (uPost[g] < 0)//No Prior information, contributes only stability to the score
                     {
-                        double theta = getTheta(sums[g+offset],clusts[i][j][g+offset]); //sums is the total number of times this gene was selected across all parameter settings
+                        double theta = getTheta(sums[g+offset],curr[g+offset]); //sums is the total number of times this gene was selected across all parameter settings
                         score[i + numRadii][j + numThreshold] += theta*(1-G);
                     }
                     else
                     {
                         if(varPost[g]<0)
                             System.out.println(g);
-                        double theta = getTheta(uPost[g],varPost[g],clusts[i][j][g+offset]);
+                        double theta = getTheta(uPost[g],varPost[g],curr[g+offset]);
                         score[i][j]+=theta*(1-G);
                     }
                 }
@@ -794,43 +567,57 @@ public class PiPrefDiv {
         normalizeScore(score);
         return score;
     }
-    private double[][] getScores(int [][][] clusts, float [] uPost, float [] varPost)
+
+    /**
+     *
+     * @param i, index of initRadii to use for computations
+     * @param j, index of initThreshold to use for computation
+     * @param needCorrs, Do we need to perform correlation computation?
+     * @return An array of the number of times each gene was selected and each gene-gene pair was clustered
+     *
+     */
+    private int[] getCounts(int i, int j, boolean needCorrs)
     {
-        int [] sums = getFullCounts(clusts);
-        double [][] score = new double[numRadii][numThreshold];
-        int offset = 0;
-        if(uPost.length>numGenes)
-            offset = numGenes;
-        for (int i = 0; i < numRadii; i++) {
-            for (int j = 0; j < numThreshold; j++) {
-                for(int g = 0; g < uPost.length;g++) //Loop through each gene
-                {
-                    double G = getG(clusts[i][j][g+offset]); //Clusts[i][j][g] is number of times gene was selected in the subsamples for this parameter setting
-                    if (uPost[g] < 0)//No Prior information, contributes only stability to the score
-                    {
-                        double theta = getTheta(sums[g+offset],clusts[i][j][g+offset]); //sums is the total number of times this gene was selected across all parameter settings
-                        score[i][j] += theta*(1-G);
-                    }
-                    else
-                    {
-                        if(varPost[g]<0)
-                            System.out.println(g);
-                        double theta = getTheta(uPost[g],varPost[g],clusts[i][j][g+offset]);
-                        score[i][j]+=theta*(1-G);
-                    }
+        int [] curr = new int[numGenes + (numGenes*(numGenes-1))/2];
+        for(int k = 0; k < subsamples.length;k++)
+        {
+            ArrayList<Gene> temp = createGenes(data,target);
+            DataSet currData = data.subsetRows(subsamples[k]);
+
+            long time = System.nanoTime();
+            temp = Functions.computeAllIntensities(temp,1,currData,target,partialCorrs,false,false,Math.exp(initThreshold[j]));
+            time = System.nanoTime()-time;
+            System.out.println("Time for ALL intensities: " + time/Math.pow(10,9));
+            if (needCorrs || pdStability) {
+                time = System.nanoTime();
+                float [] corrs = Functions.computeAllCorrelations(temp,currData,partialCorrs,false,false,Math.exp(initThreshold[j]));
+                time = System.nanoTime()-time;
+                System.out.println("Time for ALL correlations: " + time/Math.pow(10,9));
+                if(pdStability) {
+                    Collections.sort(temp,Gene.IntensityComparator);
+                    PrefDiv pd = new PrefDiv(temp, K, 0, initRadii[i], corrs);
+                    pd.setCluster(clusterByCorrs);
+                    ArrayList<Gene> topGenes = pd.diverset();
+                    addFoundGenes(topGenes, curr);
                 }
+                else
+                {
+                    addFoundGenes(temp,curr);
+                }
+                addGeneConnections(corrs,curr,initRadii[i]);
+            }
+            else
+            {
+                addFoundGenes(temp,curr);
             }
         }
-
-        normalizeScore(score);
-        return score;
+        return curr;
     }
+
 
 
     private void normalizeScore(double [][] score)
     {
-        if(separateParams)
-        {
             double max = 0;
             for (int i = 0; i < score.length/2; i++) {
                 for (int j = 0; j < score[i].length/2; j++) {
@@ -857,24 +644,6 @@ public class PiPrefDiv {
             }
 
 
-
-        }
-        else {
-
-
-            double max = 0;
-            for (int i = 0; i < score.length; i++) {
-                for (int j = 0; j < score[i].length; j++) {
-                    if (score[i][j] > max)
-                        max = score[i][j];
-                }
-            }
-            for (int i = 0; i < score.length; i++) {
-                for (int j = 0; j < score[i].length; j++) {
-                    score[i][j] /= max;
-                }
-            }
-        }
     }
 
     //Get posterior variance based on computed counts and variance, modified to work for both intensity and similarity
@@ -982,21 +751,7 @@ public class PiPrefDiv {
         }
         return vars;
     }
-    private int[] getFullCounts(int [][][]clusts)
-    {
-        int [] res = new int[clusts[0][0].length];
-        for(int i = 0; i < res.length;i++)
-        {
-            for(int j = 0; j < clusts.length;j++)
-            {
-                for(int k = 0; k < clusts[j].length;k++)
-                {
-                    res[i]+=clusts[j][k][i];
-                }
-            }
-        }
-        return res;
-    }
+
 
 
     //This is written as a separate function due to the offset in computing the sums and due to memory requirements preventing loading all sources at once
@@ -1008,8 +763,7 @@ public class PiPrefDiv {
         {
             float [][] temp = new float[1][(numGenes*(numGenes-1)/2)];
             temp[0] = Functions.loadTheoryMatrix(dFile[i],false,numGenes);
-            if(separateParams)
-                whichPriors(temp,dPriors);
+            whichPriors(temp,dPriors);
 
             getPhi(temp[0],subsamples.length);
             tao[i] = getTao(temp,sums)[0];
@@ -1026,8 +780,7 @@ public class PiPrefDiv {
         float [][] sources = Functions.loadIntensityData(iFile,false);
 
         //Identify for which genes we have prior information
-        if(separateParams)
-            whichPriors(sources,iPriors);
+        whichPriors(sources,iPriors);
         //Compute phi matrix for each source (expected number of appearences of each gene)
         for(int i = 0; i< sources.length;i++)
         {
@@ -1096,140 +849,221 @@ public class PiPrefDiv {
     }
 
 
-
-    //TODO creating gene within the stability action class is a waste of memory, can we find a better way to do this?
-    //I'm doing this currently because of synchronization issues when we create genes outside of the method, find a way to make the concurrent modification go away, can't sort at the same time as compute intensities?
-
-
-    private int[][][] computeStabsParallel()
+    /***
+     *
+     * @return int [] consisting of the appearence frequency of each gene and gene-gene pair across all radii,threshold combinations
+     */
+    private int[]computeSums()
     {
-        final int[][][] result = new int[initRadii.length][initThreshold.length][numGenes + (numGenes)*(numGenes-1)/2];
-
-
-        final ForkJoinPool pool = ForkJoinPoolInstance.getInstance().getPool();
-
-        class StabilityAction extends RecursiveAction {
-            private int chunk;
-            private int from;
-            private int to;
-            private int k;
-
-            public StabilityAction(int chunk, int k, int from, int to){
-                this.chunk = chunk;
-                this.from = from;
-                this.to = to;
-                this.k = k;
-            }
-            private synchronized void sort(ArrayList<Gene> temp2)
-            {
-                Collections.sort(temp2,Gene.IntensityComparator);
-            }
-            private synchronized DataSet subset(int [] subs)
-            {
-                return data.subsetRows(subs);
-            }
-
-
-            @Override
-            protected void compute(){
-                if (to - from <= chunk) {
-                    for (int s = from; s < to; s++) {
-                        try {
-                            ArrayList<Gene> temp = createGenes(data,target);
-                            int i = s / initRadii.length;
-                            int j = s % initThreshold.length;
-                            //if (verbose)
-                              //  System.out.println("Computing Edge Probability for run " + s + " out of " + initRadii.length * initThreshold.length + ", Subsample: " + k);
-
-                            DataSet currData = subset(subsamples[k]);
-                            float[] corrs = Functions.computeAllCorrelations(temp, currData, partialCorrs, false, false, initThreshold[j]);
-                            ArrayList<Gene> temp2 = Functions.computeAllIntensities(temp, 1, currData, target, partialCorrs, false, false, initThreshold[j]);
-                            sort(temp2);
-                            if(pdStability) {
-                                PrefDiv pd = new PrefDiv(temp2, K, 0, initRadii[i], corrs);
-                                pd.setCluster(clusterByCorrs);
-                                ArrayList<Gene> topGenes = pd.diverset();
-
-                                addFoundGenes(topGenes, result[j][i]);
-                            }
-                            else
-                            {
-                                addFoundGenes(temp2,result[j][i]);
-                            }
-                            addGeneConnections(corrs, result[j][i], initRadii[i]);
-                        }catch(Exception e)
-                        {
-                            e.printStackTrace();
-                            System.out.println(s/initRadii.length + "," + (s%initThreshold.length) + "," + k);
-                            System.exit(-2);
-                        }
-                    }
-
-                    return;
-                } else {
-                    List<StabilityAction> tasks = new ArrayList<>();
-
-                    final int mid = (to + from) / 2;
-
-                    tasks.add(new StabilityAction(chunk, k,from, mid));
-                    tasks.add(new StabilityAction(chunk, k,mid, to));
-
-                    invokeAll(tasks);
-
-                    return;
-                }
-            }
-        }
-
-        final int chunk = 5;
-
-        for(int k = 0; k < subsamples.length;k++)
-        {
-            StabilityAction sa = new StabilityAction(chunk, k,0, initRadii.length*initThreshold.length);
-            pool.invoke(sa);
-            sa.join();
-        }
-        return result;
-    }
-
-
-    /***Compute the set of pref-div genes and their clusters for each setting of radii, k, and subsample
-    //Output: Array of size radii tested x threshold values tested x (number of genes + (numGenes*(numGenes-1))/2)
-    //For each 1-D array (the last dimension), the first numGenes boxes are how many times gene i showed up in these subsamples
-    //the rest of the boxes denotes how many times genes i and j were in the same cluster***/
-    //TODO Need to parallelize this stability search
-    private int[][][] computeStabs()
-    {
-        int[][][] result = new int[initRadii.length][initThreshold.length][numGenes + (numGenes)*(numGenes-1)/2];
+        int [] sums = new int[numGenes + (numGenes)*(numGenes-1)/2];
         for(int i = 0; i < initRadii.length;i++)
         {
             for(int j = 0; j < initThreshold.length;j++)
             {
-                int [] curr = new int[numGenes+ (numGenes*(numGenes-1)/2)];
-                for(int k = 0; k < subsamples.length;k++)
+                int [] curr = getCounts(i,j,true);
+                for(int k = 0; k < curr.length;k++)
                 {
-                    ArrayList<Gene> temp = createGenes(data,target);
-                    DataSet currData = data.subsetRows(subsamples[k]);
-
-                    float [] corrs = Functions.computeAllCorrelations(temp,currData,partialCorrs,false,false,Math.exp(initThreshold[j]));
-                    temp = Functions.computeAllIntensities(temp,1,currData,target,partialCorrs,false,false,Math.exp(initThreshold[j]));
-                    Collections.sort(temp,Gene.IntensityComparator);
-                    if (pdStability) {
-                        PrefDiv pd = new PrefDiv(temp,K,0,initRadii[i], corrs);
-                        pd.setCluster(clusterByCorrs);
-                        ArrayList<Gene> topGenes = pd.diverset();
-                        addFoundGenes(topGenes,curr);
-                    }
-                    else
-                    {
-                        addFoundGenes(temp,curr);
-                    }
-                    addGeneConnections(corrs,curr,initRadii[i]);
+                    sums[k]+=curr[k];
                 }
-                result[i][j] = curr;
             }
         }
-        return result;
+        return sums;
+    }
+    /***Compute the set of pref-div genes and their clusters for each setting of radii, k, and subsample
+     //Output: Array of size radii tested x threshold values tested x (number of genes + (numGenes*(numGenes-1))/2)
+     //For each 1-D array (the last dimension), the first numGenes boxes are how many times gene i showed up in these subsamples
+     //the rest of the boxes denotes how many times genes i and j were in the same cluster***/
+    private double[][][] computeScores(String iFile, String[] dFile)
+    {
+        //int[][][] result = new int[initRadii.length][initThreshold.length][numGenes + (numGenes)*(numGenes-1)/2];
+        int [] sums = new int[numGenes + (numGenes)*(numGenes-1)/2];
+        for(int i = 0; i < initRadii.length;i++)
+        {
+            for(int j = 0; j < initThreshold.length;j++)
+            {
+                int [] curr = getCounts(i,j,true);
+                for(int k = 0; k < curr.length;k++)
+                {
+                    sums[k]+=curr[k];
+                }
+            }
+        }
+        System.out.println(Arrays.toString(sums));
+
+
+        System.out.print("Computing intensity weights...");
+        //Compute intensity weights
+        double [] intWeights = getIntensityWeights(sums,iFile);
+        lastIntensityWeights = intWeights;
+        System.out.println("Done");
+        if(verbose)
+        {
+            //TODO get header from iFile to attach source to weights
+            System.out.println("Intensity weights are: " + Arrays.toString(intWeights));
+        }
+
+        //Get Mixture Distributions of predicted dissimilarity and intensity from the prior sources
+
+        System.out.print("Loading genes with weighted intensities...");
+        //Load theory intensity file -> for mean intensity from theory
+        ArrayList<Gene> meanGenes = loadGenes(iFile,intWeights);
+        System.out.println("Done");
+        if(verbose)
+        {
+            System.out.println("All Genes: " + meanGenes);
+        }
+
+        float [] means = convertListToMatrix(meanGenes);
+        System.out.println(Arrays.toString(means));
+
+        System.out.print("Computing scores for each radii, k combination from intensities...");
+        //Compute variance of mixture distribution of prior knowledge sources
+        float [] varIntense = getVarMixture(intWeights, intTao, means,iFile);
+
+        //Get posterior distributions of predicted dissimilarity and intensity from prior sources
+        float[] uPostInt = getMeanPosterior(sums, means, varIntense);
+        float [] varPostInt = getVarPosterior(sums, varIntense);
+
+        System.out.println(Arrays.toString(uPostInt));
+        System.out.println(Arrays.toString(varPostInt));
+        //Compute posterior probabilities and stability of each gene, synthesize these results into a score for each parameter setting
+
+        double [][] scoresInt = getScoresSeparate(sums,uPostInt,varPostInt);
+
+        System.out.println("Done");
+
+
+
+        if(verbose)
+        {
+            try {
+                PrintStream out = new PrintStream("intensity_table.txt");
+                for (int i = 0; i < initThreshold.length; i++)
+                    out.print(initThreshold[i] + "\t");
+                out.println();
+                System.out.println("Printing all scores...");
+                for (int i = 0; i < scoresInt.length; i++) {
+                    System.out.print(initRadii[i % initRadii.length] + "\t");
+                    out.print(initRadii[i % initRadii.length] + "\t");
+                    for (int j = 0; j < scoresInt[i].length; j++) {
+                        System.out.print(initThreshold[j %initThreshold.length] + ": " + scoresInt[i % initRadii.length][j % initThreshold.length] + "\t");
+                        out.print(scoresInt[i][j] + "\t");
+                    }
+                    System.out.println();
+                    out.println();
+                }
+                out.flush();
+                out.close();
+
+
+                if(outputScores)
+                {
+                    for (int i = 0; i < initThreshold.length; i++)
+                        scoreStream.print(initThreshold[i % initThreshold.length] + "\t");
+                    scoreStream.println();
+                    for (int i = 0; i < scoresInt.length; i++) {
+                        scoreStream.print(initRadii[i % initThreshold.length] + "\t");
+                        for (int j = 0; j < scoresInt[i].length; j++) {
+                            scoreStream.print(scoresInt[i][j] + "\t");
+                        }
+                        scoreStream.println();
+                    }
+                    scoreStream.flush();
+                }
+            }catch(Exception e)
+            {
+                System.err.println("Couldn't write scores to file");
+            }
+        }
+
+        //Set not needed variables to null to save memory
+        uPostInt = null;
+        varPostInt = null;
+        varIntense = null;
+        intWeights = null;
+        intTao = null;
+
+
+
+
+        System.out.print("Computing similarity weights...");
+        //Compute similarity weights for each prior knowledge source
+        double [] simWeights = getSimilarityWeights(sums,dFile);
+        lastSimilarityWeights = simWeights;
+        System.out.println("Done");
+        if(verbose)
+        {
+            System.out.println("Similarity weights: " + Arrays.toString(simWeights));
+        }
+
+
+        System.out.print("Computing scores for similarities...");
+        //Load each prior knowledge source, weighted by reliability
+        float [] meanDis = loadTheoryFiles(dFile,simWeights,numGenes);
+
+
+        //Get variance of mixture distribution for each edge
+        float [] varDis = getVarMixture(simWeights,simTao,meanDis,dFile);
+
+
+
+        //Get posterior distributions of predicted dissimilarity and intensity from prior sources
+        float[] uPost = getMeanPosterior(sums,meanDis, varDis);
+        float [] varPost = getVarPosterior(sums, varDis);
+
+        //Compute posterior probabilities and stability of each gene, synthesize these results into a score for each parameter setting
+        double[][] scoresSim;
+        scoresSim = getScoresSeparate(sums,uPost,varPost);
+        System.out.println("Done");
+
+
+        if(verbose)
+        {
+            try {
+                PrintStream out = new PrintStream("similarity_table.txt");
+                for (int i = 0; i < initThreshold.length; i++)
+                    out.print(initThreshold[i] + "\t");
+                out.println();
+                System.out.println("Printing all scores...");
+                for (int i = 0; i < scoresSim.length; i++) {
+                    System.out.print(initRadii[i] + "\t");
+                    out.print(initRadii[i] + "\t");
+                    for (int j = 0; j < scoresSim[i].length; j++) {
+                        System.out.print(initThreshold[j] + ": " + scoresSim[i][j] + "\t");
+                        out.print(scoresSim[i][j] + "\t");
+                    }
+                    System.out.println();
+                    out.println();
+                }
+
+                if(outputScores)
+                {
+                    for (int i = 0; i < initThreshold.length; i++)
+                        scoreStream.print(initThreshold[i] + "\t");
+                    scoreStream.println();
+                    for (int i = 0; i < scoresSim.length; i++) {
+                        scoreStream.print(initRadii[i] + "\t");
+                        for (int j = 0; j < scoresSim[i].length; j++) {
+                            scoreStream.print(scoresSim[i][j] + "\t");
+                        }
+                        scoreStream.println();
+                    }
+                    scoreStream.flush();
+                    scoreStream.close();
+                }
+                out.flush();
+                out.close();
+            }catch(Exception e)
+            {
+                System.err.println("Couldn't write scores to file");
+            }
+        }
+
+        double[][][]scores = new double[2][scoresInt.length][scoresInt[0].length];
+        scores[0] = scoresInt;
+        scores[1] = scoresSim;
+
+        return scores;
     }
 
     private synchronized void addFoundGenes(ArrayList<Gene> top, int [] curr) {
@@ -1247,8 +1081,8 @@ public class PiPrefDiv {
         {
             for (int j = i+1; j < numGenes; j++) {
                 int temp = Functions.getIndex(i,j,numGenes);
-                    if(1-corrs[temp]<radii) //TODO Is this correct?
-                        curr[temp + numGenes]++;
+                if(1-corrs[temp]<radii) //TODO Is this correct?
+                    curr[temp + numGenes]++;
 
             }
         }

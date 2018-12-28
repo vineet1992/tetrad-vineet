@@ -774,7 +774,7 @@ public class mgmPriors {
             TetradMatrix currTheta = new TetradMatrix(data.getNumColumns(), data.getNumColumns());
             for (int ii = 0; ii < data.getNumColumns(); ii++) {
                 for (int jj = ii + 1; jj < data.getNumColumns(); jj++) {
-                    if (havePriors[ii][jj]) //TODO finish computing the probabilities for each edge, check which sources have prior information?
+                    if (havePriors[ii][jj])
                     {
                         NormalDistribution b;
                         try {
