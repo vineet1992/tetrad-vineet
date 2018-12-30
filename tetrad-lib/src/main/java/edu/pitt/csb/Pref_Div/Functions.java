@@ -70,12 +70,8 @@ public class Functions
     //Input: threshold, shrink all correlations with significance > threshold to 0
     //Input: normalize, should we do NPN normalization?
     //Output: A float [] with all of the gene-gene correlations
-    public static float [] computeAllCorrelations(ArrayList<Gene> items, DataSet d,boolean partialCorr,boolean normalize, boolean pvals,double threshold)
+    public static float [][] computeAllCorrelationsWithP(ArrayList<Gene> items, DataSet d,boolean partialCorr,boolean normalize, boolean pvals,double threshold)
     {
-        double timeForIndTest = 0;
-        double timeForCorr = 0;
-        double constructor = 0;
-        double mappings = 0;
         TetradMatrix c = null;
         if(partialCorr)
         {
@@ -91,60 +87,39 @@ public class Functions
             mapping.put(i,d.getColumn(temp));
             nodes[i] = temp;
         }
-        double [][]temp = d.getDoubleData().transpose().toArray();
         int total = (items.size()*(items.size()-1))/2;
-        float [] corrs = new float[total];
+        float [][] corrs = new float[total][2];
 
-
-        long time = System.nanoTime();
         IndTestCorrelationT ind = new IndTestCorrelationT(d,0.05);
-        time = System.nanoTime()-time;
-        constructor += (time/Math.pow(10,9));
+
 
 
         for(int i = 0; i < items.size();i++)
         {
-            time = System.nanoTime();
             Node one = nodes[i];
-            double [] curr = temp[mapping.get(i)];
             int index = Functions.getIndex(i,i+1,items.size());
-            time = System.nanoTime()-time;
-            mappings+= (time/Math.pow(10,9));
+
             for(int j = i+1;j < items.size();j++)
             {
-                time = System.nanoTime();
                 Node two = nodes[j];
-                time = System.nanoTime()-time;
-                mappings+=(time/Math.pow(10,9));
+
                 if(partialCorr)
                 {
                     int x = mapping.get(i);
                     int y = mapping.get(j);
-                    corrs[index] = (float)(-1*c.get(x,y)/(c.get(x,x)*c.get(y,y)));
+                    corrs[index][0] = (float)(-1*c.get(x,y)/(c.get(x,x)*c.get(y,y)));
                 }
                 else if(pvals)
                 {
-                    //ind.isIndependent(one,two);
-                    //corrs[index] = (float) ind.getPValue();
+                    ind.isIndependent(one,two);
+                    corrs[index][0] = (float) ind.getPValue();
                 }
                 else {
 
 
-
-                    time = System.nanoTime();
-
                     ind.isIndependent(one,two);
-                    time = System.nanoTime()-time;
-
-                    timeForIndTest+=(time/Math.pow(10,9));
-
-                    time = System.nanoTime();
-                    if(ind.getPValue()>threshold)
-                        corrs[index] = 0;
-                    else
-                        corrs[index] = (float) Math.abs(StatUtils.correlation(curr, temp[mapping.get(j)]));
-                    time = System.nanoTime()-time;
-                    timeForCorr+=(time/Math.pow(10,9));
+                    corrs[index][0] = (float) Math.abs(ind.getCorrelation());
+                    corrs[index][1]  = (float)ind.getPValue();
 
                 }
                 index++;
@@ -152,16 +127,10 @@ public class Functions
 
 
         }
-
-        System.out.println("Constructor: " + constructor);
-        System.out.println("Independence Tests: " + timeForIndTest);
-        System.out.println("Correlations: " + timeForCorr);
-        System.out.println("Mappings: " + mappings);
-
         // System.out.print("Non paranormal Normalization...");
         //time = System.nanoTime();
         if(normalize)
-            corrs = NPN(corrs,true);
+            corrs[0] = NPN(corrs[0],true);
 
 
 
@@ -183,12 +152,8 @@ public class Functions
     //Input: threshold, shrink all correlations with significance > threshold to 0
     //Input: normalize, should we do NPN normalization?
     //Output: A float [] with all of the gene-gene correlations
-    public static float [] computeAllCorrelationsTest(ArrayList<Gene> items, DataSet d,boolean partialCorr,boolean normalize, boolean pvals,double threshold)
+    public static float [] computeAllCorrelations(ArrayList<Gene> items, DataSet d,boolean partialCorr,boolean normalize, boolean pvals,double threshold)
     {
-        double timeForIndTest = 0;
-        double timeForCorr = 0;
-        double constructor = 0;
-        double mappings = 0;
         TetradMatrix c = null;
         if(partialCorr)
         {
@@ -204,31 +169,23 @@ public class Functions
             mapping.put(i,d.getColumn(temp));
             nodes[i] = temp;
         }
-        double [][]temp = d.getDoubleData().transpose().toArray();
         int total = (items.size()*(items.size()-1))/2;
         float [] corrs = new float[total];
 
 
-        long time = System.nanoTime();
         IndTestCorrelationT ind = new IndTestCorrelationT(d,0.05);
-        time = System.nanoTime()-time;
-        constructor += (time/Math.pow(10,9));
+
 
 
         for(int i = 0; i < items.size();i++)
         {
-            time = System.nanoTime();
             Node one = nodes[i];
-            double [] curr = temp[mapping.get(i)];
             int index = Functions.getIndex(i,i+1,items.size());
-            time = System.nanoTime()-time;
-            mappings+= (time/Math.pow(10,9));
+
             for(int j = i+1;j < items.size();j++)
             {
-                time = System.nanoTime();
                 Node two = nodes[j];
-                time = System.nanoTime()-time;
-                mappings+=(time/Math.pow(10,9));
+
                 if(partialCorr)
                 {
                     int x = mapping.get(i);
@@ -237,39 +194,27 @@ public class Functions
                 }
                 else if(pvals)
                 {
-                    //ind.isIndependent(one,two);
-                    //corrs[index] = (float) ind.getPValue();
+                    ind.isIndependent(one,two);
+                    corrs[index] = (float) ind.getPValue();
                 }
                 else {
 
 
 
-                    time = System.nanoTime();
 
                     ind.isIndependent(one,two);
-                    time = System.nanoTime()-time;
 
-                    timeForIndTest+=(time/Math.pow(10,9));
 
-                    time = System.nanoTime();
                     if(ind.getPValue()>threshold)
                         corrs[index] = 0;
                     else
-                        corrs[index] = (float) Math.abs(StatUtils.correlation(curr, temp[mapping.get(j)]));
-                    time = System.nanoTime()-time;
-                    timeForCorr+=(time/Math.pow(10,9));
-
+                        corrs[index] = (float) Math.abs(ind.getCorrelation());
                 }
                 index++;
             }
 
 
         }
-
-        System.out.println("Constructor: " + constructor);
-        System.out.println("Independence Tests: " + timeForIndTest);
-        System.out.println("Correlations: " + timeForCorr);
-        System.out.println("Mappings: " + mappings);
 
         // System.out.print("Non paranormal Normalization...");
         //time = System.nanoTime();
@@ -453,6 +398,59 @@ public class Functions
                 }
             }
             return g1;
+
+    }
+
+
+
+    //Compute intensities for all genes according to the appropriate method depending upon mixed or cont-cont interaction types
+    //Requires that theory intensity is specified a priori for each gene object in g1
+    public static ArrayList<Gene> computeAllIntensitiesWithP(ArrayList<Gene> g1, double a, DataSet data, String target,boolean usePc)
+    {
+        if(target==null || target.equals(""))
+        {
+            return computeIntensitiesUnsupervised(g1,a,data);
+        }
+        boolean cont = data.getVariable(target) instanceof ContinuousVariable;
+        int numCats = -1;
+        if(!cont) {
+            DataSet temp2 = MixedUtils.getDiscreteData(data);
+            numCats = MixedUtils.getDiscLevels(temp2)[temp2.getColumn(temp2.getVariable(target))];
+        }
+
+        int y = data.getColumn(data.getVariable(target));
+        Node one = data.getVariable(target);
+        double[][] temp = data.getDoubleData().transpose().toArray();
+        TetradMatrix c = null;
+        if(usePc && cont) {
+            c = new CovarianceMatrix(data).getMatrix();
+            c = c.ginverse();
+        }
+        IndTestCorrelationT ind = new IndTestCorrelationT(data,0.05);
+        for(int i = 0; i < g1.size();i++) {
+            Node two = data.getVariable(g1.get(i).symbol);
+            if(usePc && cont)//Use Partial Correlation
+            {
+                int x = data.getColumn(data.getVariable(g1.get(i).symbol));
+                g1.get(i).foldChange  = (float)(-1*c.get(x,y)/Math.sqrt(c.get(x,x)*c.get(y,y)));
+            }
+            else if(cont) //Use Correlation
+            {
+                ind.isIndependent(one,two);
+                g1.get(i).foldChange  = (float) Math.abs(StatUtils.correlation(temp[y], temp[data.getColumn(data.getVariable(g1.get(i).symbol))]));
+                g1.get(i).intensityP = ind.getPValue();
+            }
+            else //Use Mutual Information
+                g1.get(i).foldChange  = (float) mixedMI(temp[data.getColumn(data.getVariable(i))],temp[y],numCats);
+
+
+            if (g1.get(i).theoryIntensity == -1)
+                g1.get(i).intensityValue = g1.get(i).foldChange;
+            else
+                g1.get(i).intensityValue = g1.get(i).theoryIntensity * (1 - a) + a * g1.get(i).foldChange;
+        }
+
+        return g1;
 
     }
 

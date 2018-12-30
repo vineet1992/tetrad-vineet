@@ -32,7 +32,7 @@ public class Gene
     long chromosomeStop; //denotes the stopping base pair for this gene
     HashMap<Integer,Double> diseaseScores; //Denotes all
     double intensityValue;
-    double dataIntensity;
+    double intensityP;
     double theoryIntensity;
     boolean hasPrior;
 

@@ -17,7 +17,7 @@ public class PPD_Runtime {
 
 
         static int numRuns = 1;
-        static int numGenes = 10000;
+        static int numGenes = 1000;
 
         static boolean boot = false; //Should we use bootstrap samples for PiPrefDiv
         static boolean loocv = false; //Should we use leave-one-out CV for PiPrefDiv
@@ -30,8 +30,8 @@ public class PPD_Runtime {
 
         static int numPriors = 10; //Number of prior knowledge sources
         static int numReliable = 5; //Number of reliable sources
-        static int numComponents = 500; //How many components do we have for cluster simulation?
-        static int minTargetParents = 100; //How many true parents of the target are there?
+        static int numComponents = 20; //How many components do we have for cluster simulation?
+        static int minTargetParents = 10; //How many true parents of the target are there?
         static boolean amountRandom = false; //Should the priors have a random amount of prior knowledge?
         static boolean targetContinuous = true; //Is the target variable continuous?
         static boolean evenDistribution = true; //Is the distribution of nodes in each cluster even?
@@ -62,27 +62,20 @@ public class PPD_Runtime {
             }
             System.out.println("Done");
 
-            ArrayList<Gene> temp = PiPrefDiv2.createGenes(d,"Target");
-
+            ArrayList<Gene> genes = PiPrefDiv2.createGenes(d,"Target");
             long time = System.nanoTime();
-            float [] one = Functions.computeAllCorrelations(temp,d,false,false,false,0.05);
-            double result = (System.nanoTime()-time)/Math.pow(10,9);
+            Functions.computeAllCorrelations(genes,d,false,false,false,1);
+            time = System.nanoTime()-time;
+
+            System.out.println("Time for Correlations: " + (time/Math.pow(10,9)));
 
             time = System.nanoTime();
-            float [] two = Functions.computeAllCorrelationsTest(temp,d,false,false,false,0.05);
-            double result2 = (System.nanoTime()-time)/Math.pow(10,9);
+            Functions.computeAllCorrelationsWithP(genes,d,false,false,false,1);
+            time = System.nanoTime()-time;
 
-            System.out.println("Time OG: " + result + ", Time New: " + result2);
+            System.out.println("Time for correlations with P: " + (time/Math.pow(10,9)));
 
-            int diffs = 0;
-            for(int i = 0; i < one.length;i++)
-            {
-                if(Math.abs(one[i]-two[i])>0.0001)
-                    diffs++;
-            }
-            System.out.println("Differences: " + diffs);
-            System.exit(-1);
-
+           // System.exit(-1);
 
 
             /***LOAD PRIOR KNOWLEDGE FILES***/
@@ -99,8 +92,9 @@ public class PPD_Runtime {
             p.setParallel(false);
             p.setPartialCorrs(partialCorr);
             p.setPdStability(pdStability);
+            time = System.nanoTime();
             ArrayList<Gene> selected = p.selectGenes(boot, numSamples, priorIntensity, dFile, useCausalGraph);
-
+            System.out.println((System.nanoTime()-time)/Math.pow(10,9));
 
 
 

@@ -78,6 +78,7 @@ public final class IndTestCorrelationT implements IndependenceTest {
      */
     private DataSet dataSet;
 
+    private double lastCorr;
 
     private PrintStream pValueLogger;
     private Map<Node, Integer> indexMap;
@@ -188,6 +189,7 @@ public final class IndTestCorrelationT implements IndependenceTest {
 
         TetradMatrix submatrix = DataUtils.subMatrix(_covMatrix, indexMap, x, y, z);
         r = StatUtils.partialCorrelation(submatrix);
+        lastCorr = r;
 
         double t = Math.sqrt(n - 2) * (r / Math.sqrt(1. - r * r));
         pValue = 2.0 * (1.0 - gettDistribution().cumulativeProbability(abs(t)));
@@ -224,6 +226,7 @@ public final class IndTestCorrelationT implements IndependenceTest {
         return isDependent(x, y, zList);
     }
 
+    public double getCorrelation(){return lastCorr;}
     /**
      * @return the probability associated with the most recently computed independence test.
      */

@@ -13,8 +13,10 @@ import edu.pitt.csb.stability.StabilityUtils;
 import org.apache.commons.math3.distribution.BinomialDistribution;
 import org.apache.commons.math3.distribution.NormalDistribution;
 
-import java.io.File;
-import java.io.PrintStream;
+import java.io.*;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.IntBuffer;
 import java.util.*;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
@@ -65,6 +67,9 @@ public class PiPrefDiv2 {
     private double lastThresholdWP; //Last Threshold WP selected
     private boolean [] iPriors; //Contains which features have prior intensity information
     private boolean [] dPriors; //Contains which features have prior dissimiliarty information
+    private double writeTime = 0; //TODO TEMP DELETE THIS
+    private boolean saveMemory = false; //Should we conserve disc space and use the slower version of PiPrefDiv
+
 
     //Constructor that uses default parameters for both initial parameter ranges
     public PiPrefDiv2(DataSet data, String target,int K)
@@ -140,6 +145,7 @@ public class PiPrefDiv2 {
     public DataSet getSummarizedData(){return summarizedData;}
     public void setPdStability(boolean p){pdStability = p;}
     public void setPartialCorrs(boolean pc){partialCorrs = pc;}
+    public void saveMemory(){saveMemory = true;}
 
 
 
@@ -276,7 +282,6 @@ public class PiPrefDiv2 {
         System.out.print("Computing stability across radii and threshold values...");
         int [] sums = computeSums(); //i -> Radii, j -> TopK, k -> geneID
         System.out.println("Done");
-        System.out.println(Arrays.toString(sums));
 
         System.out.print("Computing intensity weights...");
         //Compute intensity weights
@@ -309,9 +314,8 @@ public class PiPrefDiv2 {
     public ArrayList<Gene> selectGenes(boolean boot, int numSamples, String iFile, String [] dFile,boolean useCausalGraph)
     {
 
-
             iPriors = new boolean[numGenes];
-            dPriors = new boolean[numGenes*(numGenes-1)/2];
+            dPriors = new boolean[numGenes * (numGenes - 1) / 2];
 
         //Generate subsamples of the data
         System.out.print("Generating subsamples...");
@@ -331,11 +335,10 @@ public class PiPrefDiv2 {
         //Compute stability of each gene selection and each gene-gene relationship
         System.out.print("Computing stability across radii and threshold values...");
 
-        double [][][] scores = computeScores(iFile,dFile); //i -> Radii, j -> TopK, k -> geneID        System.out.println("Done");
 
+        double[][][] scores = computeScores(iFile,dFile);
 
-
-
+        System.out.println("Writing time: " + writeTime);
 
         System.out.print("Merging scores to get top parameters...");
         //Find best radii and topK values and then Run Pref-Div with cross-validation to get final Output!!
@@ -432,6 +435,8 @@ public class PiPrefDiv2 {
             System.out.println("Selected top K features\n" + top);
             System.out.println("All clusters\n" + map);
         }
+
+
         return top;
     }
 
@@ -526,7 +531,6 @@ public class PiPrefDiv2 {
 
 
     /**
-     *
      * @param sums, Array of number of times each gene and gene-gene pair appeared
      * @param uPost, Posterior mean for each gene OR each gene-gene pair appearence
      * @param varPost, Posterior variance for each gene OR each gene-gene pair appearence
@@ -541,9 +545,28 @@ public class PiPrefDiv2 {
             offset = numGenes;
             needCorrs = true;
         }
+        double ogTime = 0;
+        double newTime = 0;
+        int diffs = 0;
         for (int i = 0; i < numRadii; i++) {
             for (int j = 0; j < numThreshold; j++) {
-                int [] curr = getCounts(i,j,needCorrs);
+
+                int [] curr = null;
+                if(saveMemory) {
+
+                    curr = getCounts(i, j, needCorrs);
+
+                }
+                else {
+                    curr = getCountsFromFile(i, j, needCorrs);
+
+                }
+                /*for(int x = 0; x < curr.length;x++)
+                {
+                    if(curr[x]!=curr2[x])
+                        diffs++;
+                }*/
+
 
                 for(int g = 0; g < uPost.length;g++) //Loop through each gene
                 {
@@ -584,31 +607,177 @@ public class PiPrefDiv2 {
             ArrayList<Gene> temp = createGenes(data,target);
             DataSet currData = data.subsetRows(subsamples[k]);
 
-            long time = System.nanoTime();
             temp = Functions.computeAllIntensities(temp,1,currData,target,partialCorrs,false,false,Math.exp(initThreshold[j]));
-            time = System.nanoTime()-time;
-            System.out.println("Time for ALL intensities: " + time/Math.pow(10,9));
+
             if (needCorrs || pdStability) {
-                time = System.nanoTime();
                 float [] corrs = Functions.computeAllCorrelations(temp,currData,partialCorrs,false,false,Math.exp(initThreshold[j]));
-                time = System.nanoTime()-time;
-                System.out.println("Time for ALL correlations: " + time/Math.pow(10,9));
+
+
                 if(pdStability) {
                     Collections.sort(temp,Gene.IntensityComparator);
                     PrefDiv pd = new PrefDiv(temp, K, 0, initRadii[i], corrs);
                     pd.setCluster(clusterByCorrs);
                     ArrayList<Gene> topGenes = pd.diverset();
-                    addFoundGenes(topGenes, curr);
+                    addFoundGenes(topGenes, curr,initRadii[i]);
                 }
                 else
                 {
-                    addFoundGenes(temp,curr);
+                    addFoundGenes(temp,curr,initRadii[i]);
                 }
                 addGeneConnections(corrs,curr,initRadii[i]);
             }
             else
             {
-                addFoundGenes(temp,curr);
+                addFoundGenes(temp,curr,initRadii[i]);
+            }
+        }
+        return curr;
+    }
+
+
+    /**
+     *
+     * @param i, index of initRadii to use for computations
+     * @param j, index of initThreshold to use for computation
+     * @param needCorrs, Do we need to perform correlation computation?
+     * @return An array of the number of times each gene was selected and each gene-gene pair was clustered
+     * When needCorrs is true the array has both number of times each gene was selected and each gene-gene pair
+     *
+     */
+    private int[] getCountsFromFile(int i, int j, boolean needCorrs)
+    {
+        int fullSize = numGenes + (numGenes*(numGenes-1)/2);
+        int [] curr = new int[fullSize];
+
+        int limit = fullSize;
+        if(!needCorrs)
+            limit = numGenes;
+
+
+        try{
+                File iFile =new File("Correlations_" + i + "_" + j + ".txt");
+                BufferedInputStream corrReader = new BufferedInputStream(new FileInputStream(iFile));
+                    byte [] toRead = new byte[4*fullSize];
+                    corrReader.read(toRead,0,4*limit);
+                    IntBuffer intBuf =
+                            ByteBuffer.wrap(toRead)
+                                    .order(ByteOrder.BIG_ENDIAN)
+                                    .asIntBuffer();
+                    int[] array = new int[intBuf.remaining()];
+                    intBuf.get(array);
+                    toRead = null;
+
+                    curr = array;
+                    array = null;
+                    corrReader.close();
+                    if(needCorrs)
+                        iFile.deleteOnExit();
+
+
+                /***File iFile = new File("Correlation_" + i + "_" + j + ".txt");
+                BufferedReader b = new BufferedReader(new FileReader(iFile));
+
+                while (b.ready()) {
+                    String[] line = b.readLine().split("\t");
+                    for (int x = 0; x < limit; x++) {
+                        curr[x] += Integer.parseInt(line[x]);
+                    }
+                }
+                b.close();
+                if (needCorrs)
+                   iFile.deleteOnExit();***/
+
+        }
+        catch(Exception e)
+        {
+            e.printStackTrace();
+            System.err.println("Unable to load correlation values from file");
+        }
+
+        return curr;
+    }
+
+
+    /**
+     *
+     * @param i, index of initRadii to use for computations
+     * @param j, index of initThreshold to use for computation
+     * @param temp, List of genes for computation
+     * @param corrs, correlation matrix between genes
+     * @return An array of the number of times each gene was selected and each gene-gene pair was clustered
+     *
+     */
+    private int[] getCounts(int i, int j,ArrayList<Gene> temp, float [][] corrs)
+    {
+
+        int[] curr;
+
+        if(corrs==null)
+            curr = new int[numGenes];
+        else
+            curr = new int[numGenes + (numGenes*(numGenes-1))/2];
+
+
+        for(int x = 0; x < temp.size();x++)
+        {
+            if(1-temp.get(x).intensityValue < initRadii[i] && temp.get(x).intensityP < Math.exp(initThreshold[j]))
+                curr[x]++;
+        }
+
+
+        if(corrs!=null) {
+            for (int x = 0; x < corrs.length; x++) {
+                if (1 - corrs[x][0] < initRadii[i] && corrs[x][1] < Math.exp(initThreshold[j]))
+                    curr[x + temp.size()]++;
+            }
+        }
+
+        /***EXPERIMENTAL***/
+        if(!saveMemory) {
+            try {
+                long time = System.nanoTime();
+               /* //Version with one file per i j combination SLOWWW
+                PrintStream out = new PrintStream(new FileOutputStream("Correlation_" + i + "_" + j + ".txt",true));
+                for(int x = 0; x < curr.length;x++)
+                {
+                    out.print(curr[x] + "\t");
+                }
+                out.println();
+
+
+                out.flush();
+                out.close();*/
+
+                File f = new File("Correlations_" + i + "_" + j + ".txt");
+                int[] array = new int[curr.length];
+                if (f.exists()) {
+                    BufferedInputStream corrReader = new BufferedInputStream(new FileInputStream("Correlations_" + i + "_" + j + ".txt"));
+                    byte[] toRead = new byte[4 * curr.length];
+                    corrReader.read(toRead, 0, 4 * curr.length);
+                    IntBuffer intBuf =
+                            ByteBuffer.wrap(toRead)
+                                    .order(ByteOrder.BIG_ENDIAN)
+                                    .asIntBuffer();
+                    array = new int[intBuf.remaining()];
+                    intBuf.get(array);
+                }
+                for (int k = 0; k < array.length; k++)
+                    array[k] += curr[k];
+
+                BufferedOutputStream b = new BufferedOutputStream(new FileOutputStream(f, false));
+                ByteBuffer byteBuffer = ByteBuffer.allocate(array.length * 4);
+                IntBuffer intBuffer = byteBuffer.asIntBuffer();
+                intBuffer.put(array);
+                array = null;
+                byte[] arr = byteBuffer.array();
+                b.write(arr);
+                b.flush();
+
+                writeTime += (System.nanoTime() - time) / Math.pow(10, 9);
+            } catch (Exception e) {
+                e.printStackTrace();
+                System.err.println("Unable to print correlation/intensity to file");
+                System.exit(-1);
             }
         }
         return curr;
@@ -651,6 +820,7 @@ public class PiPrefDiv2 {
     {
         float [] varPost = new float[var.length];
         int offset = 0;
+        double denom = (double)(numRadii*numThreshold*subsamples.length);
         if(var.length>numGenes)
             offset = numGenes;
         for(int i = 0; i < var.length;i++)
@@ -659,7 +829,7 @@ public class PiPrefDiv2 {
                 varPost[i] = -1;
             else
             {
-                double p = sums[i + offset] / (double) (numRadii * numThreshold * subsamples.length);
+                double p = sums[i + offset] / denom;
                 double currVar = p * (1 - p) * subsamples.length;
                 varPost[i] =(float)( currVar * var[i]/(currVar+var[i]));
             }
@@ -869,26 +1039,34 @@ public class PiPrefDiv2 {
         }
         return sums;
     }
-    /***Compute the set of pref-div genes and their clusters for each setting of radii, k, and subsample
-     //Output: Array of size radii tested x threshold values tested x (number of genes + (numGenes*(numGenes-1))/2)
-     //For each 1-D array (the last dimension), the first numGenes boxes are how many times gene i showed up in these subsamples
-     //the rest of the boxes denotes how many times genes i and j were in the same cluster***/
+
+
+
     private double[][][] computeScores(String iFile, String[] dFile)
     {
-        //int[][][] result = new int[initRadii.length][initThreshold.length][numGenes + (numGenes)*(numGenes-1)/2];
         int [] sums = new int[numGenes + (numGenes)*(numGenes-1)/2];
-        for(int i = 0; i < initRadii.length;i++)
+        for(int k = 0; k < subsamples.length;k++)
         {
-            for(int j = 0; j < initThreshold.length;j++)
+            ArrayList<Gene> temp = createGenes(data,target);
+            DataSet currData = data.subsetRows(subsamples[k]);
+            temp = Functions.computeAllIntensitiesWithP(temp,1,currData,target,partialCorrs);
+            //Threshold intensities and correlations after the fact
+            float [][] corrs = Functions.computeAllCorrelationsWithP(temp,currData,partialCorrs,false,false,1);
+
+            for(int i = 0; i < initRadii.length;i++)
             {
-                int [] curr = getCounts(i,j,true);
-                for(int k = 0; k < curr.length;k++)
+                for(int j = 0; j < initThreshold.length;j++)
                 {
-                    sums[k]+=curr[k];
+                    int [] curr = getCounts(i,j,temp,corrs);
+                    for(int x = 0; x < curr.length;x++)
+                    {
+                        sums[x]+=curr[x];
+                    }
                 }
             }
         }
-        System.out.println(Arrays.toString(sums));
+
+
 
 
         System.out.print("Computing intensity weights...");
@@ -1066,10 +1244,10 @@ public class PiPrefDiv2 {
         return scores;
     }
 
-    private synchronized void addFoundGenes(ArrayList<Gene> top, int [] curr) {
+    private synchronized void addFoundGenes(ArrayList<Gene> top, int [] curr, double radii) {
         for (int i = 0; i < top.size(); i++)
         {
-            if(top.get(i).intensityValue>0)
+            if(1-top.get(i).intensityValue<radii)
                 curr[top.get(i).ID]++;
         }
 
