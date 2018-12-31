@@ -17,7 +17,7 @@ public class PPD_Runtime {
 
 
         static int numRuns = 1;
-        static int numGenes = 1000;
+        static int numGenes = 200;
 
         static boolean boot = false; //Should we use bootstrap samples for PiPrefDiv
         static boolean loocv = false; //Should we use leave-one-out CV for PiPrefDiv
@@ -30,14 +30,14 @@ public class PPD_Runtime {
 
         static int numPriors = 10; //Number of prior knowledge sources
         static int numReliable = 5; //Number of reliable sources
-        static int numComponents = 20; //How many components do we have for cluster simulation?
-        static int minTargetParents = 10; //How many true parents of the target are there?
+        static int numComponents = 10; //How many components do we have for cluster simulation?
+        static int minTargetParents = 5; //How many true parents of the target are there?
         static boolean amountRandom = false; //Should the priors have a random amount of prior knowledge?
         static boolean targetContinuous = true; //Is the target variable continuous?
         static boolean evenDistribution = true; //Is the distribution of nodes in each cluster even?
         static int numCategories = 4; //number of categories for discrete variables
         static boolean stabilitySelection = false; //Should stability selection be used within Pref-Div?
-        static int sampleSize = 200;
+        static int sampleSize = 300;
         static double amountPrior = 0.3;
         static int[][] subs;
         static boolean parallel = false; //Should we run the experiment with parallel processing?
@@ -95,6 +95,7 @@ public class PPD_Runtime {
             time = System.nanoTime();
             ArrayList<Gene> selected = p.selectGenes(boot, numSamples, priorIntensity, dFile, useCausalGraph);
             System.out.println((System.nanoTime()-time)/Math.pow(10,9));
+            System.out.println(p.getLastCluster());
 
 
 

@@ -67,7 +67,6 @@ public class PiPrefDiv2 {
     private double lastThresholdWP; //Last Threshold WP selected
     private boolean [] iPriors; //Contains which features have prior intensity information
     private boolean [] dPriors; //Contains which features have prior dissimiliarty information
-    private double writeTime = 0; //TODO TEMP DELETE THIS
     private boolean saveMemory = false; //Should we conserve disc space and use the slower version of PiPrefDiv
 
 
@@ -338,7 +337,6 @@ public class PiPrefDiv2 {
 
         double[][][] scores = computeScores(iFile,dFile);
 
-        System.out.println("Writing time: " + writeTime);
 
         System.out.print("Merging scores to get top parameters...");
         //Find best radii and topK values and then Run Pref-Div with cross-validation to get final Output!!
@@ -404,8 +402,9 @@ public class PiPrefDiv2 {
 
 
         ArrayList<Gene> temp = createGenes(data,target);
-        ArrayList<Gene> meanGenes = Functions.computeAllIntensities(temp, 1, data, target, partialCorrs, false, false, 1);
-        float [] meanDis = Functions.computeAllCorrelations(temp, data, partialCorrs, false, false, 1);
+        ArrayList<Gene> meanGenes = Functions.computeAllIntensities(temp,1,data,target,false,Math.exp(lastThreshold),Math.exp(lastThresholdWP),iPriors);
+        Collections.sort(meanGenes,Gene.IntensityComparator);
+        float [] meanDis = Functions.computeAllCorrelations(meanGenes,data,false,Math.exp(lastThreshold),Math.exp(lastThresholdWP),dPriors);
 
         RunPrefDiv rpd;
         rpd = new RunPrefDiv(meanDis,meanGenes,data,target,LOOCV);
@@ -414,12 +413,10 @@ public class PiPrefDiv2 {
 
         rpd.setTopK(K);
         rpd.setAccuracy(0);
-        rpd.setNumAlphas(numThreshold);
         rpd.setNS(subsamples.length);
         rpd.setNumFolds(numFolds);
         rpd.setCausalGraph(useCausalGraph);
         rpd.useStabilitySelection(useStabilitySelection);
-        rpd.useCrossValidation(true);
         rpd.setClusterType(ctype);
         if(clusterByCorrs)
             rpd.clusterByCorrs();
@@ -649,23 +646,11 @@ public class PiPrefDiv2 {
         int fullSize = numGenes + (numGenes*(numGenes-1)/2);
         int [] curr = new int[fullSize];
 
-        int limit = fullSize;
-        if(!needCorrs)
-            limit = numGenes;
-
-
         try{
                 File iFile =new File("Correlations_" + i + "_" + j + ".txt");
                 BufferedInputStream corrReader = new BufferedInputStream(new FileInputStream(iFile));
-                    byte [] toRead = new byte[4*fullSize];
-                    corrReader.read(toRead,0,4*limit);
-                    IntBuffer intBuf =
-                            ByteBuffer.wrap(toRead)
-                                    .order(ByteOrder.BIG_ENDIAN)
-                                    .asIntBuffer();
-                    int[] array = new int[intBuf.remaining()];
-                    intBuf.get(array);
-                    toRead = null;
+                int [] array = Functions.readAsIntArray(corrReader,fullSize);
+
 
                     curr = array;
                     array = null;
@@ -735,45 +720,19 @@ public class PiPrefDiv2 {
         /***EXPERIMENTAL***/
         if(!saveMemory) {
             try {
-                long time = System.nanoTime();
-               /* //Version with one file per i j combination SLOWWW
-                PrintStream out = new PrintStream(new FileOutputStream("Correlation_" + i + "_" + j + ".txt",true));
-                for(int x = 0; x < curr.length;x++)
-                {
-                    out.print(curr[x] + "\t");
-                }
-                out.println();
-
-
-                out.flush();
-                out.close();*/
 
                 File f = new File("Correlations_" + i + "_" + j + ".txt");
                 int[] array = new int[curr.length];
                 if (f.exists()) {
                     BufferedInputStream corrReader = new BufferedInputStream(new FileInputStream("Correlations_" + i + "_" + j + ".txt"));
-                    byte[] toRead = new byte[4 * curr.length];
-                    corrReader.read(toRead, 0, 4 * curr.length);
-                    IntBuffer intBuf =
-                            ByteBuffer.wrap(toRead)
-                                    .order(ByteOrder.BIG_ENDIAN)
-                                    .asIntBuffer();
-                    array = new int[intBuf.remaining()];
-                    intBuf.get(array);
+                    array = Functions.readAsIntArray(corrReader,curr.length);
                 }
                 for (int k = 0; k < array.length; k++)
                     array[k] += curr[k];
 
                 BufferedOutputStream b = new BufferedOutputStream(new FileOutputStream(f, false));
-                ByteBuffer byteBuffer = ByteBuffer.allocate(array.length * 4);
-                IntBuffer intBuffer = byteBuffer.asIntBuffer();
-                intBuffer.put(array);
+                Functions.writeAsByteArray(array,b);
                 array = null;
-                byte[] arr = byteBuffer.array();
-                b.write(arr);
-                b.flush();
-
-                writeTime += (System.nanoTime() - time) / Math.pow(10, 9);
             } catch (Exception e) {
                 e.printStackTrace();
                 System.err.println("Unable to print correlation/intensity to file");

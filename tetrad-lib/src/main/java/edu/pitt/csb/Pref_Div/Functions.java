@@ -14,6 +14,10 @@ import org.apache.commons.math3.distribution.NormalDistribution;
 import org.apache.commons.math3.distribution.TDistribution;
 import org.apache.commons.math3.special.Gamma;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.*;
@@ -230,6 +234,8 @@ public class Functions
     }
 
 
+
+
     public static float [] computeAllCorrelations(ArrayList<Gene> items, DataSet d,boolean partialCorr,double threshold, double thresholdWP, boolean [] withPrior )
     {
         TetradMatrix c = null;
@@ -239,23 +245,23 @@ public class Functions
             c = c.ginverse();
         }
         HashMap<Integer,Integer> mapping = new HashMap<Integer,Integer>();
+        Node [] nodes = new Node[items.size()];
         for(int i = 0; i < items.size();i++)
         {
-            mapping.put(i,d.getColumn(d.getVariable(items.get(i).symbol)));
+            Node temp = d.getVariable(items.get(i).symbol);
+            mapping.put(i,d.getColumn(temp));
+            nodes[i] = temp;
         }
-        double [][]temp = d.getDoubleData().transpose().toArray();
         int total = (items.size()*(items.size()-1))/2;
         float [] corrs = new float[total];
-        long time = System.nanoTime();
         IndTestCorrelationT ind = new IndTestCorrelationT(d,0.05);
         for(int i = 0; i < items.size();i++)
         {
-            Node one = d.getVariable(mapping.get(i));
-            double [] curr = temp[mapping.get(i)];
+            Node one = nodes[i];
             int index = Functions.getIndex(i,i+1,items.size());
             for(int j = i+1;j < items.size();j++)
             {
-                Node two = d.getVariable(mapping.get(j));
+                Node two = nodes[j];
                 if(partialCorr)
                 {
                     int x = mapping.get(i);
@@ -269,21 +275,14 @@ public class Functions
                     else if(ind.getPValue()>thresholdWP && withPrior[index])
                         corrs[index] = 0;
                     else
-                        corrs[index] = (float) Math.abs(StatUtils.correlation(curr, temp[mapping.get(j)]));
+                        corrs[index] = (float) Math.abs(ind.getCorrelation());
                 }
                 index++;
             }
 
 
         }
-        time = System.nanoTime()-time;
-        // System.out.print("Non paranormal Normalization...");
-        //time = System.nanoTime();
 
-
-
-        //time = System.nanoTime()-time;
-        //System.out.println("Done: " + time/Math.pow(10,9));
 
         return corrs;
     }
@@ -519,6 +518,63 @@ public class Functions
                 System.exit(-1);
             }
         }
+        return g1;
+
+    }
+
+    public static ArrayList<Gene> computeAllIntensitiesTest(ArrayList<Gene> g1, double a, DataSet data, String target,boolean usePc,double threshold, double thresholdWP, boolean [] withPriors)
+    {
+        if(target==null || target.equals(""))
+        {
+            return computeIntensitiesUnsupervised(g1,a,data);
+        }
+        boolean cont = data.getVariable(target) instanceof ContinuousVariable;
+        int numCats = -1;
+        if(!cont) {
+            DataSet temp2 = MixedUtils.getDiscreteData(data);
+            numCats = MixedUtils.getDiscLevels(temp2)[temp2.getColumn(temp2.getVariable(target))];
+        }
+
+
+
+        int y = data.getColumn(data.getVariable(target));
+        Node one = data.getVariable(target);
+        double[][] temp = data.getDoubleData().transpose().toArray();
+        TetradMatrix c = null;
+        if(usePc && cont) {
+            c = new CovarianceMatrix(data).getMatrix();
+            c = c.ginverse();
+        }
+        IndTestCorrelationT ind = new IndTestCorrelationT(data,0.05);
+        float [] corrs = new float[g1.size()];
+        for(int i = 0; i < g1.size();i++) {
+            Node two = data.getVariable(g1.get(i).symbol);
+            if(usePc && cont)//Use Partial Correlation
+            {
+                int x = data.getColumn(data.getVariable(g1.get(i).symbol));
+                corrs[i] = (float)(-1*c.get(x,y)/Math.sqrt(c.get(x,x)*c.get(y,y)));
+            }
+            else if(cont) //Use Correlation
+            {
+                ind.isIndependent(one,two);
+                if(ind.getPValue()>threshold && !withPriors[i])
+                    corrs[i] = 0;
+                else if(ind.getPValue()>thresholdWP && withPriors[i])
+                    corrs[i] = 0;
+                else
+                    corrs[i] = (float) Math.abs(ind.getCorrelation());
+            }
+            else //Use Mutual Information
+                corrs[i] = (float) mixedMI(temp[data.getColumn(data.getVariable(i))],temp[y],numCats);
+            g1.get(i).foldChange = corrs[i];
+            if (g1.get(i).theoryIntensity == -1)
+                g1.get(i).intensityValue = g1.get(i).foldChange;
+            else
+                g1.get(i).intensityValue = g1.get(i).theoryIntensity * (1 - a) + a * g1.get(i).foldChange;
+            g1.get(i).hasPrior = withPriors[i];
+
+        }
+
         return g1;
 
     }
@@ -2038,6 +2094,84 @@ public class Functions
         {
             return null;
         }
+    }
+
+    public static void writeAsByteArray(int[] arr, BufferedOutputStream str)
+    {
+        int size = arr.length*4;
+        ByteBuffer byteBuffer = ByteBuffer.allocate(size);
+        IntBuffer intBuffer = byteBuffer.asIntBuffer();
+        intBuffer.put(arr);
+        arr = null;
+        byte[] array = byteBuffer.array();
+        try {
+            str.write(array);
+            str.flush();
+        }
+        catch(Exception e)
+        {
+            System.out.println("Unable to write byte array");
+            System.exit(-1);
+        }
+    }
+
+    public static void writeAsByteArray(float [] arr, BufferedOutputStream str)
+    {
+        int size = arr.length*4;
+        ByteBuffer byteBuffer = ByteBuffer.allocate(size);
+        FloatBuffer intBuffer = byteBuffer.asFloatBuffer();
+        intBuffer.put(arr);
+        arr = null;
+        byte[] array = byteBuffer.array();
+        try {
+            str.write(array);
+            str.flush();
+        }
+        catch(Exception e)
+        {
+            System.out.println("Unable to write byte array");
+            System.exit(-1);
+        }
+    }
+
+
+    public static float[] readAsFloatArray(BufferedInputStream str, int length)
+    {
+        byte[] toRead = new byte[4 * length];
+        try {
+            str.read(toRead, 0, 4 * length);
+        }
+        catch(Exception e)
+        {
+            System.err.println("Unable to read from input stream");
+            System.exit(-1);
+        }
+        FloatBuffer intBuf = ByteBuffer.wrap(toRead)
+                        .order(ByteOrder.BIG_ENDIAN)
+                        .asFloatBuffer();
+        float [] array = new float[intBuf.remaining()];
+        intBuf.get(array);
+        return array;
+    }
+
+    public static int[] readAsIntArray(BufferedInputStream str, int length)
+    {
+        byte[] toRead = new byte[4 * length];
+        try {
+            str.read(toRead, 0, 4 * length);
+        }
+        catch(Exception e)
+        {
+            System.err.println("Unable to read from input stream");
+            System.exit(-1);
+        }
+        IntBuffer intBuf =
+                ByteBuffer.wrap(toRead)
+                        .order(ByteOrder.BIG_ENDIAN)
+                        .asIntBuffer();
+        int [] array = new int[intBuf.remaining()];
+        intBuf.get(array);
+        return array;
     }
 
 

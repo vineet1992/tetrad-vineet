@@ -21,7 +21,7 @@ import org.apache.commons.math3.linear.MatrixUtils;
 import org.apache.commons.math3.linear.RealMatrix;
 import org.apache.commons.math3.stat.correlation.Covariance;
 
-import java.io.PrintStream;
+import java.io.*;
 import java.util.*;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
@@ -33,6 +33,7 @@ import static org.apache.commons.collections4.CollectionUtils.union;
   Runs genomic Pref-Div algorithm with subsampling and clustering
     TODO Handle Discrete features in theory relevance and dissimilarity
  TODO Switch to median accuracy instead of mean for cross validation?
+    TODO Clean up this entire file, reduce some of the unnecessary bloat, and test the reading from file for accuracy
  */
 public class RunPrefDiv {
 
@@ -42,7 +43,6 @@ public class RunPrefDiv {
 
     private DataSet data;
     private Random rand;
-    //private final double largeError = 1E8;
     private int B = 50; //Number of Subsamples for CPSS
     private ArrayList<Gene> genes;
     private float[] dissimilarity;
@@ -70,23 +70,25 @@ public class RunPrefDiv {
     private boolean partialCorr = false; //Use partial correlations instead of correlation for continuous variables
     private double [][] lastStepsStabilities; //Last set of gene stabilities given by StEPS
 
-    private ArrayList<String> stabPS;//PrintStream to output file where we have run\talpha\tstability
-    private boolean includeAccuracy = false; //When writing the stability output to file, should we include an accuracy score for each stability data point
-    private List<Node> targets = null; //The set of target genes (for computing accuracy score when ground truth is known)
-    private int run; //purely for printing to the stability output file
     private boolean loocv = false;
     private int [][] subs;
-    private boolean getCausalAccuracy = false;
     private Graph trueGraph;
     private DataSet summarizedData; //The dataset you get using the prefidv method on the current dataset with the current clustering procedure
 
 
-    private boolean useCrossValidation = true; //Shoudl we use cross-validation to determine alpha?
+    private boolean useCrossValidation = true; //Should we use cross-validation to determine alpha?
     private boolean useStabilitySelection = false; //Should we use stability selection when running Pref-Div?
     private boolean useCausalGraph = false; //Should we use a causal graph when determining predictive neighbors for cross-validation
     private boolean usePThreshold = false;//Should we use a p-value threshold to shrink insignificant p-value correlations to 0
     private boolean clusterByCorrs = false; //Should we cluster purely by significant correlations instead of using Pref-Div
     private ClusterType clusterType; //Which clustering method should we use (Options are PCA, Median, Mean, None)
+
+
+
+
+    private double newTime = 0;
+    private double oldTime = 0;
+    private int diffs = 0;
 
 
     public RunPrefDiv(float [] dissimilarity, ArrayList<Gene> genes, DataSet data,String target,boolean leaveOneOut)
@@ -97,7 +99,6 @@ public class RunPrefDiv {
         this.dissimilarity = dissimilarity;
         this.target = target;
         this.loocv = leaveOneOut;
-        this.stabPS = null;
         this.clusterType = ClusterType.NONE;
     }
 
@@ -106,6 +107,7 @@ public class RunPrefDiv {
     {
         withPrior = wp;
         separateParams = true;
+        useCrossValidation = false;
     }
     public void setAllParams(double radius, double radiusWP, double pThresh, double pThreshWP)
     {
@@ -113,6 +115,8 @@ public class RunPrefDiv {
         this.radiusWP = radiusWP;
         this.pThresh = pThresh;
         this.pThreshWP = pThreshWP;
+        this.usePThreshold = true;
+        useCrossValidation = false;
     }
 
 
@@ -160,11 +164,7 @@ public class RunPrefDiv {
         this.numAlphas = na;
     }
     public void setNumFolds(int nf){this.numFolds = nf;}
-    public void setStabilityOutput(boolean includeAccuracy){this.stabPS = new ArrayList<String>(); this.includeAccuracy=includeAccuracy;}
-    public ArrayList<String> getStabilityOutput(){return stabPS;}
-    public void setTargets(List<Node> targets){this.targets = targets;}
     public void setTrueGraph(Graph truth){this.trueGraph = truth;}
-    public void setRun(int r){run = r;}
     public ArrayList<Gene> getLastGeneSet(){return lastGeneSet;}
     public void usePartialCorrelation(boolean pc){partialCorr = pc;}
     public void useCrossValidation(boolean b){useCrossValidation = b;}
@@ -175,8 +175,13 @@ public class RunPrefDiv {
     public void setClusterType(ClusterType c){clusterType = c;}
     public DataSet getSummarizedData(){return summarizedData;}
 
+
+
+
+
     public ArrayList<Gene> runPD()
     {
+
 
         System.out.print("Generating Subsamples...");
         if(subs==null) {
@@ -193,10 +198,6 @@ public class RunPrefDiv {
         {
             alphas[i] = i*alphaLimit/(double)numAlphas;
         }
-
-
-
-        ArrayList<Gene> finalSet = null;
 
 
         /***run PD across B = 100 complementary pairs, and get those genes which appear(in the diverset) in those pairs most frequently
@@ -221,28 +222,14 @@ public class RunPrefDiv {
 
                 if(useStabilitySelection)
                 System.out.println("Computing accuracy for " + alphas[i]);
-                double avgAcc = 0;
-                double avgStab = 0;
+
+
                 //Get the current training dataset and testing dataset
                 A:for(int j = 0; j < subs.length;j++) {
                     Arrays.sort(subs[j]);
                     DataSet test = data.subsetRows(subs[j]);
-                    int[] trainInds = new int[data.getNumRows() - test.getNumRows()];
-                    int tempCount = 0;
-                    int subCount = 0;
-                    for (int k = 0; k < data.getNumRows(); k++) {
-                        if (subs[j][subCount]!=k) {
-                            trainInds[tempCount] = k;
-                            tempCount++;
-                        }
-                        else
-                        {
-                            subCount++;
-                            if(subCount==test.getNumRows())
-                                subCount=0;
-                        }
-                    }
-                    DataSet train = data.subsetRows(trainInds);
+                    DataSet train = getTrainingData(data,subs[j]);
+
 
 
                     /***Generate subsamples for the training dataset for internal CV by StEPS the first time through***/
@@ -255,14 +242,15 @@ public class RunPrefDiv {
 
                     /*** Run Pref-Div with or without Stability Selection ***/
                     if(useStabilitySelection)
-                    System.out.println("Running PD for alpha " + alphas[i] + ", and cv fold: " + j);
-                    double stab = -1;
+                        System.out.println("Running PD for alpha " + alphas[i] + ", and cv fold: " + j);
+
+
+                    double stab;
                     if(useStabilitySelection)
                         stab = pdCPSS(alphas[i],train);
                     else
                         stab = runPD(alphas[i],train);
                     ArrayList<Gene> genes = lastGeneSet;
-                    List<Node> cols = new ArrayList<Node>();
                     List<Node> dNeighbors = new ArrayList<Node>();
 
 
@@ -278,10 +266,10 @@ public class RunPrefDiv {
 
 
                     /***Construct Regression Dataset to test this value of alpha***/
-
                     train = summarized[0];
                     test = summarized[1];
 
+                    /***Run Pref-Div and then use StEPS to select regression features***/
                     if(useCausalGraph)
                     {
                         //Create a dataset with only those variables selected by PD
@@ -339,13 +327,15 @@ public class RunPrefDiv {
                             r = rand.nextInt(train.getNumColumns());
                         dNeighbors.add(train.getVariable(r));
                     }
+
+
                     /***Do a linear or logistic regression here depending upon the type of the target on the test set
                     //With the variables in the neighborhood of the target as the features***/
 
                     if(test.getVariable(target)instanceof ContinuousVariable)
                     {
                         if(useStabilitySelection)
-                        System.out.print("Testing accuracy via regression...");
+                            System.out.print("Testing accuracy via regression...");
                         RegressionDataset rd = new RegressionDataset(train);
                         try {
                             RegressionResult res = rd.regress(train.getVariable(target), dNeighbors);
@@ -371,14 +361,16 @@ public class RunPrefDiv {
 
                 /***Keep the alpha that gives the best accuracy***/
                 if(useStabilitySelection)
-                System.out.println("Accuracy for alpha: " + alphas[i] + ", " + accuracies[i] + ", Stability: " + stabilities[i]);
+                    System.out.println("Accuracy for alpha: " + alphas[i] + ", " + accuracies[i] + ", Stability: " + stabilities[i]);
+
+
                 if(StatUtils.median(accuracies[i]) < maxAcc)
                 {
                     maxAcc = StatUtils.median(accuracies[i]);
                     maxAlpha = i;
                 }
 
-                double stab = -1;
+                double stab;
                 /***Use this alpha for the full dataset and see what genes you get***/
                 if(useStabilitySelection)
                     stab = pdCPSS(alphas[i],data);
@@ -390,30 +382,8 @@ public class RunPrefDiv {
                 allGenes.add(genes);
                 allClusters.add(lastClusters);
 
-                if (stabPS != null) {
-                    if (includeAccuracy) {
-                        if (getCausalAccuracy) {
-                            Graph graph = learnGraph();
-                            stabPS.add(run + "\t" + alphas[i] + "\t" + accuracies[i] +  "\t" + stabilities[i] + "\t" + stab + "\t" + getAccuracy(targets, lastGeneSet)[1] + "\t" + getAccuracy(targets, lastGeneSet)[2] + "\t" + lastGeneSet + "\t" + targets + "\t" + lastClusters + "\t" + graphAccuracy(graph)[0] + "\t" + graphAccuracy(graph)[1] + "\t" + simulatePrefDivMGM.neighborAccuracy(graph, trueGraph, target)[0] + "\t" + simulatePrefDivMGM.neighborAccuracy(graph, trueGraph, target)[1]);
-                        } else
-                            stabPS.add(run + "\t" + alphas[i] + "\t" + accuracies[i] + "\t" + stabilities[i] + "\t" + stab + "\t" + getAccuracy(targets, lastGeneSet)[1] + "\t" + getAccuracy(targets, lastGeneSet)[2] + "\t" + lastGeneSet + "\t" + targets + "\t" + lastClusters);
-
-                    } else
-                        stabPS.add(run + "\t" + alphas[i] + "\t" + accuracies[i] + "\t" + stabilities[i] + "\t" + stab + "\t" + lastClusters);
-                }
             }
 
-
-            for(int i = 0; i < accuracies.length;i++)
-            {
-                System.out.print(StatUtils.median(accuracies[i]) + ", ");
-            }
-            System.out.println();
-            for(int i = 0; i < accuracies.length;i++)
-            {
-                System.out.print(StatUtils.mean(accuracies[i]) + ", ");
-            }
-            System.out.println();
 
             /***Construct summarized dataset based on selected genes and clusters***/
             lastGeneSet = (ArrayList<Gene>)allGenes.get(maxAlpha);
@@ -429,42 +399,16 @@ public class RunPrefDiv {
 
         }
 
-        //Loop over alpha values
-        //Call helper method to compute stability and result set for given alpha
-        //If result is below threshold, then keep it
-        //Otherwise increment by alphaStep and continue searching
-
+        /***If we aren't using cross validation then no alpha value is required, just run PrefDiv as is***/
+        /***This will only be used if we are running PiPrefDiv***/
         else {
-            for (int i = alphas.length - 1; i >= 0; i--) {
+            PrefDiv p = new PrefDiv(genes,topK,accuracy,radius,radiusWP,withPrior,dissimilarity);
+            p.setCluster(clusterByCorrs);
+            lastGeneSet = p.diverset();
+            lastClusters = p.clusters;
 
+            summarizedData = summarize(data,data,(ArrayList<Gene>)lastGeneSet.clone(),lastClusters,clusterType)[0];
 
-                System.out.print("Running Pref-Div for Alpha value: " + alphas[i] + " ...");
-                double stab = stabilityPD(alphas[i]);
-                if (stabPS != null) {
-                    if (includeAccuracy) {
-                        if (getCausalAccuracy) {
-                            Graph graph = learnGraph();
-                            stabPS.add(run + "\t" + alphas[i] + "\t" + stab + "\t" + getAccuracy(targets, lastGeneSet)[1] + "\t" + getAccuracy(targets, lastGeneSet)[2] + "\t" + lastGeneSet + "\t" + targets + "\t" + lastClusters + "\t" + graphAccuracy(graph)[0] + "\t" + graphAccuracy(graph)[1] + "\t" + simulatePrefDivMGM.neighborAccuracy(graph, trueGraph, target)[0] + "\t" + simulatePrefDivMGM.neighborAccuracy(graph, trueGraph, target)[1]);
-                        } else
-                            stabPS.add(run + "\t" + alphas[i] + "\t" + stab + "\t" + getAccuracy(targets, lastGeneSet)[1] + "\t" + getAccuracy(targets, lastGeneSet)[2] + "\t" + lastGeneSet + "\t" + targets + "\t" + lastClusters);
-
-                    } else
-                        stabPS.add(run + "\t" + alphas[i] + "\t" + stab + "\t" + lastClusters);
-                }
-                System.out.println("Stability = " + (stab) + ", Done");
-                if (1 - stab < g && stabPS == null) { //Continue to search alpha values if you want to output stabilities for them
-                    System.out.println("Underneath threshold of " + g + ", Returning this set");
-                    return lastGeneSet;
-                } else if (1 - stab < g && finalSet == null) {
-                    finalSet = lastGeneSet;
-                }
-            }
-
-
-            if (finalSet != null) {
-                lastGeneSet = finalSet;
-                return finalSet;
-            }
         }
         return lastGeneSet;
 
@@ -867,38 +811,15 @@ public class RunPrefDiv {
 
     //Input: alpha (data-theory tradeoff),
     //Input: train (Dataset)
+    //Input: k Subsample index, if less than 0 then just compute the correlations here
     //Output: always -1, just a dummy variable to maintain congruence with other version of PD
     //Output: lastGeneSet, topK genes selected by PD
     //Output: lastClusters, clusters selected using PD with current alpha value
+
+    //TODO If this will be a useful approach, then change this to compute all correlations and output to a file beforehand
+    //TODO In here you can just read as is
     private double runPD(final double alpha, final DataSet train)
     {
-
-            //System.out.println("Running regular version of Pref-Div without subsampling...");
-        if(usePThreshold)
-        {
-            ArrayList<Gene> curr;
-            if(separateParams)
-                curr = Functions.computeAllIntensities(genes,alpha,train,target,partialCorr,pThresh,pThreshWP,withPrior);
-            else
-                curr = Functions.computeAllIntensities(genes,alpha,train,target,partialCorr,false,false,pThresh);
-            Collections.sort(curr,Gene.IntensityComparator);
-            float [] corrs;
-            if(separateParams)
-                corrs = Functions.computeAllCorrelations(curr,train,false,pThresh,pThreshWP,withPrior);
-            else
-                corrs = Functions.computeAllCorrelations(curr,train,false,false,false,pThresh);
-
-            PrefDiv p;
-            if(separateParams)
-                p = new PrefDiv(curr,topK,accuracy,radius,radiusWP,withPrior,corrs);
-            else
-                p = new PrefDiv(curr,topK,accuracy,radius,corrs);
-            p.setCluster(clusterByCorrs);
-            lastGeneSet = p.diverset();
-            lastClusters = p.clusters;
-        }
-        else
-        {
             ArrayList<Gene> curr = Functions.computeAllIntensities(genes,alpha,train,target,partialCorr,false,false,1);
             Collections.sort(curr,Gene.IntensityComparator);
             PrefDiv p = new PrefDiv(curr,topK,accuracy,radius,dissimilarity,alpha,train,false,partialCorr);
@@ -906,11 +827,6 @@ public class RunPrefDiv {
             p.setCluster(clusterByCorrs);
             lastGeneSet = p.diverset();
             lastClusters = p.clusters;
-
-        }
-        //System.out.println("Genes selected: " + lastGeneSet);
-        //System.out.println("Clusters found: " + lastClusters);
-
         return -1;
     }
 
@@ -1056,7 +972,6 @@ public class RunPrefDiv {
     }
     public Graph getCausalGraph(String target)
     {
-        getCausalAccuracy = true;
         ArrayList<Gene> g2 = runPD();
         ArrayList<Node> names = new ArrayList<Node>();
         for(Gene x:g2)
@@ -1089,41 +1004,8 @@ public class RunPrefDiv {
         lastStepsStabilities = s.stabilities;
         return output;
     }
-    private double [] getAccuracy(List<Node> targets, ArrayList<Gene> result)
-    {
-        double [] output = new double[3];
-        double tp = 0;
-        double fp = 0;
-        double fn = 0;
-        for(int i = 0; i < targets.size();i++)
-        {
-            boolean found = false;
-            for(int j = 0; j < result.size();j++)
-            {
-                if(targets.get(i).getName().equals(result.get(j).symbol))
-                    found = true;
-            }
-            if(found)
-                tp++;
-            else
-                fn++;
-        }
-        for(int i = 0; i < result.size();i++)
-        {
-            boolean found = false;
-            for(int j = 0; j < targets.size();j++)
-            {
-                if(targets.get(j).getName().equals(result.get(i).symbol))
-                    found = true;
-            }
-            if(!found)
-                fp++;
-        }
-        output[1] = tp/(tp+fp);
-        output[2] = tp/(tp+fn);
-        output[0] = 2*output[1]*output[2]/(output[1]+output[2]);
-        return output;
-    }
+
+
     private double stabilityPD(final double alp)
     {
 
@@ -1217,6 +1099,32 @@ public class RunPrefDiv {
             return 1-clusterSim(allClusters);
         else
             return tanimotoSim(allGenes);
+    }
+
+
+    /***
+     *
+     * @param subs the set of indices for the testing data
+     * @return the Dataset consisting of all indices not in subs
+     */
+    private static DataSet getTrainingData(DataSet data, int[]subs)
+    {
+        int[] trainInds = new int[data.getNumRows() - subs.length];
+        int tempCount = 0;
+        int subCount = 0;
+        for (int k = 0; k < data.getNumRows(); k++) {
+            if (subs[subCount]!=k) {
+                trainInds[tempCount] = k;
+                tempCount++;
+            }
+            else
+            {
+                subCount++;
+                if(subCount==subs.length)
+                    subCount=0;
+            }
+        }
+        return data.subsetRows(trainInds);
     }
 
 
