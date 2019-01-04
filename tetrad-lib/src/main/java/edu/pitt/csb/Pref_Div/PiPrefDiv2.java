@@ -133,8 +133,8 @@ public class PiPrefDiv2 {
     }
     public double[] getLastIntensityWeights(){return lastIntensityWeights;}
     public double[] getLastSimilarityWeights(){return lastSimilarityWeights;}
-    public double getLastRadius(){return lastRadius;}
-    public double getLastThreshold(){return lastThreshold;}
+    public double[] getLastRadius(){return new double[]{lastRadius,lastRadiusWP};}
+    public double[] getLastThreshold(){return new double[]{lastThreshold,lastThresholdWP};}
     public double getLastRadiusWP(){return lastRadiusWP;}
     public double getLastThresholdWP(){return lastThresholdWP;}
     public void setOutputScores(PrintStream out){outputScores=true; scoreStream=out;}
@@ -145,6 +145,8 @@ public class PiPrefDiv2 {
     public void setPdStability(boolean p){pdStability = p;}
     public void setPartialCorrs(boolean pc){partialCorrs = pc;}
     public void saveMemory(){saveMemory = true;}
+    public boolean[] getIntensityPriors(){return iPriors;}
+    public boolean[] getDissimilarityPriors(){return dPriors;}
 
 
 
@@ -226,7 +228,6 @@ public class PiPrefDiv2 {
             t.set(i,0,init[i]);
             t.set(i,1,num[i]);
         }
-        System.out.println(t);
         double[] limits = mgmPriors.getLimit(t);
         double [] realLimits = new double[init.length];
         for(int i = 0; i < init.length;i++)

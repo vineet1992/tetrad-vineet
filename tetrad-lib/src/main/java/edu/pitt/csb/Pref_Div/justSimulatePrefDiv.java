@@ -35,9 +35,9 @@ public class justSimulatePrefDiv {
     public static Random rand = new Random();
 
     public static void main(String [] args) {
-        int numRuns = 1;
-        int numGenes = 200;
-        int sampleSize = 5000;
+        int numRuns = 10;
+        int numGenes = 2000;
+        int sampleSize = 200;
         double amountPrior = 0.3;//percentage of edges to have prior knowledge for
         boolean boot = false; //Should we use bootstrap samples for PiPrefDiv
         boolean loocv = false; //Should we use leave-one-out CV for PiPrefDiv
@@ -47,14 +47,14 @@ public class justSimulatePrefDiv {
 
         int numPriors = 10; //Number of prior knowledge sources
         int numReliable = 5; //Number of reliable sources
-        int numComponents = 10; //How many components do we have for cluster simulation?
-        int minTargetParents = 5; //How many true parents of the target are there?
-        boolean noiseRandom = true; //Should the priors have random amounts of reliability?
+        int numComponents = 200; //How many components do we have for cluster simulation?
+        int minTargetParents = 50; //How many true parents of the target are there?
+        boolean noiseRandom = false; //Should the priors have random amounts of reliability?
 
 
         boolean amountRandom = false; //Should the priors have a random amount of prior knowledge?
         boolean targetContinuous = true; //Is the target variable continuous?
-        boolean evenDistribution = true; //Is the distribution of nodes in each cluster even?
+        boolean evenDistribution = false; //Is the distribution of nodes in each cluster even?
         int numCategories = 4; //number of categories for discrete variables
 
 
@@ -81,7 +81,47 @@ public class justSimulatePrefDiv {
             } else if (args[index].equals("-even")) {
                 evenDistribution = true;
                 index++;
-            } else {
+            } else if(args[index].equals("-numPriors")) {
+                numPriors = Integer.parseInt(args[index+1]);
+                index+=2;
+
+            } else if(args[index].equals("-numReliable"))
+            {
+                numReliable = Integer.parseInt(args[index+1]);
+                index+=2;
+            } else if(args[index].equals("-amountPrior"))
+            {
+                amountPrior = Double.parseDouble(args[index+1]);
+                index+=2;
+            } else if(args[index].equals("-numSamples"))
+            {
+                numSamples = Integer.parseInt(args[index+1]);
+                index+=2;
+            } else if(args[index].equals("-amountRandom"))
+            {
+                amountRandom = true;
+                index++;
+            }
+            else if(args[index].equals("-noiseRandom"))
+            {
+                noiseRandom = true;
+                index++;
+            } else if(args[index].equals("-boot"))
+            {
+                boot = true;
+                index++;
+            } else if(args[index].equals("-loocv"))
+            {
+                loocv = true;
+                index++;
+            }
+            else if(args[index].equals("-even"))
+            {
+                evenDistribution = true;
+                index++;
+            }
+
+                else{
                 System.err.println("Unidentified argument: " + args[index]);
                 System.exit(-1);
             }
