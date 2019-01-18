@@ -436,7 +436,7 @@ public class Functions
             else if(cont) //Use Correlation
             {
                 ind.isIndependent(one,two);
-                g1.get(i).foldChange  = (float) Math.abs(StatUtils.correlation(temp[y], temp[data.getColumn(data.getVariable(g1.get(i).symbol))]));
+                g1.get(i).foldChange  = (float) Math.abs(ind.getCorrelation());
                 g1.get(i).intensityP = ind.getPValue();
             }
             else //Use Mutual Information

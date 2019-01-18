@@ -27,6 +27,8 @@ import java.util.concurrent.RecursiveAction;
  * Need to parallelize correlation testing and correlation computing
  */
 
+//TODO Scores seem to be completely invariant across threshold values, regardless of which radius is chosen
+
 
 public class PiPrefDiv2 {
 
@@ -34,11 +36,11 @@ public class PiPrefDiv2 {
     private String target; //The target variable of interest
     private double [] initRadii; //Initial radius values to test
     private double [] initThreshold; //Initial Top K values to test
-    private double lowRadii = 0.001; //Low range of radius values to test
-    private double highRadii = 0.9; //High range of radius values to test
+    private double lowRadii = 0; //Low range of radius values to test
+    private double highRadii = 1; //High range of radius values to test
     private int numRadii = 40; //Number of radius values to test
     private int numThreshold = 40; //Number of Threshold values to test
-    private double lowThreshold = -10; //Low range of log threshold values to test
+    private double lowThreshold = -8; //Low range of log threshold values to test
     private double highThreshold = 0; //High range of log threshold values to test
     private int [][] subsamples; //subsamples for repeated Pref-Div
     private double normalEpsilon = 0.5;//Range around which to get probability for theta with prior information
@@ -206,22 +208,28 @@ public class PiPrefDiv2 {
      * @param threshold Whether or not this is p-value threshold or absolute correlation
      * @return double [] with a constricted range of the parameter
      */
+
+    //TODO instead of running this on the full dataset, we want the average # across subsamples
     private double[] constrictRange(double[]init, DataSet data,boolean threshold)
     {
-        ArrayList<Gene> temp = createGenes(data,target);
-        Gene tgt = new Gene(temp.size());
-        tgt.symbol="Target";
-        temp.add(tgt);
-        float [] corrs = Functions.computeAllCorrelations(temp,data,false,false,threshold,1);
-        int [] num = new int[init.length];
-        for(int i = 0; i < init.length;i++)
-        {
-            if(!threshold)
-                num[i] = countLessThan(corrs,init[i]);
-            else
-                num[i] = countPLessThan(corrs,init[i]);
-        }
+        int[] num = new int[init.length];
+        for(int x = 0; x < subsamples.length; x++) {
 
+            DataSet curr = data.subsetRows(subsamples[x]);
+            ArrayList<Gene> temp = createGenes(data,target);
+            Gene tgt = new Gene(temp.size());
+            tgt.symbol="Target";
+            temp.add(tgt);
+
+            float[] corrs = Functions.computeAllCorrelations(temp, curr, false, false, threshold, 1);
+
+            for (int i = 0; i < init.length; i++) {
+                if (!threshold)
+                    num[i] += countLessThan(corrs, init[i]) / (double)init.length;
+                else
+                    num[i] += countPLessThan(corrs, init[i])/(double)init.length;
+            }
+        }
         TetradMatrix t = new TetradMatrix(init.length,2);
         for(int i = 0; i < t.rows();i++) {
 
@@ -347,15 +355,15 @@ public class PiPrefDiv2 {
         {
             try {
                 PrintStream out = new PrintStream("average_table.txt");
-                for (int i = 0; i < initThreshold.length; i++)
-                    out.print(initThreshold[i] + "\t");
+                for (int i = 0; i < initThreshold.length*2; i++)
+                    out.print(initThreshold[i % initThreshold.length] + "\t");
                 out.println();
-                System.out.println("Printing average scores...");
-                for (int i = 0; i < avgScore.length; i++) {
-                    System.out.print(initRadii[i] + "\t");
-                    out.print(initRadii[i] + "\t");
-                    for (int j = 0; j < avgScore[i].length; j++) {
-                        System.out.print(initThreshold[j] + ": " + avgScore[i][j] + "\t");
+                System.out.println("Printing all scores...");
+                for (int i = 0; i < initRadii.length*2; i++) {
+                    System.out.print(initRadii[i % initRadii.length] + "\t");
+                    out.print(initRadii[i % initRadii.length] + "\t");
+                    for (int j = 0; j < initThreshold.length*2; j++) {
+                        System.out.print(initThreshold[j %initThreshold.length] + ": " + avgScore[i][j] + "\t");
                         out.print(avgScore[i][j] + "\t");
                     }
                     System.out.println();
@@ -363,8 +371,6 @@ public class PiPrefDiv2 {
                 }
                 out.flush();
                 out.close();
-
-
 
             }catch(Exception e)
             {
@@ -543,10 +549,9 @@ public class PiPrefDiv2 {
             offset = numGenes;
             needCorrs = true;
         }
-        double ogTime = 0;
-        double newTime = 0;
-        int diffs = 0;
+       
         for (int i = 0; i < numRadii; i++) {
+            int [][] all = new int[numThreshold][sums.length];
             for (int j = 0; j < numThreshold; j++) {
 
                 int [] curr = null;
@@ -559,12 +564,9 @@ public class PiPrefDiv2 {
                     curr = getCountsFromFile(i, j, needCorrs);
 
                 }
-                /*for(int x = 0; x < curr.length;x++)
-                {
-                    if(curr[x]!=curr2[x])
-                        diffs++;
-                }*/
 
+                for(int x = 0; x < curr.length;x++)
+                    all[j][x] = curr[x];
 
                 for(int g = 0; g < uPost.length;g++) //Loop through each gene
                 {
@@ -582,7 +584,20 @@ public class PiPrefDiv2 {
                         score[i][j]+=theta*(1-G);
                     }
                 }
+
             }
+
+            /*int numDiff = 0;
+            for(int x = 0; x < all[0].length;x++)
+            {
+                int temp = all[0][x];
+                for(int j = 1; j < numThreshold;j++)
+                {
+                    if(all[j][x] != temp)
+                        numDiff++;
+                }
+            }
+            System.out.print(numDiff + "\t");*/
         }
 
         normalizeScore(score);
@@ -693,7 +708,7 @@ public class PiPrefDiv2 {
      * @return An array of the number of times each gene was selected and each gene-gene pair was clustered
      *
      */
-    private int[] getCounts(int i, int j,ArrayList<Gene> temp, float [][] corrs)
+    private int[] getCounts(int i, int j,ArrayList<Gene> temp, float [][] corrs, boolean read)
     {
 
         int[] curr;
@@ -724,7 +739,7 @@ public class PiPrefDiv2 {
 
                 File f = new File("Correlations_" + i + "_" + j + ".txt");
                 int[] array = new int[curr.length];
-                if (f.exists()) {
+                if (read) {
                     BufferedInputStream corrReader = new BufferedInputStream(new FileInputStream("Correlations_" + i + "_" + j + ".txt"));
                     array = Functions.readAsIntArray(corrReader,curr.length);
                 }
@@ -1005,11 +1020,27 @@ public class PiPrefDiv2 {
     private double[][][] computeScores(String iFile, String[] dFile)
     {
         int [] sums = new int[numGenes + (numGenes)*(numGenes-1)/2];
+        boolean read = false;
         for(int k = 0; k < subsamples.length;k++)
         {
             ArrayList<Gene> temp = createGenes(data,target);
             DataSet currData = data.subsetRows(subsamples[k]);
             temp = Functions.computeAllIntensitiesWithP(temp,1,currData,target,partialCorrs);
+            /**
+            int inRange = 0;
+            for(Gene x: temp)
+            {
+                if(Math.log(x.intensityP) > -10 && Math.log(x.intensityP)< -3)
+                {
+                    if(x.intensityValue > 0.4)
+                        inRange++;
+                    else
+                        System.out.print(x.intensityValue + " ");
+                }
+            }
+            System.out.println();
+            System.out.println(inRange + " genes in p-value range");*/
+
             //Threshold intensities and correlations after the fact
             float [][] corrs = Functions.computeAllCorrelationsWithP(temp,currData,partialCorrs,false,false,1);
 
@@ -1017,15 +1048,22 @@ public class PiPrefDiv2 {
             {
                 for(int j = 0; j < initThreshold.length;j++)
                 {
-                    int [] curr = getCounts(i,j,temp,corrs);
+
+                    int [] curr = getCounts(i,j,temp,corrs,read);
+
                     for(int x = 0; x < curr.length;x++)
                     {
                         sums[x]+=curr[x];
                     }
                 }
             }
+            read = true;
         }
 
+        if(verbose)
+        {
+            System.out.println("Computed counts for intensities and correlations: " + Arrays.toString(sums));
+        }
 
 
 
@@ -1076,15 +1114,15 @@ public class PiPrefDiv2 {
         {
             try {
                 PrintStream out = new PrintStream("intensity_table.txt");
-                for (int i = 0; i < initThreshold.length; i++)
-                    out.print(initThreshold[i] + "\t");
+                for (int i = 0; i < initThreshold.length*2; i++)
+                    out.print(initThreshold[i % initThreshold.length] + "\t");
                 out.println();
                 System.out.println("Printing all scores...");
-                for (int i = 0; i < scoresInt.length; i++) {
+                for (int i = 0; i < initRadii.length*2; i++) {
                     System.out.print(initRadii[i % initRadii.length] + "\t");
                     out.print(initRadii[i % initRadii.length] + "\t");
-                    for (int j = 0; j < scoresInt[i].length; j++) {
-                        System.out.print(initThreshold[j %initThreshold.length] + ": " + scoresInt[i % initRadii.length][j % initThreshold.length] + "\t");
+                    for (int j = 0; j < initThreshold.length*2; j++) {
+                        System.out.print(initThreshold[j %initThreshold.length] + ": " + scoresInt[i][j] + "\t");
                         out.print(scoresInt[i][j] + "\t");
                     }
                     System.out.println();
@@ -1094,6 +1132,7 @@ public class PiPrefDiv2 {
                 out.close();
 
 
+                //TODO FIX THIS
                 if(outputScores)
                 {
                     for (int i = 0; i < initThreshold.length; i++)
@@ -1157,22 +1196,24 @@ public class PiPrefDiv2 {
 
         if(verbose)
         {
-            try {
-                PrintStream out = new PrintStream("similarity_table.txt");
-                for (int i = 0; i < initThreshold.length; i++)
-                    out.print(initThreshold[i] + "\t");
-                out.println();
-                System.out.println("Printing all scores...");
-                for (int i = 0; i < scoresSim.length; i++) {
-                    System.out.print(initRadii[i] + "\t");
-                    out.print(initRadii[i] + "\t");
-                    for (int j = 0; j < scoresSim[i].length; j++) {
-                        System.out.print(initThreshold[j] + ": " + scoresSim[i][j] + "\t");
-                        out.print(scoresSim[i][j] + "\t");
-                    }
-                    System.out.println();
-                    out.println();
+            try{
+            PrintStream out = new PrintStream("similarity_table.txt");
+            for (int i = 0; i < initThreshold.length*2; i++)
+                out.print(initThreshold[i % initThreshold.length] + "\t");
+            out.println();
+            System.out.println("Printing all scores...");
+            for (int i = 0; i < initRadii.length*2; i++) {
+                System.out.print(initRadii[i % initRadii.length] + "\t");
+                out.print(initRadii[i % initRadii.length] + "\t");
+                for (int j = 0; j < initThreshold.length*2; j++) {
+                    System.out.print(initThreshold[j %initThreshold.length] + ": " + scoresSim[i][j] + "\t");
+                    out.print(scoresSim[i][j] + "\t");
                 }
+                System.out.println();
+                out.println();
+            }
+            out.flush();
+            out.close();
 
                 if(outputScores)
                 {
