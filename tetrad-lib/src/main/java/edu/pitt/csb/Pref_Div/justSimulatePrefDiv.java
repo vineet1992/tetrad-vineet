@@ -29,349 +29,357 @@ import java.util.*;
 public class justSimulatePrefDiv {
 
 
-    public static double [] reliableParams = new double[]{0.7,1.0,0.0,0.3}; //True Low, True High, False Low, False High
+
+    //TODO a question for later, should we treat intensity priors different from dissimilarity priors?
+
+    //public static double [] reliableParams = new double[]{0.7,1.0,0.0,0.3}; //True Low, True High, False Low, False High
+    public static double [] reliableParams = new double[]{0.99999,1.0,0.0,0.0001}; //True Low, True High, False Low, False High
+
+    //public static double [] unreliableParams = new double[]{0.0,1.0,0.0,1.0}; //True Low, True High, False Low, False High
+
     public static double [] unreliableParams = new double[]{0.0,1.0,0.0,1.0}; //True Low, True High, False Low, False High
-    public static double amountLimit = 0.5; //Specifies the total percentage of prior information that can be given by a single source
+    //public static double amountLimit = 0.5; //Specifies the total percentage of prior information that can be given by a single source
+
+    public static double amountLimit = 1.0; //Specifies the total percentage of prior information that can be given by a single source
+
     public static Random rand = new Random();
 
     public static void main(String [] args) {
-        int numRuns = 10;
-        int numGenes = 2000;
-        int sampleSize = 200;
-        double amountPrior = 0.3;//percentage of edges to have prior knowledge for
-        boolean boot = false; //Should we use bootstrap samples for PiPrefDiv
-        boolean loocv = false; //Should we use leave-one-out CV for PiPrefDiv
-        int numSamples =  20; //Number of bootstrap/sub-sampled samples to use
+        double[] ap = new double[]{1.0};
+        int[] nr = new int[]{10};
+        int [] ss = new int[]{200};
+
+        for (int xx = 0; xx < ap.length; xx++) {
+            for (int y = 0; y < nr.length; y++) {
+
+                for(int z = 0; z < ss.length;z++) {
 
 
-
-        int numPriors = 10; //Number of prior knowledge sources
-        int numReliable = 5; //Number of reliable sources
-        int numComponents = 200; //How many components do we have for cluster simulation?
-        int minTargetParents = 50; //How many true parents of the target are there?
-        boolean noiseRandom = false; //Should the priors have random amounts of reliability?
-
-
-        boolean amountRandom = false; //Should the priors have a random amount of prior knowledge?
-        boolean targetContinuous = true; //Is the target variable continuous?
-        boolean evenDistribution = false; //Is the distribution of nodes in each cluster even?
-        int numCategories = 4; //number of categories for discrete variables
+                    int numRuns = 10;
+                    int numGenes = 300;
+                    int sampleSize = ss[z];
+                    double amountPrior = ap[xx];//percentage of edges to have prior knowledge for
+                    boolean boot = false; //Should we use bootstrap samples for PiPrefDiv
+                    boolean loocv = false; //Should we use leave-one-out CV for PiPrefDiv
+                    int numSamples = 20; //Number of bootstrap/sub-sampled samples to use
 
 
-        int index = 0;
-        while (index < args.length) {
-            if (args[index].equals("-runs")) {
-                numRuns = Integer.parseInt(args[index + 1]);
-                index += 2;
-            } else if (args[index].equals("-ng")) {
-                numGenes = Integer.parseInt(args[index + 1]);
-                index += 2;
-            } else if (args[index].equals("-ss")) {
-                sampleSize = Integer.parseInt(args[index + 1]);
-                index += 2;
-            } else if (args[index].equals("-numParents")) {
-                minTargetParents = Integer.parseInt(args[index + 1]);
-                index += 2;
-            } else if (args[index].equals("-nc")) {
-                numComponents = Integer.parseInt(args[index + 1]);
-                index += 2;
-            } else if (args[index].equals("-categorical")) {
-                targetContinuous = false;
-                index++;
-            } else if (args[index].equals("-even")) {
-                evenDistribution = true;
-                index++;
-            } else if(args[index].equals("-numPriors")) {
-                numPriors = Integer.parseInt(args[index+1]);
-                index+=2;
-
-            } else if(args[index].equals("-numReliable"))
-            {
-                numReliable = Integer.parseInt(args[index+1]);
-                index+=2;
-            } else if(args[index].equals("-amountPrior"))
-            {
-                amountPrior = Double.parseDouble(args[index+1]);
-                index+=2;
-            } else if(args[index].equals("-numSamples"))
-            {
-                numSamples = Integer.parseInt(args[index+1]);
-                index+=2;
-            } else if(args[index].equals("-amountRandom"))
-            {
-                amountRandom = true;
-                index++;
-            }
-            else if(args[index].equals("-noiseRandom"))
-            {
-                noiseRandom = true;
-                index++;
-            } else if(args[index].equals("-boot"))
-            {
-                boot = true;
-                index++;
-            } else if(args[index].equals("-loocv"))
-            {
-                loocv = true;
-                index++;
-            }
-            else if(args[index].equals("-even"))
-            {
-                evenDistribution = true;
-                index++;
-            }
-
-                else{
-                System.err.println("Unidentified argument: " + args[index]);
-                System.exit(-1);
-            }
-        }
+                    int numPriors = 10; //Number of prior knowledge sources
+                    int numReliable = nr[y]; //Number of reliable sources
+                    int numComponents = 20; //How many components do we have for cluster simulation?
+                    int minTargetParents = 10; //How many true parents of the target are there?
+                    boolean noiseRandom = false; //Should the priors have random amounts of reliability?
 
 
-
-        boolean saveData = true;
-
-        //out variables refer to outputs
-        //correctness column to the stability file for the first boolean
-
-        //If either of outAccuracy or outStabAcc are true, then
-
-        //Create Directories to save results
-        File rFile = new File("Results");
-        if (!rFile.isDirectory())
-            rFile.mkdir();
-        File cFile = new File("Clusters");
-        File gFile = new File("Graphs");
-        File dFile = new File("Data");
-        File pFile = new File("Priors");
-        File subFile = new File("Subsamples");
-        if (saveData) {
-            if (!cFile.isDirectory())
-                cFile.mkdir();
-            if (!gFile.isDirectory())
-                gFile.mkdir();
-            if (!dFile.isDirectory())
-                dFile.mkdir();
-            if (!pFile.isDirectory())
-                pFile.mkdir();
-            if (!subFile.isDirectory())
-                subFile.mkdir();
-        }
-
-        for (int j = 0; j < numRuns; j++) {
-
-            System.out.println("Simulate data for run number: " + j);
-            HashMap<String, Integer> clusters = new HashMap<String, Integer>();
-
-            Graph g = null;
-            DataSet d = null;
-            File graphFile = null;
+                    boolean amountRandom = false; //Should the priors have a random amount of prior knowledge?
+                    boolean targetContinuous = true; //Is the target variable continuous?
+                    boolean evenDistribution = true; //Is the distribution of nodes in each cluster even?
+                    int numCategories = 4; //number of categories for discrete variables
 
 
-            /**GENERATE GRAPH**/
+                    int index = 0;
+                    while (index < args.length) {
+                        if (args[index].equals("-runs")) {
+                            numRuns = Integer.parseInt(args[index + 1]);
+                            index += 2;
+                        } else if (args[index].equals("-ng")) {
+                            numGenes = Integer.parseInt(args[index + 1]);
+                            index += 2;
+                        } else if (args[index].equals("-ss")) {
+                            sampleSize = Integer.parseInt(args[index + 1]);
+                            index += 2;
+                        } else if (args[index].equals("-numParents")) {
+                            minTargetParents = Integer.parseInt(args[index + 1]);
+                            index += 2;
+                        } else if (args[index].equals("-nc")) {
+                            numComponents = Integer.parseInt(args[index + 1]);
+                            index += 2;
+                        } else if (args[index].equals("-categorical")) {
+                            targetContinuous = false;
+                            index++;
+                        } else if (args[index].equals("-even")) {
+                            evenDistribution = true;
+                            index++;
+                        } else if (args[index].equals("-numPriors")) {
+                            numPriors = Integer.parseInt(args[index + 1]);
+                            index += 2;
 
-            System.out.print("Generating Graph...");
-
-            graphFile = new File("Graphs/Graph_" + numGenes + "_" + minTargetParents + "_" + numComponents + "_" + evenDistribution + "_" + j + ".txt");
-            if (graphFile.exists())
-                g = GraphUtils.loadGraphTxt(graphFile);
-            File dataFile = null;
-            dataFile = new File("Data/Dataset_" + numGenes + "_" + sampleSize + "_" + minTargetParents + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + j + ".txt");
-            try {
-                if (dataFile.exists())
-                    d = MixedUtils.loadDataSet2(dataFile.getAbsolutePath());
-            } catch (Exception e) {
-                System.err.println("Unable to load dataset");
-                System.exit(-1);
-            }
-
-
-            MixedLeeHastieSimulation m = new MixedLeeHastieSimulation();
-            Parameters p = new Parameters();
-
-            p.setValue("numMeasures", numGenes + 1);
-            p.setValue("sampleSize", sampleSize);
-            if (targetContinuous)
-                p.setValue("percentDiscreteForMixedSimulation", 0);
-            else
-                p.setValue("percentDiscreteForMixedSimulation", 100 / (double) numGenes);
-            p.setValue("numCategories", numCategories);
-            NormalDistribution n = new NormalDistribution(numGenes*2 , numGenes / 3);
-            int edges = (int)n.sample();
-            int nodesPerCluster = numGenes/numComponents;
-            int limit = nodesPerCluster*(nodesPerCluster-1)/2;
-            limit *= numComponents;
-            while(edges> limit) {
-                System.out.println(edges);
-                edges = (int) n.sample();
-            }
-            System.out.println(edges);
-            p.setValue("numEdges", edges);
-            p.setValue("numConnectedComponents", minTargetParents);
-            p.setValue("numComponents", numComponents);
-            if (targetContinuous)
-                p.setValue("targetContinuous", 1);
-            else
-                p.setValue("targetContinuous", 0);
-
-            if (g != null) {
-                m.setTrueGraph(g);
-            }
-            clusters = m.simulateClustered(p, evenDistribution);
-
-            System.out.println("Done");
-            System.out.println("Graph: " + m.getTrueGraph());
-
-            System.out.println("Data: " + m.getDataSet(0));
-
-            System.out.println("Clusters: " + clusters);
-
-            File clusterFile = null;
-            clusterFile = new File("Clusters/Cluster_" + numGenes + "_" + minTargetParents + "_" + numComponents + "_" + evenDistribution + "_" + j + ".txt");
-            if (clusterFile.exists()) {
-                clusters = new HashMap<String, Integer>();
-                try {
-                    BufferedReader bTemp = new BufferedReader(new FileReader(clusterFile));
-                    while (bTemp.ready()) {
-                        String[] line = bTemp.readLine().split("\t");
-                        clusters.put(line[0], Integer.parseInt(line[1]));
-                    }
-                } catch (Exception e) {
-                    System.err.println("Couldn't load clusters from file");
-                    e.printStackTrace();
-                    System.exit(-1);
-                }
-
-            }
-
-
-            String target = "Target";
-            if (d == null) {
-                d = m.getDataSet(0);
-            } else
-                m.setDataSet(d, 0);
-            g = m.getTrueGraph();
-
-
-            System.out.print("Generating Intensity File...");
-            //Consistent ordering is whatever is returned by g.getNodes() (ignoring the target variable)
-            File priorFile = null;
-            priorFile = new File("Priors/Prior_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_"  + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" +  j + "_intensity.txt");
-            File iFile = new File("Reliabilities_I_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + j + ".txt");
-            if (!priorFile.exists()) {
-                generateIntensity(priorFile,iFile, g, target, numPriors, numReliable, amountPrior,amountRandom,noiseRandom);
-            }
-            System.out.println("Done");
-            //Use this if prior file exists Make sure intensity is at the end
-            String[] disFiles = new String[numPriors];
-            try {
-                File temp = new File("Reliabilities_D_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + j + ".txt");
-                if(!temp.exists()) {
-                    PrintStream out2 = new PrintStream("Reliabilities_D_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + j + ".txt");
-                    for (int k = 0; k < numPriors; k++) {
-
-                        System.out.print("Generating Dissimilarity File #" + k + "...");
-                        disFiles[k] = "Priors/Prior_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + k + "_" + j + "_dissimilarity.txt";
-                        File f = new File(disFiles[k]);
-                        if (!f.exists()) {
-                            double reli = generateDissimilarity(f, g, target, numReliable, amountPrior, amountRandom, noiseRandom, k);
-                            out2.println(reli);
-                            out2.flush();
-                            System.out.println("Done");
-
+                        } else if (args[index].equals("-numReliable")) {
+                            numReliable = Integer.parseInt(args[index + 1]);
+                            index += 2;
+                        } else if (args[index].equals("-amountPrior")) {
+                            amountPrior = Double.parseDouble(args[index + 1]);
+                            index += 2;
+                        } else if (args[index].equals("-numSamples")) {
+                            numSamples = Integer.parseInt(args[index + 1]);
+                            index += 2;
+                        } else if (args[index].equals("-amountRandom")) {
+                            amountRandom = true;
+                            index++;
+                        } else if (args[index].equals("-noiseRandom")) {
+                            noiseRandom = true;
+                            index++;
+                        } else if (args[index].equals("-boot")) {
+                            boot = true;
+                            index++;
+                        } else if (args[index].equals("-loocv")) {
+                            loocv = true;
+                            index++;
+                        } else if (args[index].equals("-even")) {
+                            evenDistribution = true;
+                            index++;
+                        } else {
+                            System.err.println("Unidentified argument: " + args[index]);
+                            System.exit(-1);
                         }
-
-                        //End Generation of Prior Knowledge
                     }
 
-                    out2.close();
 
-                }
+                    boolean saveData = true;
 
-            }
-            catch(Exception e) {
-                e.printStackTrace();
-                System.exit(-1);
-            }
+                    //out variables refer to outputs
+                    //correctness column to the stability file for the first boolean
 
-                System.out.print("Generating Subsamples...");
-                File subsFile = null;
-                subsFile = new File("Subsamples/Subsample_" + numGenes + "_" + sampleSize + "_" + minTargetParents + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + boot + "_" + numSamples + "_" + loocv + "_" + j + ".txt");
-                int[][] subs = null;
-                if (subsFile.exists()) {
-                    try {
-                        BufferedReader b = new BufferedReader(new FileReader(subsFile));
-                        int lineCount = 0;
-                        while (b.ready()) {
-                            b.readLine();
-                            lineCount++;
+                    //If either of outAccuracy or outStabAcc are true, then
+
+                    //Create Directories to save results
+                    File rFile = new File("Results");
+                    if (!rFile.isDirectory())
+                        rFile.mkdir();
+                    File cFile = new File("Clusters");
+                    File gFile = new File("Graphs");
+                    File dFile = new File("Data");
+                    File pFile = new File("Priors");
+                    File subFile = new File("Subsamples");
+                    if (saveData) {
+                        if (!cFile.isDirectory())
+                            cFile.mkdir();
+                        if (!gFile.isDirectory())
+                            gFile.mkdir();
+                        if (!dFile.isDirectory())
+                            dFile.mkdir();
+                        if (!pFile.isDirectory())
+                            pFile.mkdir();
+                        if (!subFile.isDirectory())
+                            subFile.mkdir();
+                    }
+
+                    for (int j = 0; j < numRuns; j++) {
+
+                        System.out.println("Simulate data for run number: " + j);
+                        HashMap<String, Integer> clusters = new HashMap<String, Integer>();
+
+                        Graph g = null;
+                        DataSet d = null;
+                        File graphFile = null;
+
+
+                        /**GENERATE GRAPH**/
+
+                        System.out.print("Generating Graph...");
+
+                        graphFile = new File("Graphs/Graph_" + numGenes + "_" + minTargetParents + "_" + numComponents + "_" + evenDistribution + "_" + j + ".txt");
+                        if (graphFile.exists())
+                            g = GraphUtils.loadGraphTxt(graphFile);
+                        File dataFile = null;
+                        dataFile = new File("Data/Dataset_" + numGenes + "_" + sampleSize + "_" + minTargetParents + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + j + ".txt");
+                        try {
+                            if (dataFile.exists())
+                                d = MixedUtils.loadDataSet2(dataFile.getAbsolutePath());
+                        } catch (Exception e) {
+                            System.err.println("Unable to load dataset");
+                            System.exit(-1);
                         }
-                        subs = new int[lineCount][];
-                        b = new BufferedReader(new FileReader(subsFile));
-                        lineCount = 0;
-                        while (b.ready()) {
-                            String[] line = b.readLine().split("\t");
-                            subs[lineCount] = new int[line.length];
-                            for (int x = 0; x < line.length; x++) {
-                                subs[lineCount][x] = Integer.parseInt(line[x]);
+
+
+                        MixedLeeHastieSimulation m = new MixedLeeHastieSimulation();
+                        Parameters p = new Parameters();
+
+                        p.setValue("numMeasures", numGenes + 1);
+                        p.setValue("sampleSize", sampleSize);
+                        if (targetContinuous)
+                            p.setValue("percentDiscreteForMixedSimulation", 0);
+                        else
+                            p.setValue("percentDiscreteForMixedSimulation", 100 / (double) numGenes);
+                        p.setValue("numCategories", numCategories);
+                        //NormalDistribution n = new NormalDistribution(numGenes * 2, numGenes / 3);
+                        //int edges = (int) n.sample();
+                        int nodesPerCluster = numGenes / numComponents;
+                        int limit = nodesPerCluster * (nodesPerCluster - 1) / 2;
+                        limit *= numComponents;
+                       /* while (edges > limit) {
+                            System.out.println(edges);
+                            edges = (int) n.sample();
+                        }
+                        System.out.println(edges);
+                        p.setValue("numEdges", edges);*/
+                        p.setValue("numConnectedComponents", minTargetParents);
+                        p.setValue("numComponents", numComponents);
+                        if (targetContinuous)
+                            p.setValue("targetContinuous", 1);
+                        else
+                            p.setValue("targetContinuous", 0);
+
+                        if (g != null) {
+                            m.setTrueGraph(g);
+                        }
+                        clusters = m.simulateClustered(p, evenDistribution);
+
+                        System.out.println("Done");
+                        System.out.println("Graph: " + m.getTrueGraph());
+
+                        System.out.println("Data: " + m.getDataSet(0));
+
+                        System.out.println("Clusters: " + clusters);
+
+                        File clusterFile = null;
+                        clusterFile = new File("Clusters/Cluster_" + numGenes + "_" + minTargetParents + "_" + numComponents + "_" + evenDistribution + "_" + j + ".txt");
+                        if (clusterFile.exists()) {
+                            clusters = new HashMap<String, Integer>();
+                            try {
+                                BufferedReader bTemp = new BufferedReader(new FileReader(clusterFile));
+                                while (bTemp.ready()) {
+                                    String[] line = bTemp.readLine().split("\t");
+                                    clusters.put(line[0], Integer.parseInt(line[1]));
+                                }
+                            } catch (Exception e) {
+                                System.err.println("Couldn't load clusters from file");
+                                e.printStackTrace();
+                                System.exit(-1);
                             }
-                            lineCount++;
+
                         }
-                        b.close();
-                    } catch (Exception e) {
-                        System.err.println("Unable to load subsamples");
-                        e.printStackTrace();
-                        System.exit(-1);
-                    }
-                }
-                else
-                {
-                    subs = PiPrefDiv.genSubsamples(boot,numSamples,d,loocv);
-                }
 
 
-                System.out.print("Generating training subsamples...");
-            File subsFile2 = new File("Subsamples/Subsample_Train_" + numGenes + "_" + sampleSize + "_" + minTargetParents + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + boot + "_" + numSamples + "_" + loocv + "_" + j + ".txt");
-            int[][] subs2 = null;
-            if (subsFile2.exists()) {
-                try {
-                    BufferedReader b = new BufferedReader(new FileReader(subsFile2));
-                    int lineCount = 0;
-                    while (b.ready()) {
-                        b.readLine();
-                        lineCount++;
-                    }
-                    subs2 = new int[lineCount][];
-                    b = new BufferedReader(new FileReader(subsFile2));
-                    lineCount = 0;
-                    while (b.ready()) {
-                        String[] line = b.readLine().split("\t");
-                        subs2[lineCount] = new int[line.length];
-                        for (int x = 0; x < line.length; x++) {
-                            subs2[lineCount][x] = Integer.parseInt(line[x]);
+                        String target = "Target";
+                        if (d == null) {
+                            d = m.getDataSet(0);
+                        } else
+                            m.setDataSet(d, 0);
+                        g = m.getTrueGraph();
+
+
+                        System.out.print("Generating Intensity File...");
+
+
+                        /***Consistent ordering is whatever is returned by g.getNodes() (ignoring the target variable)**/
+                        File priorFile = null;
+                        priorFile = new File("Priors/Prior_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + j + "_intensity.txt");
+                        File iFile = new File("Reliabilities_I_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + j + ".txt");
+                        if (!priorFile.exists()) {
+                            generateIntensity(priorFile, iFile, g, target, numPriors, numReliable, amountPrior, amountRandom, noiseRandom);
                         }
-                        lineCount++;
-                    }
-                    b.close();
-                } catch (Exception e) {
-                    System.err.println("Unable to load training subsamples");
-                    e.printStackTrace();
-                    System.exit(-1);
-                }
-            }
-            else
-            {
-                int trainLength = (int)(d.getNumRows()*0.9);
-                int [] trainInds = new int[trainLength];
-                for(int i = 0; i < trainLength;i++)
-                {
-                    trainInds[i] = i;
-                }
-                DataSet toRun = d.subsetRows(trainInds);
-                subs2 = PiPrefDiv.genSubsamples(boot,numSamples,toRun,loocv);
-            }
+                        System.out.println("Done");
 
-                System.out.println("Done");
+
+                        /**Use this if prior file exists Make sure intensity is at the end**/
+                        String[] disFiles = new String[numPriors];
+                        try {
+                            File temp = new File("Reliabilities_D_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + j + ".txt");
+                            if (!temp.exists()) {
+                                PrintStream out2 = new PrintStream("Reliabilities_D_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + j + ".txt");
+
+                                /***First decide the probability for each edge to be included in the information source***/
+                                float[] prob = generateDisAmounts((numGenes * (numGenes - 1)) / 2);
+
+                                for (int k = 0; k < numPriors; k++) {
+
+                                    System.out.print("Generating Dissimilarity File #" + k + "...");
+                                    disFiles[k] = "Priors/Prior_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + k + "_" + j + "_dissimilarity.txt";
+                                    File f = new File(disFiles[k]);
+                                    if (!f.exists()) {
+                                        double reli = generateDissimilarity(f, g, target, numReliable, amountPrior, amountRandom, noiseRandom, k, prob);
+                                        out2.println(reli);
+                                        out2.flush();
+                                        System.out.println("Done");
+
+                                    }
+
+                                    //End Generation of Prior Knowledge
+                                }
+
+                                out2.close();
+
+                            }
+
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                            System.exit(-1);
+                        }
+
+                        System.out.print("Generating Subsamples...");
+                        File subsFile = null;
+                        subsFile = new File("Subsamples/Subsample_" + numGenes + "_" + sampleSize + "_" + minTargetParents + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + boot + "_" + numSamples + "_" + loocv + "_" + j + ".txt");
+                        int[][] subs = null;
+                        if (subsFile.exists()) {
+                            try {
+                                BufferedReader b = new BufferedReader(new FileReader(subsFile));
+                                int lineCount = 0;
+                                while (b.ready()) {
+                                    b.readLine();
+                                    lineCount++;
+                                }
+                                subs = new int[lineCount][];
+                                b = new BufferedReader(new FileReader(subsFile));
+                                lineCount = 0;
+                                while (b.ready()) {
+                                    String[] line = b.readLine().split("\t");
+                                    subs[lineCount] = new int[line.length];
+                                    for (int x = 0; x < line.length; x++) {
+                                        subs[lineCount][x] = Integer.parseInt(line[x]);
+                                    }
+                                    lineCount++;
+                                }
+                                b.close();
+                            } catch (Exception e) {
+                                System.err.println("Unable to load subsamples");
+                                e.printStackTrace();
+                                System.exit(-1);
+                            }
+                        } else {
+                            subs = PiPrefDiv.genSubsamples(boot, numSamples, d, loocv);
+                        }
+
+
+                        System.out.print("Generating training subsamples...");
+                        File subsFile2 = new File("Subsamples/Subsample_Train_" + numGenes + "_" + sampleSize + "_" + minTargetParents + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + boot + "_" + numSamples + "_" + loocv + "_" + j + ".txt");
+                        int[][] subs2 = null;
+                        if (subsFile2.exists()) {
+                            try {
+                                BufferedReader b = new BufferedReader(new FileReader(subsFile2));
+                                int lineCount = 0;
+                                while (b.ready()) {
+                                    b.readLine();
+                                    lineCount++;
+                                }
+                                subs2 = new int[lineCount][];
+                                b = new BufferedReader(new FileReader(subsFile2));
+                                lineCount = 0;
+                                while (b.ready()) {
+                                    String[] line = b.readLine().split("\t");
+                                    subs2[lineCount] = new int[line.length];
+                                    for (int x = 0; x < line.length; x++) {
+                                        subs2[lineCount][x] = Integer.parseInt(line[x]);
+                                    }
+                                    lineCount++;
+                                }
+                                b.close();
+                            } catch (Exception e) {
+                                System.err.println("Unable to load training subsamples");
+                                e.printStackTrace();
+                                System.exit(-1);
+                            }
+                        } else {
+                            int trainLength = (int) (d.getNumRows() * 0.9);
+                            int[] trainInds = new int[trainLength];
+                            for (int i = 0; i < trainLength; i++) {
+                                trainInds[i] = i;
+                            }
+                            DataSet toRun = d.subsetRows(trainInds);
+                            subs2 = PiPrefDiv.genSubsamples(boot, numSamples, toRun, loocv);
+                        }
+
+                        System.out.println("Done");
 /*
                 RunPrefDiv r = new RunPrefDiv(dissimilarity, genes, d, target, false);
 
@@ -385,67 +393,68 @@ public class justSimulatePrefDiv {
                 r.setCausalGraph(useCausalGraph);
                 r.setB(B);*/
 
-                try {
+                        try {
 
 
-                    PrintStream temp = new PrintStream(graphFile);
-                    temp.println(g);
-                    temp.flush();
-                    temp.close();
+                            PrintStream temp = new PrintStream(graphFile);
+                            temp.println(g);
+                            temp.flush();
+                            temp.close();
 
 
-
-                    temp = new PrintStream(clusterFile);
-                    for (String s : clusters.keySet()) {
-                        temp.println(s + "\t" + clusters.get(s));
-                        temp.flush();
-                    }
-                    temp.close();
-
+                            temp = new PrintStream(clusterFile);
+                            for (String s : clusters.keySet()) {
+                                temp.println(s + "\t" + clusters.get(s));
+                                temp.flush();
+                            }
+                            temp.close();
 
 
-                    temp = new PrintStream(dataFile);
-                    temp.println(d);
-                    temp.flush();
-                    temp.close();
+                            temp = new PrintStream(dataFile);
+                            temp.println(d);
+                            temp.flush();
+                            temp.close();
 
-                    /***PRINT SUBSAMPLES OUT***/
-                    temp = new PrintStream(subsFile);
-                    for (int i = 0; i < subs.length; i++) {
-                        for (int x = 0; x < subs[i].length; x++) {
-                            if (x == subs[i].length - 1)
-                                temp.println(subs[i][x]);
-                            else
-                                temp.print(subs[i][x] + "\t");
+                            /***PRINT SUBSAMPLES OUT***/
+                            temp = new PrintStream(subsFile);
+                            for (int i = 0; i < subs.length; i++) {
+                                for (int x = 0; x < subs[i].length; x++) {
+                                    if (x == subs[i].length - 1)
+                                        temp.println(subs[i][x]);
+                                    else
+                                        temp.print(subs[i][x] + "\t");
+                                }
+                            }
+                            temp.flush();
+                            temp.close();
+
+                            temp = new PrintStream(subsFile2);
+                            for (int i = 0; i < subs2.length; i++) {
+                                for (int x = 0; x < subs2[i].length; x++) {
+                                    if (x == subs2[i].length - 1)
+                                        temp.println(subs2[i][x]);
+                                    else
+                                        temp.print(subs2[i][x] + "\t");
+                                }
+                            }
+                            temp.flush();
+                            temp.close();
+
+
+                        } catch (Exception e) {
+                            System.err.println("Couldn't write information to files " + j);
+                            e.printStackTrace();
+                            System.exit(-1);
                         }
                     }
-                    temp.flush();
-                    temp.close();
-
-                    temp = new PrintStream(subsFile2);
-                    for (int i = 0; i < subs2.length; i++) {
-                        for (int x = 0; x < subs2[i].length; x++) {
-                            if (x == subs2[i].length - 1)
-                                temp.println(subs2[i][x]);
-                            else
-                                temp.print(subs2[i][x] + "\t");
-                        }
-                    }
-                    temp.flush();
-                    temp.close();
-
-
-                } catch (Exception e) {
-                    System.err.println("Couldn't write information to files " + j);
-                    e.printStackTrace();
-                    System.exit(-1);
                 }
             }
+        }
     }
 
 
 
-    public static double generateDissimilarity(File prior, Graph g, String target, int numReliable,double amountPrior, boolean amountRandom, boolean noiseRandom, int k)
+    public static double generateDissimilarity(File prior, Graph g, String target, int numReliable,double amountPrior, boolean amountRandom, boolean noiseRandom, int k,float[] prob)
     {
         List<Node> allNodes = g.getNodes();
         double[][] dissim = new double[allNodes.size()-1][allNodes.size()-1];
@@ -463,6 +472,7 @@ public class justSimulatePrefDiv {
             reliableParams[3] = rand.nextDouble()*0.8;
         }
         try {
+            int index = 0;
 
             for(int i = 0; i < allNodes.size();i++)
             {
@@ -485,7 +495,7 @@ public class justSimulatePrefDiv {
                     {
                         if(g.getEdge(curr,curr2)!=null)
                         {
-                            if(rand.nextDouble()<amount)
+                            if(prob[index]<amount)
                             {
                                 double val = rand.nextDouble()*(reliableParams[1]-reliableParams[0])+reliableParams[0];
                                 dissim[row][col] = val;
@@ -500,7 +510,7 @@ public class justSimulatePrefDiv {
                         }
                         else
                         {
-                            if(rand.nextDouble()<amount)
+                            if(prob[index]<amount)
                             {
                                 double val = rand.nextDouble()*(reliableParams[3]-reliableParams[2]) + reliableParams[2];
                                 dissim[row][col] = val;
@@ -512,11 +522,12 @@ public class justSimulatePrefDiv {
                                 dissim[row][col] = -1;
                             }
                         }
+                        index++;
                     }
                     //This prior is unreliable, needs to give bad information
                     else
                     {
-                        if(rand.nextDouble()<amount)
+                        if(prob[index]<amount)
                         {
                             double val = -1;
                             if(g.getEdge(curr,curr2)!=null)
@@ -539,6 +550,7 @@ public class justSimulatePrefDiv {
                         {
                             dissim[row][col] = -1;
                         }
+                        index++;
                     }
                     col++;
                 }
@@ -585,6 +597,19 @@ public class justSimulatePrefDiv {
         return -1;
     }
 
+
+    /***
+     *
+     * @param prior The file to write the intensity information to
+     * @param intense The file to write the reliability information to
+     * @param g The true data generating graph
+     * @param target The target variable name
+     * @param numPriors The total number of priors giving intensity information
+     * @param numReliable The total number of reliable prior information sources
+     * @param amountPrior The amount of prior information each source is giving (0 to 1)
+     * @param amountRandom Whether or not the amount of prior information should be randomly generated
+     * @param noiseRandom Whether or not the noise for each prior is randomly determined
+     */
     public static void generateIntensity(File prior,File intense, Graph g, String target, int numPriors, int numReliable,double amountPrior, boolean amountRandom,boolean noiseRandom)
     {
         List<Node> neighbors = g.getAdjacentNodes(g.getNode(target));
@@ -615,6 +640,9 @@ public class justSimulatePrefDiv {
                 if(curr.getName().equals(target))
                     continue;
                 out.print(allNodes.get(i).getName()+"\t");
+
+                /***Probability for all priors to include information about this relationship***/
+                double prob = rand.nextDouble();
                for(int j = 0; j < numPriors;j++)
                {
 
@@ -623,12 +651,12 @@ public class justSimulatePrefDiv {
                        reliableParams[0] = rand.nextDouble()*0.8+0.2;
                        reliableParams[3] = rand.nextDouble()*0.8;
                    }
-                   //Currently reliable priors give information about true neighbors in the range [0.6,1] and false neighbors in the range [0,0.5]
+                   /**Currently reliable priors give information about true neighbors in the range [0.6,1] and false neighbors in the range [0,0.5]**/
                    if(j < numReliable)
                    {
                        if(neighbors.contains(curr))
                        {
-                           if(rand.nextDouble()<amount[j])
+                           if(prob<amount[j])
                            {
                                double val = rand.nextDouble()*(reliableParams[1]-reliableParams[0])+reliableParams[0];
                                out.print(val + "\t");
@@ -642,7 +670,7 @@ public class justSimulatePrefDiv {
                        }
                        else
                        {
-                           if(rand.nextDouble()<amount[j])
+                           if(prob<amount[j])
                            {
                                double val = rand.nextDouble()*(reliableParams[3]-reliableParams[2]) + reliableParams[2];
                                out.print(val + "\t");
@@ -655,10 +683,10 @@ public class justSimulatePrefDiv {
                            }
                        }
                    }
-                   //This prior is unreliable, needs to give bad information
+                   /***This prior is unreliable, needs to give bad information***/
                    else
                    {
-                       if(rand.nextDouble()<amount[j])
+                       if(prob<amount[j])
                        {
                            double val = -1;
                            if(neighbors.contains(curr))
@@ -701,6 +729,22 @@ public class justSimulatePrefDiv {
             System.exit(-1);
         }
 
+    }
+
+
+    /**
+     *
+     * @param N Number of entries in the array
+     * @return A float [] with random values between 0 and 1 as elements
+     */
+    public static float[] generateDisAmounts(int N)
+    {
+        float [] temp = new float[N];
+        for(int i = 0; i < temp.length;i++)
+        {
+            temp[i] = rand.nextFloat();
+        }
+        return temp;
     }
 
     public static double averageClusterSim(ArrayList<Gene> result, String target, Graph g, HashMap<String,Integer> clusters,HashMap<Gene,List<Gene>> predClusts)

@@ -33,7 +33,7 @@ public class allPDTests {
     static boolean useCausalGraph = false; //Are we selecting genes to then use a causal graph to find connections or direct selection?
     static int numSamples = 20; //Number of bootstrap/sub-sampled samples to use
     static int numParams = 15;//Number of parameters to sweep over
-    static boolean noiseRandom = true;//Is the reliability range of reliable and unreliable priors set randomly?
+    static boolean noiseRandom = false;//Is the reliability range of reliable and unreliable priors set randomly?
     static int numFolds = 5; //Number of Folds for CV to pick alpha
 
 
@@ -56,9 +56,9 @@ public class allPDTests {
 
 
         //double [] ap = new double[]{0.3,0.6};
-        double [] ap = new double[]{0.1};
-        int [] nr = new int[]{1,5,10};
-        int [] ss = new int[]{200};
+        double [] ap = new double[]{1.0};
+        int [] nr = new int[]{10};
+        int [] ss = new int[]{200,1000,2000};
 
         for(int ii = 0; ii < ap.length;ii++) {
             amountPrior = ap[ii];
@@ -70,8 +70,9 @@ public class allPDTests {
 
 
                     ArrayList<Integer> experiment = new ArrayList<Integer>();
-                    experiment.add(5);
-                    //0 -> prior evaluation, 1 -> Accuracy of chosen parameters vs Optimal,
+                    experiment.add(0);
+                    experiment.add(1);
+                    //0 -> prior evaluation, 1 -> Accuracy of chosen parameters vs Optimal
                     //2-> Comparing separate prior parameters vs not, 3-> Comparing different summarization methods for clustered genes
                     //4 -> Runtime profiling
                     // 5-> Temporary test of using correlations alone vs using correlation and p-value
@@ -99,6 +100,8 @@ public class allPDTests {
                                 start = "Separate Parameter Experiment/Results/Separate_Param_Comparison_";
                             } else if (x.intValue() == 3) {
                                 start = "Summarization Experiment/Results/Summarization_Comparison_";
+                            } else if(x.intValue()==5){
+                                start = "Test Correlation Alone/Results/Comparison_";
                             }
 
                             out.add(new PrintStream(start + numGenes + "_" + sampleSize + "_" + numRuns + "_" + numPriors + "_" + amountPrior + "_" + amountRandom + "_" + boot + "_" + loocv + "_" + evenDistribution + "_" + targetContinuous + "_" + useCausalGraph + "_" + numReliable + "_" + numComponents + "_" + minTargetParents + "_" + numParams + "_" + stabilitySelection + ".txt"));
@@ -114,13 +117,23 @@ public class allPDTests {
                                         out.get(curr).print(starts[j] + "_" + types[i] + "\t");
                                     }
                                 }
-                                out.get(curr).println();
+                                out.get(curr).println("Predicted_Representation_Accuracy");
                             } else if (x.intValue() == 2) {
                                 out.get(curr).println("Run\tRadius_Both\tThreshold_Both\tBoth_Feat_Accuracy\tBoth_Pred_Accuracy\tBoth_Clust_Accuracy\tRadius_WP\tRadius_NP\tThreshold_WP\tThreshold_NP\tSeparate_Feat_Accuracy\tSeparate_Pred_Accuracy\tSeparate_Clust_Accuracy");
                             } else if (x.intValue() == 3) {
                                 out.get(curr).print("Run\t");
                                 for (int i = 0; i < allTypes.length; i++)
                                     out.get(curr).print(allTypes[i] + "\t");
+                                out.get(curr).println();
+                            }
+                            else if (x.intValue() == 5) {
+                                out.get(curr).print("Run\tPredicted_Radius_NP\tPredicted_Radius_WP\tPredicted_Threshold_NP\tPredicted_Threshold_WP\tBest_Radius_NP\tBest_Threshold_NP\t");
+
+                                for (int i = 0; i < types.length; i++) {
+                                    for (int j = 0; j < starts.length; j++) {
+                                        out.get(curr).print(starts[j] + "_" + types[i] + "\t");
+                                    }
+                                }
                                 out.get(curr).println();
                             }
                             curr++;
@@ -247,6 +260,21 @@ public class allPDTests {
                             p.setVerbose();
                             ArrayList<Gene> selected = p.selectGenes(boot, numSamples, priorIntensity, dFile, useCausalGraph);
 
+
+                            /****EXPERIMENTAL TODO REMOVE THIS
+                            PiPrefDiv3 p3 = new PiPrefDiv3(toRun, "Target", minTargetParents, numParams);
+                            p3.setSubsamples(subs);
+                            //p.setVerbose();
+                            p3.setUseStabilitySelection(stabilitySelection);
+                            p3.setParallel(false);
+                            p3.setPartialCorrs(partialCorr);
+                            p3.setPdStability(pdStability);
+                            p3.setVerbose();
+                            ArrayList<Gene> selected3 = p3.selectGenes(boot, numSamples, priorIntensity, dFile, useCausalGraph);
+                            **************************************************************************************************/
+
+
+
                             curr = 0;
 
                             for(Integer x: experiment) {
@@ -288,8 +316,13 @@ public class allPDTests {
                                     System.out.println(g.getAdjacentNodes(g.getNode("Target")));
                                     Map<Gene, List<Gene>> lastCluster = p.getLastCluster();
                                     System.out.println("Cluster: " + lastCluster);
+
+
+                                    /***Do we correctly identify the clusters of variables***/
                                     double clustAccuracy = getClusterAccuracy(lastCluster, clusters, numComponents);
                                     double featAccuracy = -1;
+
+                                    /***Do we pick the correct causes of the target variable***/
                                     if (minTargetParents == g.getAdjacentNodes(g.getNode("Target")).size()) {
                                         //Correct amount of selections so use accuracy
                                         featAccuracy = getFeatAccuracy(selected, g, "Target", "ACC");
@@ -298,8 +331,13 @@ public class allPDTests {
                                         //Incorrect amount of selected variables so use F1
                                         featAccuracy = getFeatAccuracy(selected, g, "Target", "F1");
                                     }
+
+                                    /***Are all the correct clusters represented in the selected features***/
+                                    double repAccuracy = getRepresentAccuracy(selected,g,clusters,"Target");
+
+                                    /**** Can we accurately predict the target variable on the test set***/
                                     double predAccuracy = getAccuracy(toRun, test, selected);
-                                    System.out.println("Run #" + j + ": Prediction=" + predAccuracy + ", Features=" + featAccuracy + ", Cluster=" + clustAccuracy);
+                                    System.out.println("Run #" + j + ": Prediction=" + predAccuracy + ", Features=" + featAccuracy + ", Cluster=" + clustAccuracy + ", Representation=" + repAccuracy);
 
                                     double[] radii = p.getTestedRadii();
                                     double[] thresholds = p.getTestedThresholds();
@@ -330,9 +368,8 @@ public class allPDTests {
                                     out.get(curr).print(j + "\t" + p.getLastRadius()[0] + "\t" + p.getLastRadius()[1] + "\t" + p.getLastThreshold()[0] + "\t" + p.getLastThreshold()[1] + "\t");
 
                                     //print out results to file
-                                    printResults(results, out.get(curr), radii, thresholds, new double[]{featAccuracy, predAccuracy, clustAccuracy}, npParams[0], npParams[1]);
+                                    printResults(results, out.get(curr), radii, thresholds, new double[]{featAccuracy, predAccuracy, clustAccuracy,repAccuracy}, npParams[0], npParams[1]);
 
-                                    printDetailedScores(results, new PrintStream("Parameter Selection Experiment/Results/Detailed_Results_" + j + "_" + numGenes + "_" + sampleSize + "_" + numRuns + "_" + numPriors + "_" + amountPrior + "_" + amountRandom + "_" + boot + "_" + loocv + "_" + evenDistribution + "_" + targetContinuous + "_" + useCausalGraph + "_" + numReliable + "_" + numComponents + "_" + minTargetParents + "_" + numParams + "_" + stabilitySelection + ".txt"));
 
 
                                     //Roll through all tested radii,threshold combos and RunPrefDiv directly to get accuracies
@@ -404,10 +441,32 @@ public class allPDTests {
                                 }
                                 else if (x.intValue() == 5) //Evaluate Parameter accuracy
                                 {
-                                    System.out.println("Selected Genes: " + selected);
+                                    int numPriorI = 0;
+                                    for(int y = 0; y < p.getIntensityPriors().length;y++)
+                                    {
+                                        if(p.getIntensityPriors()[y])
+                                            numPriorI++;
+                                    }
+
+                                    int numPriorD = 0;
+                                    for(int y = 0; y < p.getDissimilarityPriors().length;y++)
+                                    {
+                                        if(p.getDissimilarityPriors()[y])
+                                            numPriorD++;
+                                    }
+
+
+                                    System.out.println("Intensity Priors:" + numPriorI/((double)p.getIntensityPriors().length) + ", Dis Priors:" + numPriorD/((double)p.getDissimilarityPriors().length));
+
+                                    System.out.println("Selected Genes: " + selected + "\nSelected Genes w/o p-value:" + selected);
                                     System.out.println(g.getAdjacentNodes(g.getNode("Target")));
+
+
                                     Map<Gene, List<Gene>> lastCluster = p.getLastCluster();
-                                    System.out.println("Cluster: " + lastCluster);
+                                    //Map<Gene, List<Gene>> lastCluster3 = p3.getLastCluster();
+
+
+                                    //System.out.println("Cluster: " + lastCluster + "\nCluster w/o p-value:" + lastCluster3);
                                     double clustAccuracy = getClusterAccuracy(lastCluster, clusters, numComponents);
                                     double featAccuracy = -1;
                                     if (minTargetParents == g.getAdjacentNodes(g.getNode("Target")).size()) {
@@ -419,7 +478,25 @@ public class allPDTests {
                                         featAccuracy = getFeatAccuracy(selected, g, "Target", "F1");
                                     }
                                     double predAccuracy = getAccuracy(toRun, test, selected);
+
+
+                                    double clustAccuracy3 = getClusterAccuracy(lastCluster, clusters, numComponents);
+                                    double featAccuracy3 = -1;
+                                    if (minTargetParents == g.getAdjacentNodes(g.getNode("Target")).size()) {
+                                        //Correct amount of selections so use accuracy
+                                        featAccuracy3 = getFeatAccuracy(selected, g, "Target", "ACC");
+
+                                    } else {
+                                        //Incorrect amount of selected variables so use F1
+                                        featAccuracy3 = getFeatAccuracy(selected, g, "Target", "F1");
+                                    }
+                                    double predAccuracy3 = getAccuracy(toRun, test, selected);
+
+
+
+
                                     System.out.println("Run #" + j + ": Prediction=" + predAccuracy + ", Features=" + featAccuracy + ", Cluster=" + clustAccuracy);
+                                    System.out.println("Run #" + j + ": Prediction=" + predAccuracy3 + ", Features=" + featAccuracy3 + ", Cluster=" + clustAccuracy3);
 
                                     double[] radii = p.getTestedRadii();
                                     double[] thresholds = p.getTestedThresholds();
@@ -523,11 +600,9 @@ public class allPDTests {
         }
         for(int k = 0; k < 3;k++)
         {
-            if(k==2)
-                out.println(radii[k] + "\t" + thresholds[k] + "\t" + maxValue[k] + "\t" + predAcc[k]);
-            else
                 out.print(radii[k] + "\t" + thresholds[k] + "\t" + maxValue[k] + "\t" + predAcc[k] + "\t");
         }
+        out.println(predAcc[3]);/**To include cluster representation score***/
     }
 
 
@@ -854,6 +929,52 @@ public class allPDTests {
             real.put(key,curr);
         }
         return RunPrefDiv.clusterSim(est,real);
+    }
+
+
+    /***
+     *
+     * @param selected List of genes that were  by the feature selection method
+     * @param g  True data generating graph
+     * @param clusts True cluster assignments for each gene
+     * @param targName The target variable's name as a String
+     * @return What percent of the true causal clusters are represented by the result
+     */
+    public static double getRepresentAccuracy(List<Gene> selected, Graph g, Map <String,Integer> clusts, String targName)
+    {
+
+        int trueLength = 0; /***How many clusts are represented in the truth?***/
+        ArrayList<Integer> trueClusts = new ArrayList<Integer>();
+
+
+        /***Get true cluster assignments***/
+        Node target = g.getNode(targName);
+        for(Node n: g.getAdjacentNodes(target))
+        {
+            trueClusts.add(clusts.get(n.getName()));
+        }
+
+        trueLength = trueClusts.size();
+        ArrayList<Integer> estClusts = new ArrayList<Integer>();
+
+        /***Get estimated cluster assignments***/
+        for(Gene n: selected)
+        {
+            estClusts.add(clusts.get(n.symbol));
+        }
+
+        /***Compute how many clusters in the truth are represented in the est***/
+
+        int count = 0;
+        for(int i = 0; i < estClusts.size();i++)
+        {
+            if(trueClusts.contains(estClusts.get(i))) {
+                trueClusts.remove(estClusts.get(i));
+                count++;
+            }
+        }
+        return count/(double)trueLength;
+
     }
 
 

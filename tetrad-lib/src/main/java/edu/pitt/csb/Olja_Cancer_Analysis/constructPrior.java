@@ -25,7 +25,7 @@ public class constructPrior {
         boolean geneList = false;
         //for(int i = 1; i <= 5;i++) {
 
-            String dataset = "Highest_Variance_Data_Continuous_Prediction.txt";
+            String dataset = "Highest_Variance_Data_Prediction_Group1.txt";
             DataSet data = MixedUtils.loadDataSet2(dataset);
             HashMap<String, Integer> map = null;
             DoubleMatrix2D prior = null;
@@ -44,7 +44,7 @@ public class constructPrior {
                 prior = makePrior(map, data);
                 System.out.println("Done");
                 //outputPrior(prior, data, "string_prior_" + i + ".txt");
-                outputPrior(prior, data, "string_prior_baseline.txt");
+                outputPrior(prior, data, "string_prior_g1.txt");
             }
 
             //CONSTRUCT MSIGDB PRIOR
@@ -56,7 +56,7 @@ public class constructPrior {
                 prior = makePriorMSig(map2, data);
                 System.out.println("Done");
                 //outputPrior(prior, data, "M_Sig_prior_" + i + ".txt");
-                outputPrior(prior, data, "M_Sig_prior_baseline.txt");
+                outputPrior(prior, data, "M_Sig_prior_g1.txt");
 
             }
             if (geneList) {

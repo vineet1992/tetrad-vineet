@@ -144,7 +144,69 @@ public class Functions
         return corrs;
     }
 
+    /***
+     *
+     * @param items list of genes
+     * @param d Dataset from which to compute correlations
+     * @param partialCorr Should we compute partial correlations?
+     * @param normalize Should we normalize the correlations to a normal distribution using NPN?
+     * @return A float [] of all pairwise correlations between genes
+     */
+    public static float[] computeCorrelationsOnly(ArrayList<Gene> items,DataSet d, boolean partialCorr,boolean normalize)
+    {
+        TetradMatrix c = null;
+        if(partialCorr)
+        {
+            c = new CovarianceMatrix(d).getMatrix();
+            c = c.ginverse();
+        }
+        HashMap<Integer,Integer> mapping = new HashMap<Integer,Integer>();
 
+        for(int i = 0; i < items.size();i++)
+        {
+            Node temp = d.getVariable(items.get(i).symbol);
+            mapping.put(i,d.getColumn(temp));
+        }
+        int total = (items.size()*(items.size()-1))/2;
+        float [] corrs = new float[total];
+        double [][] temp = d.getDoubleData().transpose().toArray();
+
+
+        for(int i = 0; i < items.size();i++)
+        {
+            int index = Functions.getIndex(i,i+1,items.size());
+
+            int x = mapping.get(i);
+            for(int j = i+1;j < items.size();j++)
+            {
+                int y= mapping.get(j);
+                if(partialCorr)
+                {
+                    corrs[index] = (float)(-1*c.get(x,y)/(c.get(x,x)*c.get(y,y)));
+                }
+
+                else {
+
+                        corrs[index] = (float) Math.abs(StatUtils.correlation(temp[x],temp[y]));
+                }
+                index++;
+            }
+
+
+        }
+
+        // System.out.print("Non paranormal Normalization...");
+        //time = System.nanoTime();
+        if(normalize)
+            corrs = NPN(corrs,true);
+
+
+
+        //time = System.nanoTime()-time;
+        //System.out.println("Done: " + time/Math.pow(10,9));
+
+        return corrs;
+    }
 
 
     //TODO Parallelize this
