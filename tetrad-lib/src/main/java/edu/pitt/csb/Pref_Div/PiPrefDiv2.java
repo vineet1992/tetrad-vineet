@@ -392,6 +392,7 @@ public class PiPrefDiv2 {
 
         ArrayList<Gene> temp = createGenes(data,target);
         ArrayList<Gene> meanGenes = Functions.computeAllIntensities(temp,1,data,target,partialCorrs,false,false,Math.exp(lastThreshold));
+        Collections.shuffle(meanGenes);
         Collections.sort(meanGenes,Gene.IntensityComparator);
 
 
@@ -530,6 +531,8 @@ public class PiPrefDiv2 {
 
         ArrayList<Gene> temp = createGenes(data,target);
         ArrayList<Gene> meanGenes = Functions.computeAllIntensities(temp,1,data,target,false,Math.exp(lastThreshold),Math.exp(lastThresholdWP),iPriors);
+
+        Collections.shuffle(meanGenes);
         Collections.sort(meanGenes,Gene.IntensityComparator);
         float [] meanDis = Functions.computeAllCorrelations(meanGenes,data,false,Math.exp(lastThreshold),Math.exp(lastThresholdWP),dPriors);
 
@@ -747,6 +750,7 @@ public class PiPrefDiv2 {
 
 
                 if(pdStability) {
+                    Collections.shuffle(temp);
                     Collections.sort(temp,Gene.IntensityComparator);
                     PrefDiv pd = new PrefDiv(temp, K, 0, initRadii[i], corrs);
                     pd.setCluster(clusterByCorrs);
@@ -838,20 +842,48 @@ public class PiPrefDiv2 {
         else
             curr = new int[numGenes + (numGenes*(numGenes-1))/2];
 
-
-        for(int x = 0; x < temp.size();x++)
+        double limit = Math.exp(initThreshold[j]);
+        if(pdStability)
         {
-            if(1-temp.get(x).intensityValue < initRadii[i] && temp.get(x).intensityP < Math.exp(initThreshold[j]))
-                curr[x]++;
+            float [] tempCorr = new float[corrs.length];
+            for(int k = 0; k < corrs.length;k++)
+            {
+                if(corrs[k][1]<limit)
+                {
+                    tempCorr[k] = corrs[k][0];
+                }
+            }
+            for(Gene g: temp)
+            {
+                if(g.intensityP > limit)
+                    g.intensityValue = 0;
+            }
+            Collections.shuffle(temp);
+            Collections.sort(temp,Gene.IntensityComparator);
+            PrefDiv pd = new PrefDiv(temp, K, 0, initRadii[i], tempCorr);
+            pd.setCluster(clusterByCorrs);
+            ArrayList<Gene> topGenes = pd.diverset();
+            for(Gene g: topGenes)
+            {
+                curr[g.ID]++;
+            }
+
         }
+        else {
 
 
-        if(corrs!=null) {
-            for (int x = 0; x < corrs.length; x++) {
-                if (1 - corrs[x][0] < initRadii[i] && corrs[x][1] < Math.exp(initThreshold[j]))
-                    curr[x + temp.size()]++;
+            for (int x = 0; x < temp.size(); x++) {
+                if (1 - temp.get(x).intensityValue < initRadii[i] && temp.get(x).intensityP < limit)
+                    curr[x]++;
             }
         }
+
+            if (corrs != null) {
+                for (int x = 0; x < corrs.length; x++) {
+                    if (1 - corrs[x][0] < initRadii[i] && corrs[x][1] < limit)
+                        curr[x + temp.size()]++;
+                }
+            }
 
         /***EXPERIMENTAL***/
         if(!saveMemory) {

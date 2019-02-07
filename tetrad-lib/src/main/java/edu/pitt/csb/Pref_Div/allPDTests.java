@@ -27,7 +27,7 @@ public class allPDTests {
 
 
     static int numRuns = 10;
-    static int numGenes = 300;
+    static int numGenes = 10;
 
     static boolean boot = false; //Should we use bootstrap samples for PiPrefDiv
     static boolean loocv = false; //Should we use leave-one-out CV for PiPrefDiv
@@ -40,8 +40,8 @@ public class allPDTests {
 
     static int numPriors = 10; //Number of prior knowledge sources
     static int numReliable = 5; //Number of reliable sources
-    static int numComponents = 20; //How many components do we have for cluster simulation?
-    static int minTargetParents = 10; //How many true parents of the target are there?
+    static int numComponents = 5; //How many components do we have for cluster simulation?
+    static int minTargetParents = 2; //How many true parents of the target are there?
     static boolean amountRandom = false; //Should the priors have a random amount of prior knowledge?
     static boolean targetContinuous = true; //Is the target variable continuous?
     static boolean evenDistribution = true; //Is the distribution of nodes in each cluster even?
@@ -52,12 +52,12 @@ public class allPDTests {
     static int[][] subs;
     static boolean parallel = true; //Should we run the experiment with parallel processing?
     static boolean partialCorr = false;
-    static boolean pdStability = false;
+    static boolean pdStability = true;
     public static void main(String [] args) {
 
 
         //double [] ap = new double[]{0.3,0.6};
-        double [] ap = new double[]{0.1};
+        double [] ap = new double[]{0.5,1.0};
         int [] nr = new int[]{10};
         int [] ss = new int[]{200,1000};
 
@@ -72,7 +72,7 @@ public class allPDTests {
 
                     ArrayList<Integer> experiment = new ArrayList<Integer>();
                     //experiment.add(0);
-                    experiment.add(-1);
+                    experiment.add(1);
                     //0 -> prior evaluation, 1 -> Accuracy of chosen parameters vs Optimal
                     //2-> Comparing separate prior parameters vs not, 3-> Comparing different summarization methods for clustered genes
                     //4 -> Runtime profiling
@@ -263,9 +263,9 @@ public class allPDTests {
                             p.setVerbose();
 
                             //TODO Switch back and include no priors as an option
-                            //ArrayList<Gene> selected = p.selectGenes(boot, numSamples, priorIntensity, dFile, useCausalGraph);
+                            ArrayList<Gene> selected = p.selectGenes(boot, numSamples, priorIntensity, dFile, useCausalGraph);
 
-                            ArrayList<Gene> selected = p.selectGenes(boot,numSamples,useCausalGraph);
+                            //ArrayList<Gene> selected = p.selectGenes(boot,numSamples,useCausalGraph);
 
 
                             curr = 0;
