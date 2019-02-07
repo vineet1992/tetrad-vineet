@@ -33,21 +33,21 @@ public class justSimulatePrefDiv {
     //TODO a question for later, should we treat intensity priors different from dissimilarity priors?
 
     //public static double [] reliableParams = new double[]{0.7,1.0,0.0,0.3}; //True Low, True High, False Low, False High
-    public static double [] reliableParams = new double[]{0.99999,1.0,0.0,0.0001}; //True Low, True High, False Low, False High
 
-    //public static double [] unreliableParams = new double[]{0.0,1.0,0.0,1.0}; //True Low, True High, False Low, False High
+    public static double [] reliableParams = new double[]{0.99999,1.0,0.0,0.00001}; //True Low, True High, False Low, False High
 
-    public static double [] unreliableParams = new double[]{0.0,1.0,0.0,1.0}; //True Low, True High, False Low, False High
-    //public static double amountLimit = 0.5; //Specifies the total percentage of prior information that can be given by a single source
+    public static double [] unreliableParams = new double[]{0.0,0.00001,0.0,0.00001}; //True Low, True High, False Low, False High
 
     public static double amountLimit = 1.0; //Specifies the total percentage of prior information that can be given by a single source
+
+    public static boolean perfectPriors = true;
 
     public static Random rand = new Random();
 
     public static void main(String [] args) {
-        double[] ap = new double[]{1.0};
+        double[] ap = new double[]{0.1,0.5,1.0};
         int[] nr = new int[]{10};
-        int [] ss = new int[]{200};
+        int [] ss = new int[]{200,1000};
 
         for (int xx = 0; xx < ap.length; xx++) {
             for (int y = 0; y < nr.length; y++) {
@@ -267,7 +267,11 @@ public class justSimulatePrefDiv {
                         priorFile = new File("Priors/Prior_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + j + "_intensity.txt");
                         File iFile = new File("Reliabilities_I_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + j + ".txt");
                         if (!priorFile.exists()) {
-                            generateIntensity(priorFile, iFile, g, target, numPriors, numReliable, amountPrior, amountRandom, noiseRandom);
+                            if(perfectPriors)
+                                generatePerfectIntensity(priorFile,iFile,g,target,numPriors,amountPrior,amountRandom);
+                            else
+                                generateIntensity(priorFile, iFile, g, target, numPriors, numReliable, amountPrior, amountRandom, noiseRandom);
+
                         }
                         System.out.println("Done");
 
@@ -288,7 +292,11 @@ public class justSimulatePrefDiv {
                                     disFiles[k] = "Priors/Prior_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + k + "_" + j + "_dissimilarity.txt";
                                     File f = new File(disFiles[k]);
                                     if (!f.exists()) {
-                                        double reli = generateDissimilarity(f, g, target, numReliable, amountPrior, amountRandom, noiseRandom, k, prob);
+                                        double reli = -1;
+                                        if(perfectPriors)
+                                            reli = generatePerfectDis(f,g,target,amountPrior,amountRandom,k,prob);
+                                        else
+                                            reli = generateDissimilarity(f, g, target, numReliable, amountPrior, amountRandom, noiseRandom, k, prob);
                                         out2.println(reli);
                                         out2.flush();
                                         System.out.println("Done");
@@ -453,7 +461,198 @@ public class justSimulatePrefDiv {
     }
 
 
+    /****
+     *
+     * @param prior
+     * @param intense
+     * @param g
+     * @param target
+     * @param numPriors
+     * @param amountPrior
+     * @param amountRandom
+     * @return
+     */
+    public static void generatePerfectIntensity(File prior, File intense, Graph g, String target, int numPriors, double amountPrior, boolean amountRandom)
+    {
+        List<Node> neighbors = g.getAdjacentNodes(g.getNode(target));
+        List<Node> allNodes = g.getNodes();
+        double [] reliability = new double[numPriors];
+        int [] counts = new int[numPriors];
+        double [] amount = new double[numPriors];
+        for(int i = 0; i < numPriors;i++)
+        {
+            amount[i] = amountPrior;
+            if(amountRandom)
+                amount[i] = rand.nextDouble()*amountLimit;
+        }
 
+        try {
+            PrintStream out = new PrintStream(prior);
+            out.print("Gene\t");
+            for(int i = 0; i < numPriors;i++)
+            {
+                out.print("Prior_" + i + "\t");
+            }
+            out.println();
+            PrintStream out2 = new PrintStream(intense);
+
+            for(int i = 0; i < allNodes.size();i++)
+            {
+                Node curr = allNodes.get(i);
+                if(curr.getName().equals(target))
+                    continue;
+                out.print(allNodes.get(i).getName()+"\t");
+
+                /***Probability for all priors to include information about this relationship***/
+                double prob = rand.nextDouble();
+                for(int j = 0; j < numPriors;j++)
+                {
+                    /***Only give information if probability is less than amount and this is a true relationship***/
+
+                        if(neighbors.contains(curr) && prob<amount[j])
+                        {
+                            double val = 1.0;
+                            reliability[j]+=val;
+
+                            counts[j]++;
+                            out.print(val + "\t");
+                        }
+                        else
+                        {
+                            out.print("-1\t");
+                        }
+
+                }
+                out.println();
+            }
+            for(int i = 0; i < numPriors;i++)
+            {
+                reliability[i] /= counts[i];
+                out2.println(reliability[i]);
+            }
+            out2.flush();
+            out2.close();
+            out.flush();
+            out.close();
+
+        }
+        catch (Exception e)
+        {
+            System.err.println("Couldn't create intensity file");
+            System.exit(-1);
+        }
+
+    }
+
+
+
+    public static double generatePerfectDis(File prior, Graph g, String target,double amountPrior, boolean amountRandom, int k,float[] prob)
+    {
+        List<Node> allNodes = g.getNodes();
+        double[][] dissim = new double[allNodes.size()-1][allNodes.size()-1];
+        int row = 0;
+        double reliability = 0;
+        int counts = 0;
+        double amount = amountPrior;
+        if(amountRandom)
+        {
+            amount = rand.nextDouble()*amountLimit;
+        }
+
+        try {
+            int index = 0;
+
+            for(int i = 0; i < allNodes.size();i++)
+            {
+                Node curr = allNodes.get(i);
+                if(curr.getName().equals(target))
+                    continue;
+                int col = 0;
+                for(int j = 0; j < allNodes.size();j++) {
+                    Node curr2 = allNodes.get(j);
+                    if (curr2.getName().equals(target))
+                        continue;
+                    //Currently reliable priors give information about true neighbors in the range [0.6,1] and false neighbors in the range [0,0.5]
+                    if (i == j) {
+                        dissim[row][col] = -1;
+                    } else if (i > j)
+                    {
+                        dissim[row][col] = dissim[col][row];
+                    }
+                    else if(g.getEdge(curr,curr2)!=null && prob[index]<amount)
+                    {
+                        double val = 1.0;
+                        dissim[row][col] = val;
+                        reliability+=val;
+                        counts++;
+                        index++;
+                    }
+                    else
+                    {
+                        dissim[row][col] = -1;
+                        dissim[col][row] = -1;
+                        index++;
+                    }
+
+                    col++;
+                }
+                row++;
+            }
+            reliability /= counts;
+
+
+            PrintStream out = new PrintStream(prior);
+            DecimalFormat df = new DecimalFormat("#.#####");
+            for(int i = 0; i < dissim.length;i++)
+            {
+                for(int j = 0; j < dissim[i].length;j++)
+                {
+                    if(dissim[i][j]==-1)
+                    {
+                        if (j == dissim[i].length - 1)
+                            out.print("-1");
+                        else
+                            out.print("-1" + "\t");
+                    }
+                    else
+                    {
+                        if (j == dissim[i].length - 1)
+                            out.print(df.format(dissim[i][j]));
+                        else
+                            out.print(df.format(dissim[i][j]) + "\t");
+                    }
+                }
+                out.println();
+            }
+
+            out.flush();
+            out.close();
+            return reliability;
+
+        }
+        catch (Exception e)
+        {
+            System.err.println("Couldn't create dissimilarity file number " + k);
+            e.printStackTrace();
+            System.exit(-1);
+        }
+
+        return -1;
+    }
+
+    /****
+     *
+     * @param prior
+     * @param g
+     * @param target
+     * @param numReliable
+     * @param amountPrior
+     * @param amountRandom
+     * @param noiseRandom
+     * @param k
+     * @param prob
+     * @return
+     */
     public static double generateDissimilarity(File prior, Graph g, String target, int numReliable,double amountPrior, boolean amountRandom, boolean noiseRandom, int k,float[] prob)
     {
         List<Node> allNodes = g.getNodes();

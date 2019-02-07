@@ -402,7 +402,15 @@ public class RunPrefDiv {
         /***If we aren't using cross validation then no alpha value is required, just run PrefDiv as is***/
         /***This will only be used if we are running PiPrefDiv***/
         else {
-            PrefDiv p = new PrefDiv(genes,topK,accuracy,radius,radiusWP,withPrior,dissimilarity);
+            PrefDiv p;
+            if(withPrior==null)
+            {
+                p = new PrefDiv(genes,topK,accuracy,radius,dissimilarity);
+            }
+            else
+            {
+                 p = new PrefDiv(genes,topK,accuracy,radius,radiusWP,withPrior,dissimilarity);
+            }
             p.setCluster(clusterByCorrs);
             lastGeneSet = p.diverset();
             lastClusters = p.clusters;

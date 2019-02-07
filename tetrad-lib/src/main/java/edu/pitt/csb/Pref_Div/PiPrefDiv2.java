@@ -87,6 +87,7 @@ public class PiPrefDiv2 {
     //Constructor that specifies the same number of parameters for radius and k
     public PiPrefDiv2(DataSet data, String target, int K,int numParams)
     {
+
         this.K = K;
         this.numGenes = data.getNumColumns()-1;
         this.data = data;
@@ -221,7 +222,7 @@ public class PiPrefDiv2 {
             tgt.symbol="Target";
             temp.add(tgt);
 
-            float[] corrs = Functions.computeAllCorrelations(temp, curr, false, false, threshold, 1);
+            float[] corrs = Functions.computeAllCorrelations(temp, curr, partialCorrs, false, threshold, 1);
 
             for (int i = 0; i < init.length; i++) {
                 if (!threshold)
@@ -314,6 +315,119 @@ public class PiPrefDiv2 {
     }
 
 
+    /***
+     *
+     * @param boot Should we bootstrap instead of subsampling?
+     * @param numSamples How many subsamples should we draw?
+     * @param useCausalGraph Should we use a causal graph?
+     * @return
+     */
+    public ArrayList<Gene> selectGenes(boolean boot, int numSamples,boolean useCausalGraph)
+    {
+        if(data.isContinuous()) {
+            System.out.print("Standardizing Data...");
+            data = DataUtils.standardizeData(data);
+            System.out.println(data);
+            System.out.println("Done");
+        }
+
+        //Generate subsamples of the data
+        System.out.print("Generating subsamples...");
+        if(subsamples==null)
+        {
+            subsamples = genSubsamples(boot,numSamples,data,LOOCV);
+        }
+        System.out.println("Done");
+
+        //Constrict parameter ranges
+        System.out.print("Constricting Parameter Range...");
+        initRadii = constrictRange(initRadii,data,false);
+        initThreshold = constrictRange(initThreshold,data,true);
+
+        System.out.println("Done");
+
+        //Compute stability of each gene selection and each gene-gene relationship
+        System.out.print("Computing stability across radii and threshold values...");
+
+
+        double[][][] scores = computeScores();
+
+
+        System.out.print("Merging scores to get top parameters...");
+        //Find best radii and topK values and then Run Pref-Div with cross-validation to get final Output!!
+        double [][] avgScore = getAvgScore(scores[1],scores[0]);
+
+
+
+        double maxRadii = -1;
+        double maxThresh = -1;
+        double bestScore = -1;
+        for(int i = 0; i < avgScore.length;i++)
+        {
+            for(int j = 0; j < avgScore.length;j++)
+            {
+                if(avgScore[i][j] > bestScore)
+                {
+                    bestScore = avgScore[i][j];
+                    maxRadii = initRadii[i];
+                    maxThresh = initThreshold[j];
+
+                }
+            }
+        }
+
+        lastRadius = maxRadii;
+        lastThreshold = maxThresh;
+
+        System.out.println("Done");
+
+
+
+        avgScore = null;
+
+
+        System.out.print("Running Pref-Div with optimal parameters...");
+        //Run Pref-Div with optimal parameters
+
+
+        ArrayList<Gene> temp = createGenes(data,target);
+        ArrayList<Gene> meanGenes = Functions.computeAllIntensities(temp,1,data,target,partialCorrs,false,false,Math.exp(lastThreshold));
+        Collections.sort(meanGenes,Gene.IntensityComparator);
+
+
+        float [] meanDis = Functions.computeAllCorrelations(meanGenes,data,partialCorrs,false,false,Math.exp(lastThreshold));
+
+        RunPrefDiv rpd;
+        rpd = new RunPrefDiv(meanDis,meanGenes,data,target,LOOCV);
+
+        rpd.setTopK(K);
+        rpd.setAccuracy(0);
+        rpd.setNS(subsamples.length);
+        rpd.setNumFolds(numFolds);
+        rpd.setCausalGraph(useCausalGraph);
+        rpd.useStabilitySelection(useStabilitySelection);
+        rpd.setClusterType(ctype);
+        if(clusterByCorrs)
+            rpd.clusterByCorrs();
+        rpd.setRadius(lastRadius);
+        rpd.setPThreshold(Math.exp(lastThreshold));
+
+        ArrayList<Gene> top = rpd.runPD();
+        HashMap<Gene,List<Gene>> map = rpd.getClusters();
+        summarizedData = rpd.getSummarizedData();
+        lastCluster = map;
+        System.out.println("Done");
+
+        if(verbose)
+        {
+            System.out.println("Selected top K features\n" + top);
+            System.out.println("All clusters\n" + map);
+        }
+
+
+        return top;
+    }
+
     /***Full procedure to select genes based on prior information Pref-Div
      //Input: boot (should we do bootstrapping (true) or subsampling (false))
      //Input: numSamples (number of samples to subsample or bootstrap)
@@ -321,9 +435,15 @@ public class PiPrefDiv2 {
      //Input: path to theory Dissimilarity File -> dFile (no header or rownames for these files)****/
     public ArrayList<Gene> selectGenes(boolean boot, int numSamples, String iFile, String [] dFile,boolean useCausalGraph)
     {
+        if(data.isContinuous()) {
+            System.out.print("Standardizing Data...");
+            data = DataUtils.standardizeData(data);
+            System.out.println(data);
+            System.out.println("Done");
+        }
 
-            iPriors = new boolean[numGenes];
-            dPriors = new boolean[numGenes * (numGenes - 1) / 2];
+        iPriors = new boolean[numGenes];
+        dPriors = new boolean[numGenes * (numGenes - 1) / 2];
 
         //Generate subsamples of the data
         System.out.print("Generating subsamples...");
@@ -1016,7 +1136,90 @@ public class PiPrefDiv2 {
     }
 
 
+    /***
+     * This function computes scores when there is no prior information available
+     * @return a 3-d array of scores where dim1 is 2 (for intensity and similarity), dim2 is numThresholds, dim3 is numRadii
+     */
+    private double [][][] computeScores()
+    {
+        int [] sums = new int[numGenes + (numGenes)*(numGenes-1)/2];
+        boolean read = false;
+        for(int k = 0; k < subsamples.length;k++)
+        {
+            ArrayList<Gene> temp = createGenes(data,target);
+            DataSet currData = data.subsetRows(subsamples[k]);
+            temp = Functions.computeAllIntensitiesWithP(temp,1,currData,target,partialCorrs);
 
+            //Threshold intensities and correlations after the fact
+            float [][] corrs = Functions.computeAllCorrelationsWithP(temp,currData,partialCorrs,false,false,1);
+
+            for(int i = 0; i < initRadii.length;i++)
+            {
+                for(int j = 0; j < initThreshold.length;j++)
+                {
+
+                    int [] curr = getCounts(i,j,temp,corrs,read);
+
+                    for(int x = 0; x < curr.length;x++)
+                    {
+                        sums[x]+=curr[x];
+                    }
+                }
+            }
+            read = true;
+        }
+
+        if(verbose)
+        {
+            System.out.println("Computed counts for intensities and correlations: " + Arrays.toString(sums));
+        }
+
+
+
+
+
+        float [] uPost = new float[numGenes];
+        for(int i = 0; i < uPost.length;i++)
+            uPost[i] = -1;
+        double [][] score = getScoresSeparate(sums,uPost,null);
+        double [][] scoresInt = new double[numRadii][numThreshold];
+        for(int i = 0; i < numRadii;i++)
+        {
+            for(int j = 0; j < numThreshold;j++)
+            {
+                scoresInt[i][j] = score[i+numRadii][j+numThreshold];
+            }
+        }
+        uPost = new float[(numGenes*(numGenes-1))/2];
+        for(int i = 0; i < uPost.length;i++)
+            uPost[i] = -1;
+        score = getScoresSeparate(sums,uPost,null);
+
+        double[][] scoresSim = new double[numRadii][numThreshold];
+        for(int i = 0; i < numRadii;i++)
+        {
+            for(int j = 0; j < numThreshold;j++)
+            {
+                scoresSim[i][j] = score[i+numRadii][j+numThreshold];
+            }
+        }
+        System.out.println("Done");
+
+
+        double[][][]scores = new double[2][scoresInt.length][scoresInt[0].length];
+        scores[0] = scoresInt;
+        scores[1] = scoresSim;
+
+        return scores;
+    }
+
+
+    /****
+     *
+     * @param iFile Single file with all intensity information in a matrix
+     * @param dFile Array of files, each one having a matrix of dissimilarity information
+     * @return a 3-d array of scores where dim1 is 2, dim2 is numThresholds, and dim3 is numRadii
+     */
     private double[][][] computeScores(String iFile, String[] dFile)
     {
         int [] sums = new int[numGenes + (numGenes)*(numGenes-1)/2];

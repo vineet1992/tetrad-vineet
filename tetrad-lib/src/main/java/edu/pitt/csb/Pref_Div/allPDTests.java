@@ -1,6 +1,7 @@
 package edu.pitt.csb.Pref_Div;
 
 import edu.cmu.tetrad.data.DataSet;
+import edu.cmu.tetrad.data.DataUtils;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.GraphUtils;
 import edu.cmu.tetrad.graph.Node;
@@ -25,7 +26,7 @@ public class allPDTests {
 
 
 
-    static int numRuns = 20;
+    static int numRuns = 10;
     static int numGenes = 300;
 
     static boolean boot = false; //Should we use bootstrap samples for PiPrefDiv
@@ -56,9 +57,9 @@ public class allPDTests {
 
 
         //double [] ap = new double[]{0.3,0.6};
-        double [] ap = new double[]{1.0};
+        double [] ap = new double[]{0.1};
         int [] nr = new int[]{10};
-        int [] ss = new int[]{200,1000,2000};
+        int [] ss = new int[]{200,1000};
 
         for(int ii = 0; ii < ap.length;ii++) {
             amountPrior = ap[ii];
@@ -70,8 +71,8 @@ public class allPDTests {
 
 
                     ArrayList<Integer> experiment = new ArrayList<Integer>();
-                    experiment.add(0);
-                    experiment.add(1);
+                    //experiment.add(0);
+                    experiment.add(-1);
                     //0 -> prior evaluation, 1 -> Accuracy of chosen parameters vs Optimal
                     //2-> Comparing separate prior parameters vs not, 3-> Comparing different summarization methods for clustered genes
                     //4 -> Runtime profiling
@@ -94,7 +95,7 @@ public class allPDTests {
                         int curr = 0;
                         for(Integer x: experiment) {
                             String start = "Prior Evaluation Experiment/Results/Prior_Evaluation_";
-                            if (x.intValue()== 1) {
+                            if (x.intValue()== 1 || x.intValue()==-1) {
                                 start = "Parameter Selection Experiment/Results/Parameter_Accuracy_";
                             } else if (x.intValue() == 2) {
                                 start = "Separate Parameter Experiment/Results/Separate_Param_Comparison_";
@@ -109,7 +110,7 @@ public class allPDTests {
 
                             if (x.intValue() == 0) {
                                 out.get(curr).println("Run\tAmount_Prior\tReliable?\tIntensity?\tPredicted_Weight\tActual_Reliability");
-                            } else if (x.intValue() == 1) {
+                            } else if (x.intValue() == 1 || x.intValue()==-1) {
                                 out.get(curr).print("Run\tPredicted_Radius_NP\tPredicted_Radius_WP\tPredicted_Threshold_NP\tPredicted_Threshold_WP\tBest_Radius_NP\tBest_Threshold_NP\t");
 
                                 for (int i = 0; i < types.length; i++) {
@@ -160,6 +161,7 @@ public class allPDTests {
                             try {
                                 if (dataFile.exists())
                                     d = MixedUtils.loadDataSet2(dataFile.getAbsolutePath());
+
                                 else {
                                     System.err.println("Could not load data with specified parameters, please double check");
                                     System.exit(-1);
@@ -239,6 +241,7 @@ public class allPDTests {
 
 
                             /***RUN PI PREF DIV***/
+
                             DataSet toRun;
                             DataSet test = d;
                                 /***Load Train-test split***/
@@ -258,26 +261,68 @@ public class allPDTests {
                             p.setPartialCorrs(partialCorr);
                             p.setPdStability(pdStability);
                             p.setVerbose();
-                            ArrayList<Gene> selected = p.selectGenes(boot, numSamples, priorIntensity, dFile, useCausalGraph);
 
+                            //TODO Switch back and include no priors as an option
+                            //ArrayList<Gene> selected = p.selectGenes(boot, numSamples, priorIntensity, dFile, useCausalGraph);
 
-                            /****EXPERIMENTAL TODO REMOVE THIS
-                            PiPrefDiv3 p3 = new PiPrefDiv3(toRun, "Target", minTargetParents, numParams);
-                            p3.setSubsamples(subs);
-                            //p.setVerbose();
-                            p3.setUseStabilitySelection(stabilitySelection);
-                            p3.setParallel(false);
-                            p3.setPartialCorrs(partialCorr);
-                            p3.setPdStability(pdStability);
-                            p3.setVerbose();
-                            ArrayList<Gene> selected3 = p3.selectGenes(boot, numSamples, priorIntensity, dFile, useCausalGraph);
-                            **************************************************************************************************/
-
+                            ArrayList<Gene> selected = p.selectGenes(boot,numSamples,useCausalGraph);
 
 
                             curr = 0;
 
                             for(Integer x: experiment) {
+                                if(x.intValue()==-1) //TODO Temporary experiment with no prior information
+                                {
+                                    System.out.println("Selected Genes: " + selected);
+                                    System.out.println(g.getAdjacentNodes(g.getNode("Target")));
+                                    Map<Gene, List<Gene>> lastCluster = p.getLastCluster();
+                                    System.out.println("Cluster: " + lastCluster);
+
+
+                                    /***Do we correctly identify the clusters of variables***/
+                                    double clustAccuracy = getClusterAccuracy(lastCluster, clusters, numComponents);
+                                    double featAccuracy = -1;
+
+                                    /***Do we pick the correct causes of the target variable***/
+                                    if (minTargetParents == g.getAdjacentNodes(g.getNode("Target")).size()) {
+                                        //Correct amount of selections so use accuracy
+                                        featAccuracy = getFeatAccuracy(selected, g, "Target", "ACC");
+
+                                    } else {
+                                        //Incorrect amount of selected variables so use F1
+                                        featAccuracy = getFeatAccuracy(selected, g, "Target", "F1");
+                                    }
+
+                                    /***Are all the correct clusters represented in the selected features***/
+                                    double repAccuracy = getRepresentAccuracy(selected,g,clusters,"Target");
+
+                                    /**** Can we accurately predict the target variable on the test set***/
+                                    double predAccuracy = getAccuracy(toRun, test, selected);
+                                    System.out.println("Run #" + j + ": Prediction=" + predAccuracy + ", Features=" + featAccuracy + ", Cluster=" + clustAccuracy + ", Representation=" + repAccuracy);
+
+                                    double[] radii = p.getTestedRadii();
+                                    double[] thresholds = p.getTestedThresholds();
+
+
+                                    ArrayList<Gene> meanGenes = PiPrefDiv.createGenes(d, "Target");
+                                    meanGenes = Functions.computeAllIntensitiesWithP(meanGenes, 1, d, "Target", false);
+
+                                    //0 is correlation, 1 is p-value
+                                    float[][] meanDis = Functions.computeAllCorrelationsWithP(meanGenes, d, false, false, false, 1);
+                                    //Use the weights from PiPrefDiv, we are interested in determining how good param selection is given that weights are good
+                                    //Because experiment 1 demonstrated that weights are good
+
+
+                                    double[][][] results = new double[radii.length][thresholds.length][3];
+                                    double[] npParams =  new double[2];
+
+                                    out.get(curr).print(j + "\t" + p.getLastRadius()[0] + "\t" + p.getLastRadius()[1] + "\t" + p.getLastThreshold()[0] + "\t" + p.getLastThreshold()[1] + "\t");
+
+                                    //print out results to file
+                                    printResults(results, out.get(curr), radii, thresholds, new double[]{featAccuracy, predAccuracy, clustAccuracy,repAccuracy}, npParams[0], npParams[1]);
+
+
+                                }
                                 if (x.intValue() == 0) //Evaluate prior knowledge
                                 {
                                     /***LOAD RELIABILITY SCORES***/
@@ -854,6 +899,7 @@ public class allPDTests {
     //TODO Incorporate discrete target variables
     public static double getAccuracy(DataSet train, DataSet test, List<Gene> selected)
     {
+        test = DataUtils.standardizeData(test);
         RegressionDataset rd = new RegressionDataset(train);
         List<Node> regressors = new ArrayList<Node>();
         if(selected!=null) {

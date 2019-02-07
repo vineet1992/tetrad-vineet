@@ -1,10 +1,10 @@
 package edu.pitt.csb.Pref_Div;
 import edu.cmu.tetrad.data.*;
+import edu.cmu.tetrad.data.CovarianceMatrix;
 import edu.cmu.tetrad.graph.Node;
-import edu.cmu.tetrad.search.IndTestCorrelationT;
-import edu.cmu.tetrad.search.IndTestFisherZ;
-import edu.cmu.tetrad.search.IndTestPartialCorrelation;
-import edu.cmu.tetrad.search.IndependenceTest;
+import edu.cmu.tetrad.search.*;
+import edu.cmu.tetrad.stat.correlation.*;
+import edu.cmu.tetrad.util.RandomUtil;
 import edu.cmu.tetrad.util.StatUtils;
 import edu.cmu.tetrad.util.TetradMatrix;
 import edu.cmu.tetrad.util.TetradVector;
@@ -79,8 +79,8 @@ public class Functions
         TetradMatrix c = null;
         if(partialCorr)
         {
-            c = new CovarianceMatrix(d).getMatrix();
-            c = c.ginverse();
+
+            c = new CovarianceMatrix(d).getMatrix().ginverse();
         }
         HashMap<Integer,Integer> mapping = new HashMap<Integer,Integer>();
         Node [] nodes = new Node[items.size()];
@@ -111,7 +111,9 @@ public class Functions
                 {
                     int x = mapping.get(i);
                     int y = mapping.get(j);
-                    corrs[index][0] = (float)(-1*c.get(x,y)/(c.get(x,x)*c.get(y,y)));
+                    double [] result = getPartialCorr(c,d,x,y);
+                    corrs[index][0] = (float)result[0];
+                    corrs[index][1] = (float)result[1];
                 }
                 else if(pvals)
                 {
@@ -220,12 +222,17 @@ public class Functions
     //Output: A float [] with all of the gene-gene correlations
     public static float [] computeAllCorrelations(ArrayList<Gene> items, DataSet d,boolean partialCorr,boolean normalize, boolean pvals,double threshold)
     {
+
+        /***Construct inverse covriance matrix if doing partial correlations***/
         TetradMatrix c = null;
         if(partialCorr)
         {
-            c = new CovarianceMatrix(d).getMatrix();
-            c = c.ginverse();
+
+            d = DataUtils.standardizeData(d);
+            c = new CovarianceMatrix(d).getMatrix().ginverse();
         }
+
+        /***Construct mapping between indices and nodes***/
         HashMap<Integer,Integer> mapping = new HashMap<Integer,Integer>();
         Node [] nodes = new Node[items.size()];
 
@@ -239,10 +246,12 @@ public class Functions
         float [] corrs = new float[total];
 
 
+
         IndTestCorrelationT ind = new IndTestCorrelationT(d,0.05);
 
 
 
+        /***For each pair of items, compute the correlation***/
         for(int i = 0; i < items.size();i++)
         {
             Node one = nodes[i];
@@ -256,7 +265,15 @@ public class Functions
                 {
                     int x = mapping.get(i);
                     int y = mapping.get(j);
-                    corrs[index] = (float)(-1*c.get(x,y)/(c.get(x,x)*c.get(y,y)));
+
+                    double [] result = getPartialCorr(c,d,x,y);
+
+
+                    if(result[1] >threshold)
+                        corrs[index] = 0;
+                    else
+                        corrs[index] = (float) result[0];
+
                 }
                 else if(pvals)
                 {
@@ -296,7 +313,23 @@ public class Functions
     }
 
 
+    /***
+     *
+     * @param c Inverse covariance matrix constructed from the dataset
+     * @param d Dataset itself
+     * @param x Index of the first variable
+     * @param y Index of the second variable
+     * @return array with 2 elements, First has the partial correlation of x and y, the second has the p-value
+     */
+    private static double[] getPartialCorr(TetradMatrix c, DataSet d, int x, int y)
+    {
 
+        double [] result = new double[2];
+        result[0] = (-1*c.get(x,y))/Math.sqrt(c.get(x,x)*c.get(y,y));
+        double fisherZ = Math.sqrt(d.getNumRows() - 3 - (d.getNumColumns() - 2)) * 0.5 * (Math.log(1.0 + result[0]) - Math.log(1.0 - result[0]));
+        result[1] = 2.0 * (1.0 - RandomUtil.getInstance().normalCdf(0, 1, abs(fisherZ)));
+        return result;
+    }
 
     public static float [] computeAllCorrelations(ArrayList<Gene> items, DataSet d,boolean partialCorr,double threshold, double thresholdWP, boolean [] withPrior )
     {
@@ -415,8 +448,7 @@ public class Functions
         double[][] temp = data.getDoubleData().transpose().toArray();
         TetradMatrix c = null;
         if(usePc && cont) {
-            c = new CovarianceMatrix(data).getMatrix();
-            c = c.ginverse();
+            c = new CovarianceMatrix(data).getMatrix().ginverse();
         }
         IndTestCorrelationT ind = new IndTestCorrelationT(data,0.05);
         float [] corrs = new float[g1.size()];
@@ -425,7 +457,11 @@ public class Functions
             if(usePc && cont)//Use Partial Correlation
             {
                 int x = data.getColumn(data.getVariable(g1.get(i).symbol));
-                corrs[i] = (float)(-1*c.get(x,y)/Math.sqrt(c.get(x,x)*c.get(y,y)));
+                double [] result = getPartialCorr(c,data,x,y);
+                if(result[1]>threshold)
+                    corrs[i] = 0;
+                else
+                    corrs[i] = (float)result[0];
             }
             else if(cont) //Use Correlation
             {
@@ -484,8 +520,7 @@ public class Functions
         double[][] temp = data.getDoubleData().transpose().toArray();
         TetradMatrix c = null;
         if(usePc && cont) {
-            c = new CovarianceMatrix(data).getMatrix();
-            c = c.ginverse();
+            c = new CovarianceMatrix(data).getMatrix().ginverse();
         }
         IndTestCorrelationT ind = new IndTestCorrelationT(data,0.05);
         for(int i = 0; i < g1.size();i++) {
@@ -493,7 +528,9 @@ public class Functions
             if(usePc && cont)//Use Partial Correlation
             {
                 int x = data.getColumn(data.getVariable(g1.get(i).symbol));
-                g1.get(i).foldChange  = (float)(-1*c.get(x,y)/Math.sqrt(c.get(x,x)*c.get(y,y)));
+                double [] result = getPartialCorr(c,data,x,y);
+                g1.get(i).foldChange  = (float)result[0];
+                g1.get(i).intensityP = (float) result[1];
             }
             else if(cont) //Use Correlation
             {
