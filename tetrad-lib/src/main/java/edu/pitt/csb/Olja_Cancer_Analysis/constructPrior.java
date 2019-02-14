@@ -25,7 +25,7 @@ public class constructPrior {
         boolean geneList = false;
         //for(int i = 1; i <= 5;i++) {
 
-            String dataset = "Highest_Variance_Data_Prediction_Group1.txt";
+            String dataset = "Highest_Variance_Prediction_Data.txt";
             DataSet data = MixedUtils.loadDataSet2(dataset);
             HashMap<String, Integer> map = null;
             DoubleMatrix2D prior = null;

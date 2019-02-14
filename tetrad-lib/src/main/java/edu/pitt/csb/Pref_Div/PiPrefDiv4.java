@@ -168,7 +168,6 @@ public class PiPrefDiv4 {
      * @return double [] with a constricted range of the parameter
      */
 
-    //TODO instead of running this on the full dataset, we want the average # across subsamples
     private double[] constrictRange(double[]init, DataSet data,boolean threshold)
     {
         int[] num = new int[init.length];
@@ -276,10 +275,9 @@ public class PiPrefDiv4 {
      *
      * @param boot Should we bootstrap instead of subsampling?
      * @param numSamples How many subsamples should we draw?
-     * @param useCausalGraph Should we use a causal graph?
      * @return
      */
-    public ArrayList<Gene> selectGenes(boolean boot, int numSamples,boolean useCausalGraph)
+    public ArrayList<Gene> selectGenes(boolean boot, int numSamples)
     {
         if(data.isContinuous()) {
             System.out.print("Standardizing Data...");
@@ -362,7 +360,6 @@ public class PiPrefDiv4 {
         rpd.setAccuracy(0);
         rpd.setNS(subsamples.length);
         rpd.setNumFolds(numFolds);
-        rpd.setCausalGraph(useCausalGraph);
         rpd.useCrossValidation(false);
         rpd.useStabilitySelection(useStabilitySelection);
         rpd.setClusterType(ctype);
@@ -384,7 +381,6 @@ public class PiPrefDiv4 {
             System.out.println("All clusters\n" + map);
         }
 
-
         return top;
     }
 
@@ -393,7 +389,7 @@ public class PiPrefDiv4 {
      //Input: numSamples (number of samples to subsample or bootstrap)
      //Input: path to theory Intensity File -> iFile (should have a header)
      //Input: path to theory Dissimilarity File -> dFile (no header or rownames for these files)****/
-    public ArrayList<Gene> selectGenes(boolean boot, int numSamples, String [] dFile,boolean useCausalGraph)
+    public ArrayList<Gene> selectGenes(boolean boot, int numSamples, String [] dFile)
     {
         if(data.isContinuous()) {
             System.out.print("Standardizing Data...");
@@ -489,7 +485,6 @@ public class PiPrefDiv4 {
         rpd.setAccuracy(0);
         rpd.setNS(subsamples.length);
         rpd.setNumFolds(numFolds);
-        rpd.setCausalGraph(useCausalGraph);
         rpd.useStabilitySelection(useStabilitySelection);
         rpd.useCrossValidation(false);
         rpd.setClusterType(ctype);
@@ -620,6 +615,10 @@ public class PiPrefDiv4 {
     {
         double [] score = new double[numRadii*2];
 
+        /**Temporary for debugging**/
+        double [] stabs = new double[numRadii];
+        double [] match = new double[numRadii];
+
         for (int i = 0; i < numRadii; i++) {
             int [] all = new int[sums.length];
 
@@ -644,6 +643,8 @@ public class PiPrefDiv4 {
                     {
                         double theta = getTheta(sums[g],curr[g]); //sums is the total number of times this gene was selected across all parameter settings
                         score[i + numRadii] += theta*(1-G);
+
+
                     }
                     else
                     {
@@ -651,11 +652,14 @@ public class PiPrefDiv4 {
                             System.out.println(g);
                         double theta = getTheta(uPost[g],varPost[g],curr[g]);
                         score[i]+=theta*(1-G);
+                        stabs[i]+=(1-G);
+                        match[i]+=theta;
                     }
                 }
 
             }
 
+            System.out.println("Stabilities:" + Arrays.toString(stabs) + "\n Posterior Match:" + Arrays.toString(match));
         normalizeScore(score);
         return score;
     }

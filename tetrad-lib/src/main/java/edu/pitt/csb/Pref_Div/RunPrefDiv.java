@@ -183,16 +183,18 @@ public class RunPrefDiv {
     {
 
 
-        System.out.print("Generating Subsamples...");
         if(subs==null) {
+            System.out.print("Generating Subsamples...");
+
             if (loocv)
                 subs = StabilityUtils.generateSubsamples(data.getNumRows());
             else if(useCrossValidation)
                 subs = StabilityUtils.generateSubsamples(numFolds, data.getNumRows());
             else
                 subs = StabilityUtils.generateSubsamples(numSubs,data.getNumRows());
+            System.out.println("Done");
+
         }
-        System.out.println("Done");
         double [] alphas = new double[numAlphas+1];
         for(int i = 0; i < alphas.length;i++)
         {

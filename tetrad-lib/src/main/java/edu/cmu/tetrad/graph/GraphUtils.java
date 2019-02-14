@@ -20,6 +20,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package edu.cmu.tetrad.graph;
 
+import edu.cmu.tetrad.data.ContinuousVariable;
 import edu.cmu.tetrad.util.ChoiceGenerator;
 import edu.cmu.tetrad.util.ForkJoinPoolInstance;
 import edu.cmu.tetrad.util.JsonUtils;
@@ -27,30 +28,16 @@ import edu.cmu.tetrad.util.PointXy;
 import edu.cmu.tetrad.util.RandomUtil;
 import edu.cmu.tetrad.util.TaskManager;
 import edu.cmu.tetrad.util.TextTable;
-import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
-import java.io.CharArrayReader;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.PrintWriter;
-import java.io.Reader;
-import java.io.Writer;
+
+import java.io.*;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.*;
 import java.util.concurrent.RecursiveTask;
 import java.util.regex.Matcher;
-import nu.xom.Builder;
-import nu.xom.Document;
-import nu.xom.Element;
-import nu.xom.Elements;
-import nu.xom.ParsingException;
-import nu.xom.Serializer;
-import nu.xom.Text;
+
+import nu.xom.*;
+import org.apache.commons.math3.distribution.ExponentialDistribution;
 import org.apache.commons.math3.distribution.NormalDistribution;
 
 /**
@@ -61,14 +48,15 @@ import org.apache.commons.math3.distribution.NormalDistribution;
 public final class GraphUtils {
 
 
-    public static HashMap<String,Integer> clusters;
+    public static HashMap<String, List<Integer>> clusters;
+
     /**
      * Arranges the nodes in the graph in a circle.
      *
      * @param radius The radius of the circle in pixels; a good default is 150.
      */
     public static void circleLayout(Graph graph, int centerx, int centery,
-            int radius) {
+                                    int radius) {
         if (graph == null) return;
         List<Node> nodes = graph.getNodes();
 
@@ -99,8 +87,8 @@ public final class GraphUtils {
     }
 
     public static void kamadaKawaiLayout(Graph graph,
-            boolean randomlyInitialized, double naturalEdgeLength,
-            double springConstant, double stopEnergy) {
+                                         boolean randomlyInitialized, double naturalEdgeLength,
+                                         double springConstant, double stopEnergy) {
         KamadaKawaiLayout layout = new KamadaKawaiLayout(graph);
         layout.setRandomlyInitialized(randomlyInitialized);
         layout.setNaturalEdgeLength(naturalEdgeLength);
@@ -118,7 +106,7 @@ public final class GraphUtils {
      * Decompose a latent variable graph into its measurement model
      */
     private static int getMeasurementModel(Graph graph, List<Node> latents,
-            List<List<Node>> partition) {
+                                           List<List<Node>> partition) {
         int totalSize = 0;
 
         for (Object o : graph.getNodes()) {
@@ -143,9 +131,9 @@ public final class GraphUtils {
     }
 
     public static Graph randomDag(int numNodes, int numLatentConfounders,
-            int maxNumEdges, int maxDegree,
-            int maxIndegree, int maxOutdegree,
-            boolean connected) {
+                                  int maxNumEdges, int maxDegree,
+                                  int maxIndegree, int maxOutdegree,
+                                  boolean connected) {
         List<Node> nodes = new ArrayList<>();
 
         for (int i = 0; i < numNodes; i++) {
@@ -157,17 +145,17 @@ public final class GraphUtils {
     }
 
     public static Dag randomDag(List<Node> nodes, int numLatentConfounders,
-            int maxNumEdges, int maxDegree,
-            int maxIndegree, int maxOutdegree,
-            boolean connected) {
+                                int maxNumEdges, int maxDegree,
+                                int maxIndegree, int maxOutdegree,
+                                boolean connected) {
         return new Dag(randomGraph(nodes, numLatentConfounders, maxNumEdges, maxDegree, maxIndegree, maxOutdegree,
                 connected));
     }
 
     public static Graph randomGraph(int numNodes, int numLatentConfounders,
-            int maxNumEdges, int maxDegree,
-            int maxIndegree, int maxOutdegree,
-            boolean connected) {
+                                    int maxNumEdges, int maxDegree,
+                                    int maxIndegree, int maxOutdegree,
+                                    boolean connected) {
         List<Node> nodes = new ArrayList<>();
 
         for (int i = 0; i < numNodes; i++) {
@@ -179,9 +167,9 @@ public final class GraphUtils {
     }
 
     public static Graph randomGraph(List<Node> nodes, int numLatentConfounders,
-            int maxNumEdges, int maxDegree,
-            int maxIndegree, int maxOutdegree,
-            boolean connected) {
+                                    int maxNumEdges, int maxDegree,
+                                    int maxIndegree, int maxOutdegree,
+                                    boolean connected) {
 
         // It is still unclear whether we should use the random forward edges method or the
         // random uniform method to create random DAGs, hence this method.
@@ -272,8 +260,8 @@ public final class GraphUtils {
     }
 
     public static Graph randomGraphRandomForwardEdges(int numNodes, int numLatentConfounders,
-            int numEdges, int maxDegree,
-            int maxIndegree, int maxOutdegree, boolean connected) {
+                                                      int numEdges, int maxDegree,
+                                                      int maxIndegree, int maxOutdegree, boolean connected) {
 
         List<Node> nodes = new ArrayList<>();
 
@@ -283,6 +271,176 @@ public final class GraphUtils {
 
         return randomGraph(nodes, numLatentConfounders, numEdges, maxDegree,
                 maxIndegree, maxOutdegree, connected);
+    }
+
+
+    /***
+     *
+     * @param numNodes Number of nodes in the entire graph - 1 (doesn't include target)
+     * @param numComponents Number of pathways in the entire graph
+     * @param numConnectedComponents Number of relevant pathways in the entire graph
+     * @param maxDegree Max node degree
+     * @param maxIndegree Max node indegree
+     * @param maxOutdegree Max node outdegree
+     * @param avgPathways Average number of pathways a gene belongs to
+     * @param avgCauses Average number of variables in an important pathway that cause the target
+     * @return A graph with some pathways affecting the target and some isolated, genes can appear in multiple pathways,
+     * and multiple genes in a pathway can affect the target
+     */
+    public static Graph randomGraphRealPathways(int numNodes, int numComponents, int numConnectedComponents, int maxDegree,
+                                                int maxIndegree, int maxOutdegree,int avgPathways,int avgCauses) {
+        Random rand = new Random();
+
+        //TODO Issues: Sometimes a node might not be involved in any edges, sometimes the graph contains cycles during the merging step, any others?
+        System.out.print("Assigning Genes to Pathways...");
+        /***STEP 1 Assign Genes to Pathways***/
+
+        //What pathways are Gene N in?
+        HashMap<Node, List<Integer>> pathways = new HashMap<Node, List<Integer>>();
+
+        //Which genes are in Pathway N?
+        HashMap<Integer,List<Node>> nodesInPaths = new HashMap<Integer,List<Node>>();
+        int [] numGenesInPathways = new int[numComponents];
+
+
+        //AllNodes specifies the causal order (Node i+1 cannot cause Node i)
+        List<Node> allNodes = new ArrayList<Node>();
+        for(int i =0; i < numNodes;i++)
+        {
+            allNodes.add(new GraphNode("X" + (i+1)));
+        }
+        Collections.shuffle(allNodes);
+
+        ExponentialDistribution ed = new ExponentialDistribution((double)avgPathways);
+
+        for (int i = 0; i < numNodes; i++) {
+            //How many paths are gene N involved in?
+            int np = (int) ed.sample();
+            if(np<1)
+                np = 1;
+            if(np > numComponents)
+                np = numComponents;
+
+            //Store pathways for Gene N
+            ArrayList<Integer> currPaths = new ArrayList<Integer>();
+
+            for (int j = 0; j < np; j++) {
+                int temp = rand.nextInt(numComponents);
+                while(currPaths.contains(temp))
+                {
+                    temp = rand.nextInt(numComponents);
+                }
+                numGenesInPathways[temp]++;
+                currPaths.add(temp);
+                if(nodesInPaths.get(temp)==null)
+                {
+                    List<Node> nodes = new ArrayList<Node>();
+                    nodes.add(allNodes.get(i));
+                    nodesInPaths.put(temp,nodes);
+                }else
+                {
+                    List<Node> nodes = nodesInPaths.get(temp);
+                    nodes.add(allNodes.get(i));
+                    nodesInPaths.put(temp,nodes);
+                }
+            }
+            pathways.put(allNodes.get(i), currPaths);
+        }
+
+        System.out.println("Done");
+
+
+
+
+
+        /***STEP 2 Construct each pathway***/
+        HashMap<Integer,Graph> graphs = new HashMap<Integer,Graph>();
+        //Build each pathway into the full graph
+        Graph fullGraph = null;
+
+        System.out.print("Constructing pathways...");
+        for(int i = 0; i < numComponents;i++)
+        {
+            int maxEdges = numGenesInPathways[i]*(numGenesInPathways[i]-1)/2;
+            int numEdges = rand.nextInt(maxEdges);
+            List<Node>currNodes = nodesInPaths.get(i);
+            Graph currGraph = randomGraphRandomForwardEdges(currNodes,0,numEdges,maxDegree,maxIndegree,maxOutdegree,true);
+
+
+            if(fullGraph==null)
+                fullGraph = currGraph;
+            else
+                fullGraph = GraphUtils.mergeGraphs(fullGraph,currGraph,allNodes);
+        }
+        System.out.println("Done");
+
+        //Add the target variable to the graph
+        fullGraph.addNode(new GraphNode("Target"));
+
+
+
+
+
+
+        /***STEP 3 Connect a random set of nodes from the connected pathways to the target variable***/
+
+        System.out.print("Adding parents to the target...");
+        ed = new ExponentialDistribution((double)avgCauses); //Usually one node in the pathway is causally related to the target
+        for(int i = 0; i < numConnectedComponents;i++)
+        {
+            Node two = fullGraph.getNode("Target");
+            List<Node> currNodes = nodesInPaths.get(i);
+            int numParents = (int)ed.sample();
+            if(numParents==0)
+                numParents = 1;
+            if(numParents>currNodes.size())
+                numParents = currNodes.size();
+            for(int j =0 ;j < numParents;j++)
+            {
+                Node one = currNodes.get(rand.nextInt(currNodes.size()));
+                while(fullGraph.getEdge(one,two)!=null)
+                {
+                    one = currNodes.get(rand.nextInt(currNodes.size()));
+                }
+                fullGraph.addDirectedEdge(one,two);
+            }
+        }
+
+        System.out.println("Done");
+        clusters = new HashMap<String,List<Integer>>();
+        for(Node n: pathways.keySet())
+        {
+            clusters.put(n.getName(),pathways.get(n));
+        }
+
+        /***For debugging***/
+
+        return fullGraph;
+    }
+
+    public static Graph mergeGraphs(Graph g1, Graph g2,List<Node>allNodes)
+    {
+        /***Add all new nodes to the graph**/
+        for(Node n:g2.getNodes())
+        {
+            Node x = g1.getNode(n.getName());
+            if(x==null || !x.getName().equals(n.getName()))
+                g1.addNode(n);
+        }
+
+        /***Add all non-existing edges to the graph unless they would create a cycle***/
+        for(Edge e: g2.getEdges())
+        {
+                if (g1.getEdge(g1.getNode(e.getNode1().getName()), g1.getNode(e.getNode2().getName())) == null) {
+
+                    if(allNodes.indexOf(g1.getNode(e.getNode1().getName())) < allNodes.indexOf(g1.getNode(e.getNode2().getName())))
+                    g1.addDirectedEdge(g1.getNode(e.getNode1().getName()), g1.getNode(e.getNode2().getName()));
+                }
+
+        }
+
+        return g1;
+
     }
 
     /**Similar method to randomGraphForwardEdges but here we want to specify the total number of components (pathways/subgraphs),
@@ -313,7 +471,7 @@ public final class GraphUtils {
 
                 edgesPerGraph[i] = (nodesPerGraph[i]*(nodesPerGraph[i]-1))/2;
 
-                if(edgesPerGraph[i] >= (nodesPerGraph[i]*(nodesPerGraph[i]-1)/2))
+                if(edgesPerGraph[i] > (nodesPerGraph[i]*(nodesPerGraph[i]-1)/2))
                 {
                     System.err.println("Too many edges to evenly distribute amongst pathways...");
                     System.exit(-1);
@@ -351,7 +509,9 @@ public final class GraphUtils {
 
             for (int j = 0; j < nodesPerGraph[i]; j++) {
                 nodes.add(new GraphNode("X" + (j + nodeCount)));
-                clusters.put("X" + (j+nodeCount),i);
+                List<Integer> temp = new ArrayList<Integer>();
+                temp.add(i);
+                clusters.put("X" + (j+nodeCount),temp);
             }
             nodeCount+=nodesPerGraph[i];
             components[i]  = randomGraph(nodes, 0, edgesPerGraph[i], maxDegree,

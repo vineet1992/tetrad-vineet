@@ -1468,7 +1468,7 @@ public class Functions
             }
             catch(Exception e)
             {
-                System.err.println("Error in Reading Dissimilarity matrix without normalization");
+                System.err.println("Error in Reading Dissimilarity matrix from file: " + theoryFile + ", without normalization");
                 e.printStackTrace();
                 return null;
             }

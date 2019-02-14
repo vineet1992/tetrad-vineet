@@ -30,24 +30,35 @@ public class justSimulatePrefDiv {
 
 
 
-    //TODO a question for later, should we treat intensity priors different from dissimilarity priors?
+    /***TODO Can we find a more difficult way to simulate data? Make it harder to identify clusters? (Cluster could be defined more like a pathway (connected but not fully)
+    Answer: Yes but we need to implement this, relax genes in multiple pathways, multiple genes in a pathway cause the target
 
-    //public static double [] reliableParams = new double[]{0.7,1.0,0.0,0.3}; //True Low, True High, False Low, False High
+     ***/
 
-    public static double [] reliableParams = new double[]{0.99999,1.0,0.0,0.00001}; //True Low, True High, False Low, False High
+    public static double [] reliableParams = new double[]{0.7,1.0,0.0,0.3}; //True Low, True High, False Low, False High
 
-    public static double [] unreliableParams = new double[]{0.0,0.00001,0.0,0.00001}; //True Low, True High, False Low, False High
+    //public static double [] reliableParams = new double[]{0.99999,1.0,0.0,0.00001}; //True Low, True High, False Low, False High
 
+    //public static double [] unreliableParams = new double[]{0.0,0.00001,0.0,0.00001}; //True Low, True High, False Low, False High
+
+
+    public static double [] unreliableParams = new double[]{0,1,0,1};
     public static double amountLimit = 1.0; //Specifies the total percentage of prior information that can be given by a single source
 
-    public static boolean perfectPriors = true;
+    public static boolean perfectPriors = false; // Priors give perfect information only about true relationships
+
+    public static boolean simulateTogether = true; //Simulate both intensity and dissimilarity priors in a single file
+
+
+    public static boolean realPathways = true; //Pathways are more realistic (not tightly clustered, distinct groups)
+    public static boolean priorsToClusters = true; //Only important if real pathway simulation -> Is "true" info cluster membership? Or is it edge existence?
 
     public static Random rand = new Random();
 
     public static void main(String [] args) {
-        double[] ap = new double[]{0.5,1.0};
-        int[] nr = new int[]{10};
-        int [] ss = new int[]{200,1000};
+        double[] ap = new double[]{0.01,0.05,0.1};
+        int[] nr = new int[]{1,3,5};
+        int [] ss = new int[]{50,200};
 
         for (int xx = 0; xx < ap.length; xx++) {
             for (int y = 0; y < nr.length; y++) {
@@ -55,20 +66,23 @@ public class justSimulatePrefDiv {
                 for(int z = 0; z < ss.length;z++) {
 
 
-                    int numRuns = 10;
-                    int numGenes = 10;
+                    int numRuns = 15;
+                    int numGenes = 300;
                     int sampleSize = ss[z];
                     double amountPrior = ap[xx];//percentage of edges to have prior knowledge for
                     boolean boot = false; //Should we use bootstrap samples for PiPrefDiv
                     boolean loocv = false; //Should we use leave-one-out CV for PiPrefDiv
                     int numSamples = 20; //Number of bootstrap/sub-sampled samples to use
 
+                    int avgPathways = 1; //Average number of pathways a gene belongs to (only for realPathways simulation)
+                    int avgCauses = 1; //Average number of genes in a relevant pathway causally related to the target
 
-                    int numPriors = 10; //Number of prior knowledge sources
+
+                    int numPriors = 5; //Number of prior knowledge sources
                     int numReliable = nr[y]; //Number of reliable sources
-                    int numComponents = 5; //How many components do we have for cluster simulation?
-                    int minTargetParents = 2; //How many true parents of the target are there?
-                    boolean noiseRandom = false; //Should the priors have random amounts of reliability?
+                    int numComponents = 20; //How many components do we have for cluster simulation?
+                    int minTargetParents = 10; //How many true parents of the target are there?
+                    boolean noiseRandom = true; //Should the priors have random amounts of reliability?
 
 
                     boolean amountRandom = false; //Should the priors have a random amount of prior knowledge?
@@ -167,7 +181,7 @@ public class justSimulatePrefDiv {
                     for (int j = 0; j < numRuns; j++) {
 
                         System.out.println("Simulate data for run number: " + j);
-                        HashMap<String, Integer> clusters = new HashMap<String, Integer>();
+                        HashMap<String, List<Integer>> clusters = new HashMap<String, List<Integer>>();
 
                         Graph g = null;
                         DataSet d = null;
@@ -193,9 +207,13 @@ public class justSimulatePrefDiv {
 
 
                         MixedLeeHastieSimulation m = new MixedLeeHastieSimulation();
+                        m.setRealPathways(realPathways);
                         Parameters p = new Parameters();
 
-                        p.setValue("numMeasures", numGenes + 1);
+                        if(realPathways)
+                            p.setValue("numMeasures",numGenes);
+                        else
+                            p.setValue("numMeasures", numGenes + 1);
                         p.setValue("sampleSize", sampleSize);
                         if (targetContinuous)
                             p.setValue("percentDiscreteForMixedSimulation", 0);
@@ -223,6 +241,11 @@ public class justSimulatePrefDiv {
                         if (g != null) {
                             m.setTrueGraph(g);
                         }
+                        if(realPathways)
+                        {
+                            p.setValue("avgPathways",avgPathways);
+                            p.setValue("avgCauses",avgCauses);
+                        }
                         clusters = m.simulateClustered(p, evenDistribution);
 
                         System.out.println("Done");
@@ -235,12 +258,15 @@ public class justSimulatePrefDiv {
                         File clusterFile = null;
                         clusterFile = new File("Clusters/Cluster_" + numGenes + "_" + minTargetParents + "_" + numComponents + "_" + evenDistribution + "_" + j + ".txt");
                         if (clusterFile.exists()) {
-                            clusters = new HashMap<String, Integer>();
+                            clusters = new HashMap<String, List<Integer>>();
                             try {
                                 BufferedReader bTemp = new BufferedReader(new FileReader(clusterFile));
                                 while (bTemp.ready()) {
                                     String[] line = bTemp.readLine().split("\t");
-                                    clusters.put(line[0], Integer.parseInt(line[1]));
+                                    List<Integer>temp = new ArrayList<Integer>();
+                                    for(int x = 1; x < line.length;x++)
+                                        temp.add(Integer.parseInt(line[x]));
+                                    clusters.put(line[0], temp);
                                 }
                             } catch (Exception e) {
                                 System.err.println("Couldn't load clusters from file");
@@ -259,61 +285,75 @@ public class justSimulatePrefDiv {
                         g = m.getTrueGraph();
 
 
-                        System.out.print("Generating Intensity File...");
+                            if(!simulateTogether) {
+                                /***Consistent ordering is whatever is returned by g.getNodes() (ignoring the target variable)**/
+                                File priorFile = null;
+                                priorFile = new File("Priors/Prior_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + j + "_intensity.txt");
+                                File iFile = new File("Reliabilities_I_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + j + ".txt");
+                                if (!priorFile.exists()) {
+                                    if (perfectPriors)
+                                        generatePerfectIntensity(priorFile, iFile, g, target, numPriors, amountPrior, amountRandom);
+                                    else
+                                        generateIntensity(priorFile, iFile, g, target, numPriors, numReliable, amountPrior, amountRandom, noiseRandom);
 
-
-                        /***Consistent ordering is whatever is returned by g.getNodes() (ignoring the target variable)**/
-                        File priorFile = null;
-                        priorFile = new File("Priors/Prior_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + j + "_intensity.txt");
-                        File iFile = new File("Reliabilities_I_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + j + ".txt");
-                        if (!priorFile.exists()) {
-                            if(perfectPriors)
-                                generatePerfectIntensity(priorFile,iFile,g,target,numPriors,amountPrior,amountRandom);
-                            else
-                                generateIntensity(priorFile, iFile, g, target, numPriors, numReliable, amountPrior, amountRandom, noiseRandom);
-
-                        }
-                        System.out.println("Done");
-
-
-                        /**Use this if prior file exists Make sure intensity is at the end**/
-                        String[] disFiles = new String[numPriors];
-                        try {
-                            File temp = new File("Reliabilities_D_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + j + ".txt");
-                            if (!temp.exists()) {
-                                PrintStream out2 = new PrintStream("Reliabilities_D_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + j + ".txt");
-
-                                /***First decide the probability for each edge to be included in the information source***/
-                                float[] prob = generateDisAmounts((numGenes * (numGenes - 1)) / 2);
-
-                                for (int k = 0; k < numPriors; k++) {
-
-                                    System.out.print("Generating Dissimilarity File #" + k + "...");
-                                    disFiles[k] = "Priors/Prior_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + k + "_" + j + "_dissimilarity.txt";
-                                    File f = new File(disFiles[k]);
-                                    if (!f.exists()) {
-                                        double reli = -1;
-                                        if(perfectPriors)
-                                            reli = generatePerfectDis(f,g,target,amountPrior,amountRandom,k,prob);
-                                        else
-                                            reli = generateDissimilarity(f, g, target, numReliable, amountPrior, amountRandom, noiseRandom, k, prob);
-                                        out2.println(reli);
-                                        out2.flush();
-                                        System.out.println("Done");
-
-                                    }
-
-                                    //End Generation of Prior Knowledge
                                 }
-
-                                out2.close();
-
+                                System.out.println("Done");
                             }
 
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                            System.exit(-1);
-                        }
+
+                            /**Use this if prior file exists Make sure intensity is at the end**/
+                            String[] disFiles = new String[numPriors];
+                            try {
+                                File temp = new File("Reliabilities_D_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + j + ".txt");
+                                if(simulateTogether)
+                                    temp = new File("Reliabilities_D_All_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + j + ".txt");
+
+                                if (!temp.exists()) {
+                                    PrintStream out2;
+                                    if(simulateTogether)
+                                        out2 = new PrintStream("Reliabilities_D_All_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + j + ".txt");
+                                    else
+                                         out2 = new PrintStream("Reliabilities_D_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + j + ".txt");
+
+                                    /***First decide the probability for each edge to be included in the information source***/
+                                    float[]prob;
+                                    if(simulateTogether)
+                                        prob = generateDisAmounts(((numGenes+1)*numGenes)/2);
+                                    else
+                                        prob = generateDisAmounts((numGenes * (numGenes - 1)) / 2);
+
+                                    for (int k = 0; k < numPriors; k++) {
+
+                                        System.out.print("Generating Dissimilarity File #" + k + "...");
+                                        if(simulateTogether)
+                                            disFiles[k] = "Priors/Prior_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + k + "_" + j + ".txt";
+                                        else
+                                            disFiles[k] = "Priors/Prior_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + k + "_" + j + "_dissimilarity.txt";
+                                        File f = new File(disFiles[k]);
+                                        if (!f.exists()) {
+                                            double reli = -1;
+                                            if (perfectPriors)
+                                                reli = generatePerfectDis(f, g, target, amountPrior, amountRandom, k, prob,simulateTogether);
+                                            else
+                                                reli = generateDissimilarity(f, g, target, numReliable, amountPrior, amountRandom, noiseRandom, k, prob,simulateTogether);
+                                            out2.println(reli);
+                                            out2.flush();
+                                            System.out.println("Done");
+
+                                        }
+
+                                        //End Generation of Prior Knowledge
+                                    }
+
+                                    out2.close();
+
+                                }
+
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                                System.exit(-1);
+                            }
+
 
                         System.out.print("Generating Subsamples...");
                         File subsFile = null;
@@ -345,7 +385,7 @@ public class justSimulatePrefDiv {
                                 System.exit(-1);
                             }
                         } else {
-                            subs = PiPrefDiv.genSubsamples(boot, numSamples, d, loocv);
+                            subs = PiPrefDiv4.genSubsamples(boot, numSamples, d, loocv);
                         }
 
 
@@ -384,7 +424,7 @@ public class justSimulatePrefDiv {
                                 trainInds[i] = i;
                             }
                             DataSet toRun = d.subsetRows(trainInds);
-                            subs2 = PiPrefDiv.genSubsamples(boot, numSamples, toRun, loocv);
+                            subs2 = PiPrefDiv4.genSubsamples(boot, numSamples, toRun, loocv);
                         }
 
                         System.out.println("Done");
@@ -412,7 +452,12 @@ public class justSimulatePrefDiv {
 
                             temp = new PrintStream(clusterFile);
                             for (String s : clusters.keySet()) {
-                                temp.println(s + "\t" + clusters.get(s));
+                                List<Integer> paths = clusters.get(s);
+
+                                temp.print(s);
+                                for(int x = 0; x < paths.size();x++)
+                                    temp.print("\t"+ paths.get(x));
+                                temp.println();
                                 temp.flush();
                             }
                             temp.close();
@@ -545,11 +590,24 @@ public class justSimulatePrefDiv {
     }
 
 
-
-    public static double generatePerfectDis(File prior, Graph g, String target,double amountPrior, boolean amountRandom, int k,float[] prob)
+    /***
+     *
+     * @param prior File to write the prior knowledge out to
+     * @param g True simulated graph
+     * @param target String representation of the target variable name
+     * @param amountPrior What proportion of prior information should the source provide?
+     * @param amountRandom Should the proportion be randomly chosen?
+     * @param k Which index of dissimilarity prior are we on?
+     * @param prob Probability of edge appearence
+     * @param simulateTogether Should both intensity and similarity be simulated together
+     * @return The reliability of this prior knowledge source
+     */
+    public static double generatePerfectDis(File prior, Graph g, String target,double amountPrior, boolean amountRandom, int k,float[] prob,boolean simulateTogether)
     {
         List<Node> allNodes = g.getNodes();
         double[][] dissim = new double[allNodes.size()-1][allNodes.size()-1];
+        if(simulateTogether)
+            dissim = new double[allNodes.size()][allNodes.size()];
         int row = 0;
         double reliability = 0;
         int counts = 0;
@@ -565,12 +623,12 @@ public class justSimulatePrefDiv {
             for(int i = 0; i < allNodes.size();i++)
             {
                 Node curr = allNodes.get(i);
-                if(curr.getName().equals(target))
+                if(curr.getName().equals(target) && !simulateTogether)
                     continue;
                 int col = 0;
                 for(int j = 0; j < allNodes.size();j++) {
                     Node curr2 = allNodes.get(j);
-                    if (curr2.getName().equals(target))
+                    if (curr2.getName().equals(target) && !simulateTogether)
                         continue;
                     //Currently reliable priors give information about true neighbors in the range [0.6,1] and false neighbors in the range [0,0.5]
                     if (i == j) {
@@ -642,21 +700,25 @@ public class justSimulatePrefDiv {
 
     /****
      *
-     * @param prior
-     * @param g
-     * @param target
-     * @param numReliable
-     * @param amountPrior
-     * @param amountRandom
-     * @param noiseRandom
-     * @param k
-     * @param prob
-     * @return
+     * @param prior File Prior knowledge file
+     * @param g True graph
+     * @param target Target variable (string representation)
+     * @param numReliable Number of reliable priors
+     * @param amountPrior Proportion of reliable priors
+     * @param amountRandom Should the amount this prior gives be random?
+     * @param noiseRandom Should the noise for this prior be random?
+     * @param k The index of this prior
+     * @param prob Probability for each edge to have prior information
+     * @param simulateTogether Should intensity and dissimilarity be generated together
+     * @return Reliability measure for this prior
+     *
      */
-    public static double generateDissimilarity(File prior, Graph g, String target, int numReliable,double amountPrior, boolean amountRandom, boolean noiseRandom, int k,float[] prob)
+    public static double generateDissimilarity(File prior, Graph g, String target, int numReliable,double amountPrior, boolean amountRandom, boolean noiseRandom, int k,float[] prob, boolean simulateTogether)
     {
         List<Node> allNodes = g.getNodes();
         double[][] dissim = new double[allNodes.size()-1][allNodes.size()-1];
+        if(simulateTogether)
+            dissim = new double[allNodes.size()][allNodes.size()];
         int row = 0;
         double reliability = 0;
         int counts = 0;
@@ -676,12 +738,12 @@ public class justSimulatePrefDiv {
             for(int i = 0; i < allNodes.size();i++)
             {
                 Node curr = allNodes.get(i);
-                if(curr.getName().equals(target))
+                if(curr.getName().equals(target) && !simulateTogether)
                     continue;
                 int col = 0;
                 for(int j = 0; j < allNodes.size();j++) {
                     Node curr2 = allNodes.get(j);
-                    if (curr2.getName().equals(target))
+                    if (curr2.getName().equals(target) && !simulateTogether)
                         continue;
                     //Currently reliable priors give information about true neighbors in the range [0.6,1] and false neighbors in the range [0,0.5]
                     if (i == j) {

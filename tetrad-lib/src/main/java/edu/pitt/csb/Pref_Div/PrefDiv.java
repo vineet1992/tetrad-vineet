@@ -284,7 +284,14 @@ public class PrefDiv {
 
             for(int i = 0; i < items.size();i++)
             {
-                if(g.ID!=items.get(i).ID && distance(g,items.get(i))<radius)
+                int index = getIndex(g,items.get(i));
+                if(g.ID==items.get(i).ID)
+                    continue;
+                if(usingPrior && withPrior[index] && distance(g,items.get(i)) < radiusWP)
+                {
+                    list.add(items.get(i));
+                }
+                else if((!usingPrior || !withPrior[index]) && distance(g,items.get(i))<radius)
                 {
                     list.add(items.get(i));
                 }

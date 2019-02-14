@@ -11,48 +11,54 @@ import java.io.*;
 
 public class PrefExperiment
 {
+	/****
+	 * The purpose of this class is to create a packgeable jar file to smoothly run Prior Information Pref-Div with prior matrices
+	 * The input is a data matrix where rows are samples and columns are genes to be selected.
+	 * In addition, the algorithm expects a set of files in a specified directory to be prior knowledge (probability of each variable being related to one another)
+	 * Lastly, user must specify the number of genes to choose, a target variable of interest, and whether or not to run causal modeling as a post-processing step
+	   The output is either a reduced dataset with only the variables specified, or a graphical model of the reduced variables
+
+	 	Author: Vineet Raghu (vineet@cs.pitt.edu)
+	 */
 
 
-	//TODO Add if target variable is null, just use the highest variance genes as the intensity score, implemented need to debug
 
-	//TODO adapt this to use PiPrefDiv and those expected input files
+	static boolean boot = false; //Should we use bootstrap samples for PiPrefDiv
+	static boolean loocv = false; //Should we use leave-one-out CV for PiPrefDiv
+	static int numSamples = 20; //Number of bootstrap/sub-sampled samples to use
+	static int numParams = 30;//Number of parameters to sweep over
+
+	static int numSelected = 75; //How many true parents of the target are there?
+	static boolean targetContinuous = true; //Is the target variable continuous?
+	static boolean partialCorr = false;
+	static boolean pdStability = false;
+	static boolean noPrior = true;
+
+	static double rLow = 0.3;
+	static double rHigh = 1.0;
+	static boolean useGraph = false;
+	static String dataFile = "";
+	static String directory = ".";
+	static String priorDir = "";
+
+	static String target = "";
+
+	static String outputDataset = "";
+	static String outputClusters = "";
+	static String outputGraph = "";
+
+	static boolean runPiMGM = false;
+
 	public static void main(String [] args) throws Exception
 	{
-		//PARAMS
 
-		int numAlphas = 20;
-		int ns = 20;
-		double threshold = 0.1;
-		int numParams = -1;
-		int numRadii = 10;
-		int K = 50;
-		double rLow = 0.1;
-		double rHigh = 0.8;
-		double tLow = 0.0001;
-		double tHigh = 0.2;
-		int numThreshold = 10;
-		boolean normalizeFiles = false;
-		boolean loocv = false;
-		boolean bootstrap = false;
-		boolean approxCorrelations = true;
-		boolean useGraph = false;
-		String dataFile = "";
-		String intensityFile = "";
-		String directory = ".";
-		String dissimilarityDir = "";
-
-
-		String outputFile = "";
-		String clusterFile = "";
-		String graphFile = "";
-		String target = "";
 
 		int index = 0;
 		while(index < args.length)
 		{
 			try {
 				if (args[index].equals("-ns")) {
-					ns = Integer.parseInt(args[index + 1]);
+					numSamples = Integer.parseInt(args[index + 1]);
 					index += 2;
 				}  else if (args[index].equals("-t")) {
 					target = args[index + 1];
@@ -60,41 +66,25 @@ public class PrefExperiment
 				} else if (args[index].equals("-data")) {
 					dataFile = args[index + 1];
 					index += 2;
-				} else if (args[index].equals("-out")) {
-					outputFile = args[index + 1];
+				} else if (args[index].equals("-outData")) {
+					outputDataset = args[index + 1];
 					index += 2;
 				} else if (args[index].equals("-outCluster")) {
-					clusterFile = args[index + 1];
+					outputClusters = args[index + 1];
 					index += 2;
-				}
-				else if(args[index].equals("-graph"))
-				{
-					graphFile = args[index+1];
-					index+=2;
-				}
-				else if(args[index].equals("-numRadii"))
-				{
-					numRadii = Integer.parseInt(args[index+1]);
-					index+=2;
-				}
-				else if(args[index].equals("-numThreshold"))
-				{
-					numThreshold = Integer.parseInt(args[index+1]);
-					index+=2;
+				}else if (args[index].equals("-outGraph")) {
+					outputGraph = args[index + 1];
+					index += 2;
 				}
 				else if(args[index].equals("-numParams"))
 				{
 					numParams = Integer.parseInt(args[index+1]);
 					index+=2;
 				}
-				else if(args[index].equals("-g"))
+
+				else if(args[index].equals("-numSelect"))
 				{
-					threshold = Double.parseDouble(args[index+1]);
-					index+=2;
-				}
-				else if(args[index].equals("-K"))
-				{
-					K = Integer.parseInt(args[index+1]);
+					numSelected = Integer.parseInt(args[index+1]);
 					index+=2;
 				}
 				else if(args[index].equals("-loocv"))
@@ -102,26 +92,16 @@ public class PrefExperiment
 					loocv = true;
 					index++;
 				}
-				else if(args[index].equals("-approx"))
+				else if(args[index].equals("-paramRange"))
 				{
-					approxCorrelations = true;
-					index++;
-				}
-				else if(args[index].equals("-tRange"))
-				{
-					tLow = Integer.parseInt(args[index+1]);
-					tHigh = Integer.parseInt(args[index+2]);
+					rLow = Integer.parseInt(args[index+1]);
+					rHigh = Integer.parseInt(args[index+2]);
 					index+=3;
 				}
-				else if(args[index].equals("-rRange"))
+				else if(args[index].equals("-priors"))
 				{
-					rLow = Double.parseDouble(args[index+1]);
-					rHigh = Double.parseDouble(args[index+2]);
-					index+=3;
-				}
-				else if(args[index].equals("-dissim"))
-				{
-					dissimilarityDir = args[index+1];
+					priorDir = args[index+1];
+					noPrior = false;
 					index+=2;
 				}
 				else if(args[index].equals("-dir"))
@@ -131,19 +111,39 @@ public class PrefExperiment
 				}
 				else if(args[index].equals("-boot"))
 				{
-					bootstrap = true;
+					boot = true;
 					index++;
 				}
 				else if(args[index].equals("-useCausalGraph"))
 				{
 					useGraph = true;
+					if(args.length==index+1)
+					{
+
+					}
+					else if(!args[index+1].startsWith("-"))
+					{
+						if(args[index+1].equals("piMGM"))
+						{
+							runPiMGM = true;
+
+						}
+						index+=2;
+					}
+					else
+						index++;
+				}
+				else if(args[index].equals("-partialCorr"))
+				{
+					partialCorr = true;
 					index++;
 				}
-				else if(args[index].equals("-iFile"))
+				else if(args[index].equals("-pdStability"))
 				{
-					intensityFile = args[index+1];
-					index+=2;
+					pdStability = true;
+					index++;
 				}
+
 			}
 			catch(ArrayIndexOutOfBoundsException e)
 			{
@@ -162,20 +162,24 @@ public class PrefExperiment
 			System.err.println("No data file specified, usage: (-data <filename>)");
 			System.exit(-1);
 		}
-		if(dissimilarityDir.equals(""))
+		if(priorDir.equals(""))
 		{
-			System.err.println("No dissimilarity directory specified, please use -dissim <Dissimilarity Directory>\nAll dissimilarity prior knowledge files should be included in this directory");
-			System.exit(-1);
+			System.out.println("No prior knowledge directory specified, running PiPrefDiv no Prior version");
 		}
 
-		if(outputFile.equals(""))
+		if(outputDataset.equals(""))
 		{
-			outputFile = "OUT_" + dataFile;
+			outputDataset = "OUT_" + dataFile;
 		}
 
-		if(clusterFile.equals(""))
+		if(outputClusters.equals(""))
 		{
-			clusterFile = "CLUST_" + dataFile;
+			outputClusters = "CLUST_" + dataFile;
+		}
+
+		if(outputGraph.equals("") && useGraph)
+		{
+			outputGraph = "GRAPH_" + dataFile;
 		}
 
 		DataSet data = null;
@@ -188,43 +192,82 @@ public class PrefExperiment
 			e.printStackTrace();
 			System.exit(-1);
 		}
-		PiPrefDiv ppd;
-		double [] initRadii = new double[numRadii];
-		double [] initThreshold = new double[numThreshold];
-		for(int i = 0; i < numRadii;i++)
+		PiPrefDiv4 ppd;
+		System.out.print("Initializing radii values in the range: (" + rLow + "," + rHigh + "}...");
+		double [] initRadii = new double[numParams];
+		for(int i = 0; i < numParams;i++)
 		{
-			initRadii[i] = rLow + i*(rHigh-rLow)/numRadii;
+			initRadii[i] = rLow + i*(rHigh-rLow)/numParams;
 		}
-		for(int i = 0; i < numThreshold;i++)
-		{
-			initThreshold[i] = (tLow + i*(tHigh-tLow)/(double)numThreshold);
-		}
+		System.out.println("Done");
 
 
-			ppd = new PiPrefDiv(data,target,K,initRadii,initThreshold);
+			ppd = new PiPrefDiv4(data,target,numSelected,initRadii);
 
 
-		if(bootstrap)
-			ns = data.getNumRows();
+		if(boot)
+			numSamples = data.getNumRows();
 		ppd.setLOOCV(loocv);
 		ppd.setVerbose();
 
-		File dDir = new File(directory + "/" + dissimilarityDir);
-		File [] files = dDir.listFiles();
-
-		String [] diss = new String[files.length];
-		for(int i = 0; i < files.length;i++)
+		ArrayList<Gene> output;
+		Map<Gene,List<Gene>> map;
+		DataSet summarized;
+		if(noPrior)
 		{
-			diss[i] = files[i].getAbsolutePath();
+			System.out.println("Running PiPref-Div without prior information to select genes...");
+
+			output = ppd.selectGenes(boot,numSamples);
+
+		}else
+		{
+			System.out.println("Running PiPref-Div to select genes...");
+
+			File dDir = new File(directory + "/" + priorDir);
+			File [] files = dDir.listFiles();
+
+			String [] diss = new String[files.length];
+			for(int i = 0; i < files.length;i++)
+			{
+				diss[i] = files[i].getAbsolutePath();
+			}
+			output = ppd.selectGenes(boot,numSamples,diss);
 		}
-		ArrayList<Gene> output = ppd.selectGenes(bootstrap,ns,intensityFile,diss,useGraph);
-		Map<Gene,List<Gene>> map = ppd.getLastCluster();
+
+		map = ppd.getLastCluster();
+		summarized = ppd.getSummarizedData();
+
+		if(useGraph)
+		{
+			File temp = new File("temp.txt");
+			PrintStream out = new PrintStream(temp);
+			out.println(summarized);
+			out.flush();
+			out.close();
+			if(runPiMGM)
+			{
+				//TODO figure out how to summarize the prior information sources to match the summarized dataset (same options as PiPrefDiv)
+			}
+			else
+			{
+				System.out.print("Running StEPS to learn a causal model...");
+
+				String cmd = "java -jar causalDiscovery.jar -d temp.txt -mgm -steps -o " + outputGraph + " -maxCat 3";
+				Runtime.getRuntime().exec(cmd);
+
+				temp.deleteOnExit();
+				System.out.println("Done");
+			}
+
+		}
 
 		System.out.println(map);
 
 		printOutput(output,map,directory);
-
-
+		PrintStream out = new PrintStream(outputDataset);
+		out.println(summarized);
+		out.flush();
+		out.close();
 	}
 
 

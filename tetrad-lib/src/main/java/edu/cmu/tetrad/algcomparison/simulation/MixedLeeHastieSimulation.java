@@ -22,6 +22,7 @@ public class MixedLeeHastieSimulation implements Simulation {
     private List<DataSet> dataSets;
     private Graph graph;
     private GeneralizedSemIm instModel;
+    private boolean realPathways; //Should pathways be simulated more realistically
 
     public void simulate(Parameters parameters) {
         this.dataSets = new ArrayList<>();
@@ -59,6 +60,8 @@ public class MixedLeeHastieSimulation implements Simulation {
         }
     }
 
+    public void setRealPathways(boolean realPathways){this.realPathways = realPathways;}
+
     private DataSet simulate(Graph dag, edu.cmu.tetrad.util.Parameters parameters) {
         HashMap<String, Integer> nd = new HashMap<>();
 
@@ -87,19 +90,34 @@ public class MixedLeeHastieSimulation implements Simulation {
 
 
     //Returns cluster assignments for each Node <X32,1> means that node X32 is in cluster 1
-    public HashMap<String,Integer> simulateClustered(Parameters parameters,boolean evenDistribution)
+    public HashMap<String,List<Integer>> simulateClustered(Parameters parameters,boolean evenDistribution)
     {
         this.dataSets = new ArrayList<>();
         if(graph==null)
         {
-            this.graph = GraphUtils.randomGraphForwardEdgesClusters(parameters.getInt("numMeasures"),parameters.getInt("numComponents"),parameters.getInt("numConnectedComponents"),
-                    parameters.getInt("numEdges"),evenDistribution,true,parameters.getInt("maxDegree")
-            ,parameters.getInt("maxIndegree"),parameters.getInt("maxOutdegree"));
+            if(realPathways)
+            {
+                this.graph = GraphUtils.randomGraphRealPathways(parameters.getInt("numMeasures"),parameters.getInt("numComponents"),parameters.getInt("numConnectedComponents"),
+                        parameters.getInt("maxDegree"),parameters.getInt("maxIndegree"),parameters.getInt("maxOutdegree"),parameters.getInt("avgPathways"),parameters.getInt("avgCauses"));
+            }else
+            {
+                this.graph = GraphUtils.randomGraphForwardEdgesClusters(parameters.getInt("numMeasures"),parameters.getInt("numComponents"),parameters.getInt("numConnectedComponents"),
+                        parameters.getInt("numEdges"),evenDistribution,true,parameters.getInt("maxDegree")
+                        ,parameters.getInt("maxIndegree"),parameters.getInt("maxOutdegree"));
+            }
+
 
         }
+        System.out.println(this.graph);
         for (int i = 0; i < parameters.getInt("numRuns"); i++) {
             DataSet dataSet = simulateClustered(graph, parameters,parameters.getInt("targetContinuous"));
             dataSet = DataUtils.standardizeData(dataSet);
+            System.out.println("Graph has: " + graph.getNumNodes() + ", Data has " + dataSet.getNumColumns() + ", supposed to have: " + (parameters.getInt("numMeasures")+1));
+            if(dataSet.getNumColumns()!=parameters.getInt("numMeasures")+1)
+            {
+                System.err.println("Dataset did not contain all variables, ensure your simulated graph is proper");
+                System.exit(-1);
+            }
             dataSets.add(dataSet);
         }
         return GraphUtils.clusters;
