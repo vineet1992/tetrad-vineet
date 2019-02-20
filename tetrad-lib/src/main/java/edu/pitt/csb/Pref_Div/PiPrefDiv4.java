@@ -65,6 +65,8 @@ public class PiPrefDiv4 {
     public double lastThreshold = 0;
     public double lastThresholdWP = 0;
 
+    private int targetIndex = 0; //Index of the target variable
+
 
     //Constructor that uses default parameters for both initial parameter ranges
     public PiPrefDiv4(DataSet data, String target,int K)
@@ -74,6 +76,7 @@ public class PiPrefDiv4 {
         this.numGenes = data.getNumColumns()-1;
         this.target = target;
         this.initRadii = initRadiiDefault();
+        this.targetIndex = data.getColumn(data.getVariable(target));
     }
 
 
@@ -88,6 +91,8 @@ public class PiPrefDiv4 {
         this.numRadii = numParams;
         this.initRadii = initRadiiDefault();
         this.numFolds = 5;
+        this.targetIndex = data.getColumn(data.getVariable(target));
+
     }
 
 
@@ -101,6 +106,8 @@ public class PiPrefDiv4 {
         this.numRadii = radii.length;
         this.K = K;
         this.numFolds = 5;
+        this.targetIndex = data.getColumn(data.getVariable(target));
+
     }
 
 
@@ -426,10 +433,6 @@ public class PiPrefDiv4 {
 
         int [] inds = getMaxScoreSeparate(scores);
 
-
-/***The method works from here below TODO debug everything above this (why can't we select great parameters?)***/
-
-
          double bestRadii = initRadii[inds[0]];
          double bestRadiiNP = initRadii[inds[1]];
 
@@ -449,6 +452,8 @@ public class PiPrefDiv4 {
         //Run Pref-Div with optimal parameters
 
         ArrayList<Gene> temp = createGenes(data,target,false);
+
+
 
         iPriors = loadIPrior(dFile);
         boolean [] tempPrior = new boolean[numGenes*(numGenes-1)/2];
@@ -509,7 +514,11 @@ public class PiPrefDiv4 {
     }
 
 
-
+    /***
+     *
+     * @param dFile Array of filenames that contain prior information files
+     * @return A boolean [] specifying whether or not each gene has prior information about its relationship to the target variable
+     */
     private boolean [] loadIPrior(String [] dFile)
     {
         boolean [] temp = new boolean[numGenes];
@@ -517,11 +526,19 @@ public class PiPrefDiv4 {
             for(int i = 0; i < dFile.length;i++)
             {
                 BufferedReader b = new BufferedReader(new FileReader(dFile[i]));
+                for(int j = 0; j < targetIndex;j++)
+                    b.readLine();
                 String [] line = b.readLine().split("\t");
-                for(int j = 1; j < line.length;j++)
+
+                int count = 0;
+                for(int j = 0; j < line.length;j++)
                 {
+                    if(j==targetIndex)
+                        continue;
+
                     if(Double.parseDouble(line[j])>=0)
-                        temp[j-1] = true;
+                        temp[count] = true;
+                    count++;
                 }
 
             }
