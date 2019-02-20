@@ -456,11 +456,25 @@ public class PiPrefDiv4 {
 
 
         iPriors = loadIPrior(dFile);
-        boolean [] tempPrior = new boolean[numGenes*(numGenes-1)/2];
-        for(int i = numGenes; i < dPriors.length;i++)
-        {
-            tempPrior[i-numGenes] = dPriors[i];
+
+        /***This also depends upon targetIndex being 0, if it is non-zero then we have to be more clever***/
+
+
+        boolean [] tempPrior = getPriorNoTarget();
+
+
+        //TODO This is a temporary check to ensure the above method works
+        if(targetIndex==0) {
+            for (int i = numGenes; i < dPriors.length; i++) {
+                if(tempPrior[i - numGenes] != dPriors[i])
+                {
+                    System.err.println("Error in loading temp prior when target is the first variable..exiting");
+                    System.exit(-1);
+                }
+            }
         }
+
+        
         ArrayList<Gene> meanGenes = Functions.computeAllIntensities(temp,1,data,target,false,1,1,iPriors);
         //If you aren't within radius of the target then you are shrunk to zero
         for(int i = 0; i < meanGenes.size();i++)
@@ -516,6 +530,31 @@ public class PiPrefDiv4 {
 
     /***
      *
+     * @return A boolean [] specifying which gene-gene relationships had prior information, excluding the target varialbe
+     * This is useful for the final run of Pref-Div after selecting parameters
+     */
+    private boolean[] getPriorNoTarget()
+    {
+        boolean [] tempPrior = new boolean[numGenes* (numGenes-1)/2];
+        int allCount = 0; //Counter for the prior info including the target
+        int newCount = 0; //Where we are in the newly created array
+        //Loop over all genes and the target variable
+        for(int i = 0; i < numGenes + 1;i++)
+        {
+            for(int j = i+1; j < numGenes + 1;j++)
+            {
+                allCount++;
+                if(i==targetIndex || j==targetIndex)
+                    continue;
+                tempPrior[newCount] = dPriors[allCount];
+                newCount++;
+            }
+        }
+        return tempPrior;
+
+    }
+    /***
+     *
      * @param dFile Array of filenames that contain prior information files
      * @return A boolean [] specifying whether or not each gene has prior information about its relationship to the target variable
      */
@@ -526,8 +565,12 @@ public class PiPrefDiv4 {
             for(int i = 0; i < dFile.length;i++)
             {
                 BufferedReader b = new BufferedReader(new FileReader(dFile[i]));
+
+                //Read all lines up to the one about the target variable
                 for(int j = 0; j < targetIndex;j++)
                     b.readLine();
+
+
                 String [] line = b.readLine().split("\t");
 
                 int count = 0;
@@ -536,6 +579,7 @@ public class PiPrefDiv4 {
                     if(j==targetIndex)
                         continue;
 
+                    //If this gene has information then mark it
                     if(Double.parseDouble(line[j])>=0)
                         temp[count] = true;
                     count++;
