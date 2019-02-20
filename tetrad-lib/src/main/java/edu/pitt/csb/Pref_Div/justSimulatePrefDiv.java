@@ -5,14 +5,12 @@ import edu.cmu.tetrad.algcomparison.simulation.Parameters;
 import edu.cmu.tetrad.calculator.expression.Expression;
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.data.DiscreteVariable;
-import edu.cmu.tetrad.graph.EdgeListGraphSingleConnections;
-import edu.cmu.tetrad.graph.Graph;
-import edu.cmu.tetrad.graph.GraphUtils;
-import edu.cmu.tetrad.graph.Node;
+import edu.cmu.tetrad.graph.*;
 import edu.cmu.tetrad.sem.GeneralizedSemIm;
 import edu.cmu.tetrad.sem.GeneralizedSemPm;
 import edu.cmu.tetrad.util.StatUtils;
 import edu.pitt.csb.mgm.MixedUtils;
+import nu.xom.Nodes;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.math3.distribution.NormalDistribution;
 
@@ -29,12 +27,6 @@ import java.util.*;
 public class justSimulatePrefDiv {
 
 
-
-    /***TODO Can we find a more difficult way to simulate data? Make it harder to identify clusters? (Cluster could be defined more like a pathway (connected but not fully)
-    Answer: Yes but we need to implement this, relax genes in multiple pathways, multiple genes in a pathway cause the target
-
-     ***/
-
     public static double [] reliableParams = new double[]{0.7,1.0,0.0,0.3}; //True Low, True High, False Low, False High
 
     //public static double [] reliableParams = new double[]{0.99999,1.0,0.0,0.00001}; //True Low, True High, False Low, False High
@@ -50,15 +42,15 @@ public class justSimulatePrefDiv {
     public static boolean simulateTogether = true; //Simulate both intensity and dissimilarity priors in a single file
 
 
-    public static boolean realPathways = true; //Pathways are more realistic (not tightly clustered, distinct groups)
-    public static boolean priorsToClusters = true; //Only important if real pathway simulation -> Is "true" info cluster membership? Or is it edge existence?
+    public static boolean realPathways = false; //Pathways are more realistic (not tightly clustered, distinct groups)
+    public static boolean priorsToClusters = false; //Only important if real pathway simulation -> Is "true" info cluster membership? Or is it edge existence?
 
     public static Random rand = new Random();
 
     public static void main(String [] args) {
-        double[] ap = new double[]{0.01,0.05,0.1};
-        int[] nr = new int[]{1,3,5};
-        int [] ss = new int[]{50,200};
+        double[] ap = new double[]{0.01,0.1,0.5,1.0};
+        int[] nr = new int[]{0,1,3,5};
+        int [] ss = new int[]{200};
 
         for (int xx = 0; xx < ap.length; xx++) {
             for (int y = 0; y < nr.length; y++) {
@@ -66,7 +58,7 @@ public class justSimulatePrefDiv {
                 for(int z = 0; z < ss.length;z++) {
 
 
-                    int numRuns = 15;
+                    int numRuns = 25;
                     int numGenes = 300;
                     int sampleSize = ss[z];
                     double amountPrior = ap[xx];//percentage of edges to have prior knowledge for
@@ -82,7 +74,7 @@ public class justSimulatePrefDiv {
                     int numReliable = nr[y]; //Number of reliable sources
                     int numComponents = 20; //How many components do we have for cluster simulation?
                     int minTargetParents = 10; //How many true parents of the target are there?
-                    boolean noiseRandom = true; //Should the priors have random amounts of reliability?
+                    boolean noiseRandom = false; //Should the priors have random amounts of reliability?
 
 
                     boolean amountRandom = false; //Should the priors have a random amount of prior knowledge?
@@ -325,6 +317,8 @@ public class justSimulatePrefDiv {
                                     for (int k = 0; k < numPriors; k++) {
 
                                         System.out.print("Generating Dissimilarity File #" + k + "...");
+
+
                                         if(simulateTogether)
                                             disFiles[k] = "Priors/Prior_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + k + "_" + j + ".txt";
                                         else
@@ -332,10 +326,18 @@ public class justSimulatePrefDiv {
                                         File f = new File(disFiles[k]);
                                         if (!f.exists()) {
                                             double reli = -1;
-                                            if (perfectPriors)
-                                                reli = generatePerfectDis(f, g, target, amountPrior, amountRandom, k, prob,simulateTogether);
+
+                                            if(priorsToClusters)
+                                            {
+                                                    reli = generateDissimilarityClustered(f,clusters,target,numReliable,amountPrior,amountRandom,noiseRandom,k,prob,numComponents);
+                                            }
                                             else
-                                                reli = generateDissimilarity(f, g, target, numReliable, amountPrior, amountRandom, noiseRandom, k, prob,simulateTogether);
+                                            {
+                                                if (perfectPriors)
+                                                    reli = generatePerfectDis(f, g, target, amountPrior, amountRandom, k, prob,simulateTogether);
+                                                else
+                                                    reli = generateDissimilarity(f, g, target, numReliable, amountPrior, amountRandom, noiseRandom, k, prob,simulateTogether);
+                                            }
                                             out2.println(reli);
                                             out2.flush();
                                             System.out.println("Done");
@@ -696,6 +698,60 @@ public class justSimulatePrefDiv {
         }
 
         return -1;
+    }
+
+
+    /***Same dissimilarity generation script, but here we use clusters instead of the graph to determine "true" adjacencies***/
+    public static double generateDissimilarityClustered(File prior, Map<String,List<Integer>> clusters, String target, int numReliable,double amountPrior, boolean amountRandom, boolean noiseRandom, int k,float[] prob, int numComponents)
+    {
+        /****Generate graph based on the clusters and call the usual method***/
+        List<Node> nodes = new ArrayList<Node>();
+        for(String s: clusters.keySet())
+        {
+            nodes.add(new GraphNode(s));
+        }
+        Graph temp = new EdgeListGraphSingleConnections(nodes);
+
+        List<List<Node>> gConnections = new ArrayList<List<Node>>();
+        for(int i = 0; i < numComponents;i++)
+        {
+            gConnections.add(new ArrayList<Node>());
+        }
+        /***Get all nodes in cluster one and connect them***/
+        for(int i =0 ; i < nodes.size();i++)
+        {
+            Node curr = nodes.get(i);
+            List<Integer> components = clusters.get(curr.getName());
+            for(int j = 0; j < components.size();j++)
+            {
+                gConnections.get(components.get(j)).add(curr);
+            }
+        }
+
+        /***For each component, add an edge between all of the pairs of nodes in the component***/
+        for(int i = 0; i < gConnections.size();i++)
+        {
+            List<Node> curr = gConnections.get(i);
+
+            for(int j = 0; j < curr.size();j++)
+            {
+                Node one = temp.getNode(curr.get(j).getName());
+                for(int x = j+1; x < curr.size();x++)
+                {
+                    Node two = temp.getNode(curr.get(x).getName());
+                    temp.addUndirectedEdge(one,two);
+
+                }
+            }
+        }
+
+
+        /***Call approriate prior generation script***/
+        if(perfectPriors)
+            return generatePerfectDis(prior,temp,target,amountPrior,amountRandom,k,prob,simulateTogether);
+        else
+            return generateDissimilarity(prior,temp,target,numReliable,amountPrior,amountRandom,noiseRandom,k,prob,simulateTogether);
+
     }
 
     /****

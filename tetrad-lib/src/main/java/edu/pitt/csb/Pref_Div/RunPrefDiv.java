@@ -430,10 +430,11 @@ public class RunPrefDiv {
     {
         if(type==ClusterType.NONE)
         {
+            ArrayList<Gene> tempList = new ArrayList<Gene>(genes);
             Gene temp = new Gene(-1);
             temp.symbol="Target";
-            genes.add(temp);
-            return subset(dat,genes);
+            tempList.add(temp);
+            return subset(dat,tempList);
         }
         else
         {
@@ -467,7 +468,9 @@ public class RunPrefDiv {
                 col++;
                 String name = "";
                 for(Gene x:currGenes)
-                    name+= "," + x.symbol;
+                    name+= "|" + x.symbol;
+
+                name = name.substring(1);
                 nodes.add(new ContinuousVariable(name));
             }
             /***Transpose summarized data to prepare for conversion to Dataset***/
@@ -478,17 +481,44 @@ public class RunPrefDiv {
                 td[i][td[i].length-1] = dat.getDouble(i,dat.getColumn(dat.getVariable("Target")));
             }
             nodes.add(new ContinuousVariable("Target"));
-            DataSet finalData = new BoxDataSet(new DoubleDataBox(td),nodes);
+
+
+            DataSet finalData = new ColtDataSet(td.length,nodes);
+            for(int i = 0; i < td.length;i++)
+            {
+                for(int j = 0; j < td[i].length;j++)
+                {
+                    finalData.setDouble(i,j,td[i][j]);
+                }
+            }
             return finalData;
         }
     }
 
+    private static List<Gene> removeDuplicates(List<Gene> genes)
+    {
+        List<Gene> result = new ArrayList<Gene>();
+        Map<String,Integer> set = new HashMap<String,Integer>();
+        for(Gene g:genes)
+        {
+            if(set.get(g.symbol)==null)
+            {
+                result.add(g);
+                set.put(g.symbol,0);
+            }
+        }
+
+        return result;
+    }
     private static DataSet subset(DataSet data, ArrayList<Gene> genes)
     {
-        int [] cols = new int[genes.size()];
-        for(int i = 0; i < genes.size();i++)
+        //First get only unique elements of the list
+        List<Gene> newList = removeDuplicates(genes);
+
+        int [] cols = new int[newList.size()];
+        for(int i = 0; i < newList.size();i++)
         {
-            cols[i] = data.getColumn(data.getVariable(genes.get(i).symbol));
+            cols[i] = data.getColumn(data.getVariable(newList.get(i).symbol));
         }
         return data.subsetColumns(cols);
     }
@@ -1154,7 +1184,7 @@ public class RunPrefDiv {
         }
     }
 
-    private static double[][] computeCostMatrix(List<List<Gene>> one, List<List<Gene>> two)
+    public static double[][] computeCostMatrix(List<List<Gene>> one, List<List<Gene>> two)
     {
         double [][] costs = new double[one.size()][two.size()];
         for(int i = 0; i < one.size();i++)

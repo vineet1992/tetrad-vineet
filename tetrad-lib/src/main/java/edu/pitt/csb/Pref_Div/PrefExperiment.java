@@ -2,8 +2,10 @@ package edu.pitt.csb.Pref_Div;
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.data.DataUtils;
 import edu.cmu.tetrad.graph.Graph;
+import edu.cmu.tetrad.graph.Node;
 import edu.cmu.tetrad.search.Fci;
 import edu.pitt.csb.mgm.MixedUtils;
+import org.apache.commons.math3.ml.clustering.Cluster;
 import org.apache.commons.math3.stat.StatUtils;
 
 import java.util.*;
@@ -30,25 +32,30 @@ public class PrefExperiment
 
 	static int numSelected = 75; //How many true parents of the target are there?
 	static boolean targetContinuous = true; //Is the target variable continuous?
-	static boolean partialCorr = false;
-	static boolean pdStability = false;
-	static boolean noPrior = true;
+	static boolean partialCorr = false; //Should we use partial correlation instead of pearson correlation (doesn't really work right now)
+	static boolean pdStability = false; //Should we run Pref-Div within the subsamples to get stability?
+	static boolean noPrior = true; //Should we use prior information at all or just stability?
 
-	static double rLow = 0.3;
-	static double rHigh = 1.0;
-	static boolean useGraph = false;
-	static String dataFile = "";
-	static String directory = ".";
-	static String priorDir = "";
+	static double rLow = 0.3; //Low value for the radius
+	static double rHigh = 1.0; //High value for the radius
+	static boolean useGraph = false; //Should we use causal modeling?
+	static String dataFile = ""; //Data file
+	static String directory = "."; //Home directory for the run
+	static String priorDir = ""; //Prior knowledge directory
 
-	static String target = "";
+	static String target = ""; //Target variable name
 
-	static String outputDataset = "";
-	static String outputClusters = "";
-	static String outputGraph = "";
+	static String outputDataset = ""; //Should we output the summarized dataset?
+	static String outputClusters = ""; //Should we output clusters?
+	static String outputGraph = ""; //Should we output the causal graph?
+	static String pathwayFile = ""; //Should we attempt to map aggregations to gene lists?
 
-	static boolean runPiMGM = false;
+	static boolean runPiMGM = false; //Should we run piMGM to incorporate prior knowledge in undirected modeling (only if aggregation type is NONE)
 
+	static RunPrefDiv.ClusterType ctype; //Aggregation type used
+
+
+	static int pathwayLimit = 10; //How many genes must be present to include a pathway/gene list?
 	public static void main(String [] args) throws Exception
 	{
 
@@ -138,10 +145,37 @@ public class PrefExperiment
 					partialCorr = true;
 					index++;
 				}
+				else if(args[index].equals("-ctype"))
+				{
+					if(args[index+1].toLowerCase().equals("none"))
+					{
+						ctype = RunPrefDiv.ClusterType.NONE;
+					}else if(args[index+1].toLowerCase().equals("pca"))
+					{
+						ctype = RunPrefDiv.ClusterType.PCA;
+
+					}else if(args[index+1].toLowerCase().equals("median"))
+					{
+						ctype = RunPrefDiv.ClusterType.MEDIAN;
+
+					}else if(args[index+1].toLowerCase().equals("mean"))
+					{
+						ctype = RunPrefDiv.ClusterType.MEAN;
+					}else
+					{
+						System.err.println("Unrecognized aggregation option...using None\nValid types are: PCA, MEDIAN, MEAN, NONE");
+					}
+					index+=2;
+				}
 				else if(args[index].equals("-pdStability"))
 				{
 					pdStability = true;
 					index++;
+				}
+				else if(args[index].equals("-pathwayFile"))
+				{
+					pathwayFile = args[index+1];
+					index+=2;
 				}
 
 			}
@@ -182,6 +216,12 @@ public class PrefExperiment
 			outputGraph = "GRAPH_" + dataFile;
 		}
 
+		if(ctype!= RunPrefDiv.ClusterType.NONE && runPiMGM)
+		{
+			System.err.println("Do not have prior knowledge for aggregations of features, either do not use piMGM or do not use feature aggregation");
+			System.exit(-1);
+		}
+
 		DataSet data = null;
 		try {
 			data = MixedUtils.loadDataSet2(dataFile);
@@ -192,6 +232,17 @@ public class PrefExperiment
 			e.printStackTrace();
 			System.exit(-1);
 		}
+
+		if(data.isMixed())
+		{
+			System.out.print("Mixed continuous and categorical dataset detected, extracting just the continuous data...");
+			int [] indices = MixedUtils.getContinuousInds(data.getVariables());
+			List<Node> varsToKeep = data.subsetColumns(indices).getVariables();
+			varsToKeep.add(data.getVariable(target));
+			data = data.subsetColumns(varsToKeep);
+			System.out.print("Done");
+		}
+
 		PiPrefDiv4 ppd;
 		System.out.print("Initializing radii values in the range: (" + rLow + "," + rHigh + "}...");
 		double [] initRadii = new double[numParams];
@@ -209,6 +260,7 @@ public class PrefExperiment
 			numSamples = data.getNumRows();
 		ppd.setLOOCV(loocv);
 		ppd.setVerbose();
+		ppd.setClusterType(ctype);
 
 		ArrayList<Gene> output;
 		Map<Gene,List<Gene>> map;
@@ -237,6 +289,13 @@ public class PrefExperiment
 		map = ppd.getLastCluster();
 		summarized = ppd.getSummarizedData();
 
+		if(!pathwayFile.equals(""))
+		{
+			System.out.print("Mapping features to pathways...");
+			mapFeaturesToData(summarized,data,pathwayFile);
+			System.out.println("Done");
+		}
+
 		if(useGraph)
 		{
 			File temp = new File("temp.txt");
@@ -246,7 +305,8 @@ public class PrefExperiment
 			out.close();
 			if(runPiMGM)
 			{
-				//TODO figure out how to summarize the prior information sources to match the summarized dataset (same options as PiPrefDiv)
+
+				//TODO Only use piMGM with no feature aggregation, figure out how to convert matrix to useable prior knowledge
 			}
 			else
 			{
@@ -270,6 +330,110 @@ public class PrefExperiment
 		out.close();
 	}
 
+
+	/****This function creates a file giving the best mapping from aggregate features to pathways based on a user-specified pathway file***/
+
+	/***Pathway file consists of pathways in the rows, with the first column containing the name of the pathway***/
+	public static void mapFeaturesToData(DataSet data,DataSet fullSet, String pathwayFile)
+	{
+		List<String> varNames = fullSet.getVariableNames();
+		ArrayList<List<Gene>> features = new ArrayList<List<Gene>>();
+
+
+		/***Load features from the variable names of the data***/
+		for(int i = 0; i < features.size();i++)
+		{
+			ArrayList<Gene> temp = new ArrayList<Gene>();
+			String [] names = data.getVariable(i).getName().split("|");
+			for(String s: names)
+			{
+				Gene x= new Gene(0);
+				x.symbol = s;
+				temp.add(x);
+			}
+			features.add(temp);
+		}
+		ArrayList<List<Gene>> pathways = new ArrayList<List<Gene>>();
+		/***List with only pathways that we included in the analysis(at least one gene was present in the data)***/
+		List<String> keptNames = new ArrayList<String>();
+		try{
+			BufferedReader b = new BufferedReader(new FileReader(pathwayFile));
+			while(b.ready())
+			{
+				String [] line = b.readLine().split("\t");
+				ArrayList<Gene> currPath = new ArrayList<Gene>();
+				for(int i = 1; i < line.length;i++)
+				{
+					Gene x = new Gene(0);
+					x.symbol = b.readLine();
+
+					if(varNames.contains(x.symbol))
+						currPath.add(x);
+
+				}
+
+
+				if(currPath.size()>=pathwayLimit) {
+					pathways.add(currPath);
+					keptNames.add(line[0]);
+				}
+			}
+			b.close();
+
+		}
+		catch(Exception e) {
+			System.err.println("Could not load pathways from file: " + pathwayFile);
+			return;
+		}
+
+
+
+		/***Load features from the pathways, but only include genes that were in the original dataset***/
+
+
+
+		double[][] costs = RunPrefDiv.computeCostMatrix(features,pathways);
+
+		try {
+
+
+			/***Write out top 5 pathways and costs to file for each feature***/
+
+			PrintStream out = new PrintStream("Pathway_Information.txt");
+
+			out.print("Feature\tNumber\tPathway_Name\tScore");
+			for (int i = 0; i < costs.length; i++) //For each feature
+			{
+
+				/***Create temporary index array***/
+				Integer[] inds = new Integer[pathways.size()];
+				for (int j = 0; j < inds.length; j++)
+					inds[j] = j;
+				final double[] currCosts = costs[i];
+
+
+				/***Extract top 5 cost indices***/
+				Arrays.sort(inds, new Comparator<Integer>() {
+					@Override
+					public int compare(final Integer o1, final Integer o2) {
+						return Double.compare(currCosts[o1], currCosts[o2]);
+					}
+				});
+
+				for (int j = 0; j < 5; j++) {
+					out.println(data.getVariable(i) + "\t" + j + "\t" + keptNames.get(j) + "\t" + costs[j]);
+
+				}
+			}
+			out.flush();
+			out.close();
+		}catch(Exception e)
+		{
+			System.err.println("Unable to write pathway information to the file");
+			e.printStackTrace();
+		}
+
+	}
 
 	public static void printOutput(ArrayList<Gene> top, Map<Gene,List<Gene>> map, String currDir)
 	{

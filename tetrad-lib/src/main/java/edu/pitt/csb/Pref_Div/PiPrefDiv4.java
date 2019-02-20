@@ -463,19 +463,9 @@ public class PiPrefDiv4 {
         boolean [] tempPrior = getPriorNoTarget();
 
 
-        //TODO This is a temporary check to ensure the above method works
-        if(targetIndex==0) {
-            for (int i = numGenes; i < dPriors.length; i++) {
-                if(tempPrior[i - numGenes] != dPriors[i])
-                {
-                    System.err.println("Error in loading temp prior when target is the first variable..exiting");
-                    System.exit(-1);
-                }
-            }
-        }
-
-        
         ArrayList<Gene> meanGenes = Functions.computeAllIntensities(temp,1,data,target,false,1,1,iPriors);
+
+
         //If you aren't within radius of the target then you are shrunk to zero
         for(int i = 0; i < meanGenes.size();i++)
         {
@@ -484,18 +474,19 @@ public class PiPrefDiv4 {
             else if(!iPriors[i] && 1-meanGenes.get(i).intensityValue>lastRadius)
                 meanGenes.get(i).intensityValue=0;
         }
-        float [] meanDis = Functions.computeAllCorrelations(meanGenes,data,false,1,1,tempPrior);
 
+        float [] meanDis = Functions.computeAllCorrelations(meanGenes,data,false,1,1,tempPrior);
 
         Collections.shuffle(meanGenes);
         Collections.sort(meanGenes,Gene.IntensityComparator);
+
 
         RunPrefDiv rpd;
         rpd = new RunPrefDiv(meanDis,meanGenes,data,target,LOOCV);
 
 
         rpd.setWithPrior(tempPrior);
-
+        dPriors = tempPrior;
 
 
         rpd.setAllParams(bestRadiiNP,bestRadii,1,1);
@@ -543,11 +534,11 @@ public class PiPrefDiv4 {
         {
             for(int j = i+1; j < numGenes + 1;j++)
             {
+                if(i!=targetIndex && j!=targetIndex) {
+                    tempPrior[newCount] = dPriors[allCount];
+                    newCount++;
+                }
                 allCount++;
-                if(i==targetIndex || j==targetIndex)
-                    continue;
-                tempPrior[newCount] = dPriors[allCount];
-                newCount++;
             }
         }
         return tempPrior;

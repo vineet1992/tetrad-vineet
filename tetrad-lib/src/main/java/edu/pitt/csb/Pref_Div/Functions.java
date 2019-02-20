@@ -242,6 +242,9 @@ public class Functions
             mapping.put(i,d.getColumn(temp));
             nodes[i] = temp;
         }
+
+
+
         int total = (items.size()*(items.size()-1))/2;
         float [] corrs = new float[total];
 
@@ -331,6 +334,17 @@ public class Functions
         return result;
     }
 
+
+    /***
+     *
+     * @param items List of genes
+     * @param d The dataset
+     * @param partialCorr Should we use partial correlation?
+     * @param threshold What is the p-value threshold to shrink correlations?
+     * @param thresholdWP What is the p-value threshold for those genes where we have prior information?
+     * @param withPrior Which genes do we have prior information for?
+     * @return
+     */
     public static float [] computeAllCorrelations(ArrayList<Gene> items, DataSet d,boolean partialCorr,double threshold, double thresholdWP, boolean [] withPrior )
     {
         TetradMatrix c = null;
