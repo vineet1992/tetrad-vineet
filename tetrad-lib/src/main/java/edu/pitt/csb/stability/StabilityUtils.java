@@ -380,7 +380,6 @@ public class StabilityUtils {
             protected void compute(){
                 if (to - from <= chunk) {
                     for (int s = from; s < to; s++) {
-                        System.out.println("Running sample: " + s);
                         DataSet dataSubSamp = data.subsetRows(samps[s]).copy();
                         DataGraphSearch curGs = gs.copy();
                         Graph g = curGs.search(dataSubSamp);
