@@ -7,6 +7,7 @@ import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.search.IndTestFisherZ;
 import edu.cmu.tetrad.util.ForkJoinPoolInstance;
 import edu.cmu.tetrad.util.TetradMatrix;
+import edu.pitt.csb.Pref_Div.Comparisons.ComparablePD;
 import edu.pitt.csb.Priors.mgmPriors;
 import edu.pitt.csb.mgm.MGM;
 import edu.pitt.csb.stability.StabilityUtils;
@@ -29,7 +30,7 @@ import java.util.concurrent.RecursiveAction;
 
 
 
-public class PiPrefDiv4 {
+public class PiPrefDiv4 implements ComparablePD {
 
     private DataSet data; //The current expression dataset to be analyzed, assumes that all variables are fair game for Pref-Div except the target
     private String target; //The target variable of interest
@@ -61,9 +62,10 @@ public class PiPrefDiv4 {
     private double lastRadiusWP; //Last Radius WP selected
     private boolean [] iPriors; //Contains which features have prior intensity information
     private boolean [] dPriors; //Contains which features have prior dissimiliarty information
+    private boolean [] dPriorsWT; // Contains which features have prior dissimilarity information (excludes the target variable)
     private boolean saveMemory = false; //Should we conserve disc space and use the slower version of PiPrefDiv
-    public double lastThreshold = 0;
-    public double lastThresholdWP = 0;
+    private List<Gene> lastSelected; //Last set of selected genes
+    private Random rand = new Random(42);
 
     private int targetIndex = 0; //Index of the target variable
 
@@ -128,11 +130,9 @@ public class PiPrefDiv4 {
     public void setPartialCorrs(boolean pc){partialCorrs = pc;}
     public void saveMemory(){saveMemory = true;}
     public boolean[] getIntensityPriors(){return iPriors;}
-    public boolean[] getDissimilarityPriors(){return dPriors;}
-    public double [] getLastThreshold(){return new double[]{lastThreshold,lastThresholdWP};}
-    public double [] getTestedThresholds(){return new double[]{0,0.5,1};}
+    public boolean[] getDissimilarityPriors(){return dPriorsWT;}
     public double [] getLastIntensityWeights(){return new double[10];}
-    public double getLastThresholdWP(){return lastThresholdWP;}
+    public List<Gene> getLastSelected(){return lastSelected;}
 
 
     //Set numbe of folds
@@ -278,6 +278,126 @@ public class PiPrefDiv4 {
     }
 
 
+
+
+    /***
+     *
+     * @param radiiNP Radius of similarity for relationships with no prior knowledge
+     * @return List of selected genes based on this radius
+     */
+    public ArrayList<Gene> selectGenes(double radiiNP)
+    {
+
+        ArrayList<Gene> temp = createGenes(data,target,false);
+        ArrayList<Gene> meanGenes = Functions.computeAllIntensities(temp,1,data,target,partialCorrs,false,false,1);
+
+        float [] meanDis = Functions.computeAllCorrelations(meanGenes,data,partialCorrs,false,false,1);
+
+        Collections.shuffle(meanGenes,rand);
+        Collections.sort(meanGenes,Gene.IntensityComparator);
+
+
+
+        RunPrefDiv rpd;
+        rpd = new RunPrefDiv(meanDis,meanGenes,data,LOOCV);
+
+        rpd.setTopK(K);
+        rpd.setAccuracy(0);
+        rpd.setNS(subsamples.length);
+        rpd.setClusterType(ctype);
+        if(clusterByCorrs)
+            rpd.clusterByCorrs();
+        rpd.setRadius(radiiNP);
+        rpd.setSubs(subsamples);
+
+        ArrayList<Gene> top = rpd.runPD();
+        Map<Gene,List<Gene>> map = rpd.getClusters();
+        summarizedData = rpd.getSummarizedData();
+        lastCluster = map;
+        System.out.println("Done");
+
+        if(verbose)
+        {
+            System.out.println("Selected top K features\n" + top);
+            System.out.println("All clusters\n" + map);
+        }
+        lastSelected = top;
+        return top;
+    }
+
+
+    /***
+     *
+     * @param radiiNP Radius for relationships that do not have prior knowledge
+     * @param radiiWP Radius for relationships with prior knowledge
+     * @param dFile Array of filenames for similarity matrices
+     * @return List of selected genes
+     */
+    public ArrayList<Gene> selectGenes(double radiiNP, double radiiWP, String [] dFile)
+    {
+
+        ArrayList<Gene> temp = createGenes(data,target,false);
+
+
+
+        iPriors = loadIPrior(dFile);
+
+        /***This also depends upon targetIndex being 0, if it is non-zero then we have to be more clever***/
+
+
+        boolean [] tempPrior = getPriorNoTarget();
+
+
+        ArrayList<Gene> meanGenes = Functions.computeAllIntensities(temp,1,data,target,false,1,1,iPriors);
+
+
+        //If you aren't within radius of the target then you are shrunk to zero
+        for(int i = 0; i < meanGenes.size();i++)
+        {
+            if(iPriors[i] && 1-meanGenes.get(i).intensityValue>lastRadiusWP)
+                meanGenes.get(i).intensityValue = 0;
+            else if(!iPriors[i] && 1-meanGenes.get(i).intensityValue>lastRadius)
+                meanGenes.get(i).intensityValue=0;
+        }
+
+        float [] meanDis = Functions.computeAllCorrelations(meanGenes,data,false,1,1,tempPrior);
+
+        Collections.shuffle(meanGenes,rand);
+        Collections.sort(meanGenes,Gene.IntensityComparator);
+
+
+        RunPrefDiv rpd;
+        rpd = new RunPrefDiv(meanDis,meanGenes,data,LOOCV);
+
+
+        rpd.setWithPrior(tempPrior);
+        dPriorsWT = tempPrior;
+
+
+        rpd.setAllParams(radiiNP,radiiWP);
+
+        rpd.setTopK(K);
+        rpd.setAccuracy(0);
+        rpd.setNS(subsamples.length);
+        rpd.setClusterType(ctype);
+        rpd.setSubs(subsamples);
+        if(clusterByCorrs)
+            rpd.clusterByCorrs();
+
+        ArrayList<Gene> top = rpd.runPD();
+        Map<Gene,List<Gene>> map = rpd.getClusters();
+        summarizedData = rpd.getSummarizedData();
+        lastCluster = map;
+
+        /*if(verbose)
+        {
+            System.out.println("Selected top K features\n" + top);
+            System.out.println("All clusters\n" + map);
+        }*/
+        lastSelected = top;
+        return top;
+    }
+
     /***
      *
      * @param boot Should we bootstrap instead of subsampling?
@@ -349,47 +469,11 @@ public class PiPrefDiv4 {
         System.out.print("Running Pref-Div with optimal parameters...");
         //Run Pref-Div with optimal parameters
 
+        return selectGenes(lastRadius);
 
-        ArrayList<Gene> temp = createGenes(data,target,false);
-        ArrayList<Gene> meanGenes = Functions.computeAllIntensities(temp,1,data,target,partialCorrs,false,false,1);
-
-        float [] meanDis = Functions.computeAllCorrelations(meanGenes,data,partialCorrs,false,false,1);
-
-        Collections.shuffle(meanGenes);
-        Collections.sort(meanGenes,Gene.IntensityComparator);
-
-
-
-        RunPrefDiv rpd;
-        rpd = new RunPrefDiv(meanDis,meanGenes,data,target,LOOCV);
-
-        rpd.setTopK(K);
-        rpd.setAccuracy(0);
-        rpd.setNS(subsamples.length);
-        rpd.setNumFolds(numFolds);
-        rpd.useCrossValidation(false);
-        rpd.useStabilitySelection(useStabilitySelection);
-        rpd.setClusterType(ctype);
-        if(clusterByCorrs)
-            rpd.clusterByCorrs();
-        rpd.setRadius(lastRadius);
-        rpd.setSubs(subsamples);
-        rpd.setPThreshold(1);
-
-        ArrayList<Gene> top = rpd.runPD();
-        HashMap<Gene,List<Gene>> map = rpd.getClusters();
-        summarizedData = rpd.getSummarizedData();
-        lastCluster = map;
-        System.out.println("Done");
-
-        if(verbose)
-        {
-            System.out.println("Selected top K features\n" + top);
-            System.out.println("All clusters\n" + map);
-        }
-
-        return top;
     }
+
+
 
     /***Full procedure to select genes based on prior information Pref-Div
      //Input: boot (should we do bootstrapping (true) or subsampling (false))
@@ -447,75 +531,11 @@ public class PiPrefDiv4 {
             System.out.println("Best Radii WP/NP: " + bestRadii + "," + bestRadiiNP);
         }
 
-
         System.out.print("Running Pref-Div with optimal parameters...");
         //Run Pref-Div with optimal parameters
 
-        ArrayList<Gene> temp = createGenes(data,target,false);
+        return selectGenes(bestRadiiNP,bestRadii,dFile);
 
-
-
-        iPriors = loadIPrior(dFile);
-
-        /***This also depends upon targetIndex being 0, if it is non-zero then we have to be more clever***/
-
-
-        boolean [] tempPrior = getPriorNoTarget();
-
-
-        ArrayList<Gene> meanGenes = Functions.computeAllIntensities(temp,1,data,target,false,1,1,iPriors);
-
-
-        //If you aren't within radius of the target then you are shrunk to zero
-        for(int i = 0; i < meanGenes.size();i++)
-        {
-            if(iPriors[i] && 1-meanGenes.get(i).intensityValue>lastRadiusWP)
-                meanGenes.get(i).intensityValue = 0;
-            else if(!iPriors[i] && 1-meanGenes.get(i).intensityValue>lastRadius)
-                meanGenes.get(i).intensityValue=0;
-        }
-
-        float [] meanDis = Functions.computeAllCorrelations(meanGenes,data,false,1,1,tempPrior);
-
-        Collections.shuffle(meanGenes);
-        Collections.sort(meanGenes,Gene.IntensityComparator);
-
-
-        RunPrefDiv rpd;
-        rpd = new RunPrefDiv(meanDis,meanGenes,data,target,LOOCV);
-
-
-        rpd.setWithPrior(tempPrior);
-        dPriors = tempPrior;
-
-
-        rpd.setAllParams(bestRadiiNP,bestRadii,1,1);
-
-        rpd.setTopK(K);
-        rpd.setAccuracy(0);
-        rpd.setNS(subsamples.length);
-        rpd.setNumFolds(numFolds);
-        rpd.useStabilitySelection(useStabilitySelection);
-        rpd.useCrossValidation(false);
-        rpd.setClusterType(ctype);
-        rpd.setSubs(subsamples);
-        if(clusterByCorrs)
-            rpd.clusterByCorrs();
-
-        ArrayList<Gene> top = rpd.runPD();
-        HashMap<Gene,List<Gene>> map = rpd.getClusters();
-        summarizedData = rpd.getSummarizedData();
-        lastCluster = map;
-        System.out.println("Done");
-
-        if(verbose)
-        {
-            System.out.println("Selected top K features\n" + top);
-            System.out.println("All clusters\n" + map);
-        }
-
-
-        return top;
     }
 
 

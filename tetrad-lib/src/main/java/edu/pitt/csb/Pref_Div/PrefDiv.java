@@ -6,6 +6,7 @@ import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.GraphUtils;
 import edu.cmu.tetrad.search.Fges;
 import edu.cmu.tetrad.util.StatUtils;
+import edu.pitt.csb.Pref_Div.Comparisons.ComparablePD;
 import javafx.collections.transformation.SortedList;
 
 import java.io.BufferedWriter;
@@ -16,7 +17,7 @@ import java.text.DecimalFormat;
 import java.util.*;
 
 
-public class PrefDiv {
+public class PrefDiv implements ComparablePD {
 	
     public int topK;
     public double accuracy;
@@ -25,7 +26,8 @@ public class PrefDiv {
     public ArrayList<Gene> result;
     public ArrayList<Gene> G = new ArrayList<Gene>();
     public ArrayList<Gene> B = new ArrayList<Gene>();
-    public HashMap<Gene,List<Gene>> clusters;
+
+    public Map<Gene,List<Gene>> clusters;
     private float [] corrMat;
     private float [] theoryMat;
    private double alpha;
@@ -40,10 +42,10 @@ public class PrefDiv {
    private boolean [] withPrior;
    private boolean usingPrior = false;
    private ArrayList<Float> sampledCorrs;
+   private ArrayList<Gene> selected;
 
-   //TODO clustering is fine, need to decide if variables in the same cluster are allowed to be in the Top K together?
-    //TODO Don't think it make ssense to use partial correlation for the quick approximation calculation?
-    //TODO Clean up this whole code, might be redundant, might be broken when not clustering and not using theory and data together
+
+
     public PrefDiv(ArrayList<Gene> items, int topK, double accuracy, double radius, float [] theory,double alpha,DataSet data,boolean computeAllCorrs,boolean partialCorr) {
     	this.topK = topK;
     	this.accuracy = accuracy;
@@ -114,6 +116,9 @@ public class PrefDiv {
         this.usingPrior = true;
 
     }
+
+    public Map<Gene,List<Gene>> getLastCluster(){return clusters;}
+    public List<Gene> getLastSelected(){return selected; }
     //============================================================
     //====================== Algorithm ===========================
     //============================================================
@@ -123,6 +128,7 @@ public class PrefDiv {
     {
         this.preSampleSize = ss;
     }
+
 
 
     //Sets up so that we are clustering with Pref-Div
@@ -269,6 +275,7 @@ public class PrefDiv {
             addAllToClusters();
         }
         time = System.nanoTime()-time;
+        selected = result;
        // System.out.println("Acutal Pref-Div Time: " + time/Math.pow(10,9));
         return result;
    

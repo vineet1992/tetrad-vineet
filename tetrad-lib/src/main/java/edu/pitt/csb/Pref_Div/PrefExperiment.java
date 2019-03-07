@@ -4,6 +4,7 @@ import edu.cmu.tetrad.data.DataUtils;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.Node;
 import edu.cmu.tetrad.search.Fci;
+import edu.pitt.csb.Pref_Div.Comparisons.ClusterSim;
 import edu.pitt.csb.mgm.MixedUtils;
 import org.apache.commons.math3.ml.clustering.Cluster;
 import org.apache.commons.math3.stat.StatUtils;
@@ -392,7 +393,7 @@ public class PrefExperiment
 
 
 
-		double[][] costs = RunPrefDiv.computeCostMatrix(features,pathways);
+		double[][] costs = ClusterSim.computeCostMatrix(features,pathways);
 
 		try {
 

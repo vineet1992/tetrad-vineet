@@ -1,4 +1,4 @@
-package edu.pitt.csb.Pref_Div;
+package edu.pitt.csb.Pref_Div.Comparisons;
 
 import java.util.Arrays;
 

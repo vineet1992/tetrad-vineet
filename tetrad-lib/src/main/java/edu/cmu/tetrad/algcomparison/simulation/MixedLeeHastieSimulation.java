@@ -108,16 +108,10 @@ public class MixedLeeHastieSimulation implements Simulation {
 
 
         }
-        System.out.println(this.graph);
         for (int i = 0; i < parameters.getInt("numRuns"); i++) {
             DataSet dataSet = simulateClustered(graph, parameters,parameters.getInt("targetContinuous"));
             dataSet = DataUtils.standardizeData(dataSet);
-            System.out.println("Graph has: " + graph.getNumNodes() + ", Data has " + dataSet.getNumColumns() + ", supposed to have: " + (parameters.getInt("numMeasures")+1));
-            if(dataSet.getNumColumns()!=parameters.getInt("numMeasures")+1)
-            {
-                System.err.println("Dataset did not contain all variables, ensure your simulated graph is proper");
-                System.exit(-1);
-            }
+
             dataSets.add(dataSet);
         }
         return GraphUtils.clusters;
