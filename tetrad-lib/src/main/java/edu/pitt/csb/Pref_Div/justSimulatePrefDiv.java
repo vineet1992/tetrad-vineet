@@ -27,7 +27,7 @@ import java.util.*;
 public class justSimulatePrefDiv {
 
 
-    public static double [] reliableParams = new double[]{0.7,1.0,0.0,0.3}; //True Low, True High, False Low, False High
+    public static double [] reliableParams = new double[]{0.6,1.0,0.0,0.7}; //True Low, True High, False Low, False High
 
     //public static double [] reliableParams = new double[]{0.99999,1.0,0.0,0.00001}; //True Low, True High, False Low, False High
 
@@ -41,16 +41,22 @@ public class justSimulatePrefDiv {
 
     public static boolean simulateTogether = true; //Simulate both intensity and dissimilarity priors in a single file
 
+    public static boolean latentControl = true;
+
+    public static boolean cutPriors = true;
 
     public static boolean realPathways = false; //Pathways are more realistic (not tightly clustered, distinct groups)
     public static boolean priorsToClusters = false; //Only important if real pathway simulation -> Is "true" info cluster membership? Or is it edge existence?
 
+
+    public static double cutThresh = 0.5; //Threshold to include information from this prior source
+
     public static Random rand = new Random();
 
     public static void main(String [] args) {
-        double[] ap = new double[]{0.01,0.05,0.1,0.3};
+        double[] ap = new double[]{0.1,0.3,0.6};
         int[] nr = new int[]{0,1,3,5};
-        int [] ss = new int[]{200};
+        int [] ss = new int[]{50};
 
         for (int xx = 0; xx < ap.length; xx++) {
             for (int y = 0; y < nr.length; y++) {
@@ -58,7 +64,7 @@ public class justSimulatePrefDiv {
                 for(int z = 0; z < ss.length;z++) {
 
 
-                    int numRuns = 20;
+                    int numRuns = 15;
                     int numGenes = 500;
                     int sampleSize = ss[z];
                     double amountPrior = ap[xx];//percentage of edges to have prior knowledge for
@@ -72,9 +78,10 @@ public class justSimulatePrefDiv {
 
                     int numPriors = 5; //Number of prior knowledge sources
                     int numReliable = nr[y]; //Number of reliable sources
-                    int numComponents = 50; //How many components do we have for cluster simulation?
-                    int minTargetParents = 15; //How many true parents of the target are there?
+                    int numComponents = 25; //How many components do we have for cluster simulation?
+                    int minTargetParents = 10; //How many true parents of the target are there?
                     boolean noiseRandom = false; //Should the priors have random amounts of reliability?
+
 
 
                     boolean amountRandom = false; //Should the priors have a random amount of prior knowledge?
@@ -815,9 +822,18 @@ public class justSimulatePrefDiv {
                             if(prob[index]<amount)
                             {
                                 double val = rand.nextDouble()*(reliableParams[1]-reliableParams[0])+reliableParams[0];
-                                dissim[row][col] = val;
-                                reliability+=val;
-                                counts++;
+                                if(cutPriors && val < cutThresh)
+                                {
+                                    dissim[row][col] = -1;
+                                }
+                                else
+                                {
+                                    dissim[row][col] = val;
+                                    reliability+=val;
+                                    counts++;
+                                }
+
+
                             }
                             else
                             {
@@ -830,9 +846,17 @@ public class justSimulatePrefDiv {
                             if(prob[index]<amount)
                             {
                                 double val = rand.nextDouble()*(reliableParams[3]-reliableParams[2]) + reliableParams[2];
-                                dissim[row][col] = val;
-                                reliability-= val;
-                                counts++;
+                                if(cutPriors && val < cutThresh)
+                                {
+                                    dissim[row][col] = -1;
+                                }
+                                else
+                                {
+                                    dissim[row][col] = val;
+                                    reliability-= val;
+                                    counts++;
+                                }
+
                             }
                             else
                             {
@@ -850,18 +874,34 @@ public class justSimulatePrefDiv {
                             if(g.getEdge(curr,curr2)!=null)
                             {
                                 val = rand.nextDouble()*(unreliableParams[1]-unreliableParams[0]) + unreliableParams[0];
-                                reliability+=val;
+
+                                if(cutPriors && val < cutThresh)
+                                {
+                                    dissim[row][col] = -1;
+                                }
+                                else
+                                {
+                                    dissim[row][col] = val;
+                                    reliability+=val;
+                                    counts++;
+
+                                }
 
                             }
                             else
                             {
                                 val = rand.nextDouble()*(unreliableParams[3]-unreliableParams[2]) + unreliableParams[2];
-                                reliability-=val;
-
-
+                                if(cutPriors && val < cutThresh)
+                                {
+                                    dissim[row][col] = -1;
+                                }
+                                else
+                                {
+                                    dissim[row][col] = val;
+                                    reliability-=val;
+                                    counts++;
+                                }
                             }
-                            dissim[row][col] = val;
-                            counts++;
                         }
                         else
                         {

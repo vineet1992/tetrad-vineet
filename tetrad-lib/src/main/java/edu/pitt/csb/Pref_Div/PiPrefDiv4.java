@@ -190,9 +190,9 @@ public class PiPrefDiv4 implements ComparablePD {
 
             for (int i = 0; i < init.length; i++) {
                 if (!threshold)
-                    num[i] += countLessThan(corrs, init[i]) / (double)init.length;
+                    num[i] += countLessThan(corrs, init[i]) / (double)subsamples.length;
                 else
-                    num[i] += countPLessThan(corrs, init[i])/(double)init.length;
+                    num[i] += countPLessThan(corrs, init[i])/(double)subsamples.length;
             }
         }
         TetradMatrix t = new TetradMatrix(init.length,2);
@@ -288,16 +288,27 @@ public class PiPrefDiv4 implements ComparablePD {
     public ArrayList<Gene> selectGenes(double radiiNP)
     {
 
+        /***Create genes list based upon the order of the columns in the dataset***/
         ArrayList<Gene> temp = createGenes(data,target,false);
+
+
+        /***Add correlation to the target variable in the intensity value and fold change fields of each gene***/
         ArrayList<Gene> meanGenes = Functions.computeAllIntensities(temp,1,data,target,partialCorrs,false,false,1);
 
+
+        /***Order of correlation is based upon the order of the genes in the array list (needs to be the same as the data order)***/
         float [] meanDis = Functions.computeAllCorrelations(meanGenes,data,partialCorrs,false,false,1);
 
+
+        /***Shuffle and sort the list of genes***/
         Collections.shuffle(meanGenes,rand);
         Collections.sort(meanGenes,Gene.IntensityComparator);
 
 
 
+
+
+        /***Create RunPrefDiv wrapper object and set all parameters***/
         RunPrefDiv rpd;
         rpd = new RunPrefDiv(meanDis,meanGenes,data,LOOCV);
 
@@ -310,17 +321,18 @@ public class PiPrefDiv4 implements ComparablePD {
         rpd.setRadius(radiiNP);
         rpd.setSubs(subsamples);
 
+
+        /***Run Pref-Div and get selected features and clusters***/
         ArrayList<Gene> top = rpd.runPD();
         Map<Gene,List<Gene>> map = rpd.getClusters();
         summarizedData = rpd.getSummarizedData();
         lastCluster = map;
-        System.out.println("Done");
 
-        if(verbose)
+        /*if(verbose)
         {
             System.out.println("Selected top K features\n" + top);
             System.out.println("All clusters\n" + map);
-        }
+        }*/
         lastSelected = top;
         return top;
     }
@@ -336,34 +348,49 @@ public class PiPrefDiv4 implements ComparablePD {
     public ArrayList<Gene> selectGenes(double radiiNP, double radiiWP, String [] dFile)
     {
 
+        /****Create gene list based upon the order of columns in the data***/
         ArrayList<Gene> temp = createGenes(data,target,false);
 
 
 
+        /***Load which genes have prior info about relationship to target***/
         iPriors = loadIPrior(dFile);
 
-        /***This also depends upon targetIndex being 0, if it is non-zero then we have to be more clever***/
 
-
+        /***Load which gene-gene relationships have prior information (based upon the order in the dataset)***/
         boolean [] tempPrior = getPriorNoTarget();
 
 
+        /***Give intensity values to each gene in "temp"***/
         ArrayList<Gene> meanGenes = Functions.computeAllIntensities(temp,1,data,target,false,1,1,iPriors);
 
 
-        //If you aren't within radius of the target then you are shrunk to zero
+        /***Compute correlation for each pair of genes***/
+        float [] meanDis = Functions.computeAllCorrelations(meanGenes,data,false,1,1,tempPrior);
+
+
+        /***Shuffle and sort the list of genes based upon intensity value***/
+        Collections.shuffle(meanGenes,rand);
+
+        Collections.sort(meanGenes,Gene.IntensityComparator);
+
+        /***If you aren't within radius of the target then you are shrunk to zero***/
         for(int i = 0; i < meanGenes.size();i++)
         {
-            if(iPriors[i] && 1-meanGenes.get(i).intensityValue>lastRadiusWP)
+            if(iPriors[meanGenes.get(i).ID] && 1-meanGenes.get(i).intensityValue>radiiWP)
                 meanGenes.get(i).intensityValue = 0;
-            else if(!iPriors[i] && 1-meanGenes.get(i).intensityValue>lastRadius)
+            else if(!iPriors[meanGenes.get(i).ID] && 1-meanGenes.get(i).intensityValue>radiiNP)
                 meanGenes.get(i).intensityValue=0;
         }
 
-        float [] meanDis = Functions.computeAllCorrelations(meanGenes,data,false,1,1,tempPrior);
 
-        Collections.shuffle(meanGenes,rand);
+
+
         Collections.sort(meanGenes,Gene.IntensityComparator);
+
+
+
+        /***TODO Temp prior is in the order of the dataset, but meanDis is in the order of the gene list***/
 
 
         RunPrefDiv rpd;
@@ -448,7 +475,6 @@ public class PiPrefDiv4 implements ComparablePD {
                 {
                     bestScore = scores[i];
                     maxRadii = initRadii[i];
-
                 }
         }
 
@@ -466,7 +492,6 @@ public class PiPrefDiv4 implements ComparablePD {
 
 
 
-        System.out.print("Running Pref-Div with optimal parameters...");
         //Run Pref-Div with optimal parameters
 
         return selectGenes(lastRadius);
@@ -531,7 +556,6 @@ public class PiPrefDiv4 implements ComparablePD {
             System.out.println("Best Radii WP/NP: " + bestRadii + "," + bestRadiiNP);
         }
 
-        System.out.print("Running Pref-Div with optimal parameters...");
         //Run Pref-Div with optimal parameters
 
         return selectGenes(bestRadiiNP,bestRadii,dFile);
@@ -614,7 +638,7 @@ public class PiPrefDiv4 implements ComparablePD {
         int [] inds = new int[2];
         double maxScore = -1;
         double maxScoreNP = -1;
-        for(int i = 0; i < avg.length/2;i++)
+        for(int i = avg.length/2-1; i >= 0;i--)
         {
 
                 if(avg[i]>maxScore)
@@ -692,7 +716,6 @@ public class PiPrefDiv4 implements ComparablePD {
         double [] match = new double[numRadii];
 
         for (int i = 0; i < numRadii; i++) {
-            int [] all = new int[sums.length];
 
                 int [] curr = null;
                 if(saveMemory) {
@@ -705,17 +728,13 @@ public class PiPrefDiv4 implements ComparablePD {
 
                 }
 
-                for(int x = 0; x < curr.length;x++)
-                    all[x] = curr[x];
-
                 for(int g = 0; g < uPost.length;g++) //Loop through each gene
                 {
                     double G = getG(curr[g]); //Clusts[i][j][g] is number of times gene was selected in the subsamples for this parameter setting
                     if (uPost[g] < 0)//No Prior information, contributes only stability to the score
                     {
                         double theta = getTheta(sums[g],curr[g]); //sums is the total number of times this gene was selected across all parameter settings
-                        score[i + numRadii] += theta*(1-G);
-
+                        score[i + numRadii] +=  theta * (1-G);
 
                     }
                     else
@@ -723,14 +742,15 @@ public class PiPrefDiv4 implements ComparablePD {
                         if(varPost[g]<0)
                             System.out.println(g);
                         double theta = getTheta(uPost[g],varPost[g],curr[g]);
-                        score[i]+=theta*(1-G);
+                        /***TODO Change this back to stability and match if necessary***/
+                        score[i]+=theta *(1-G);
                         stabs[i]+=(1-G);
                         match[i]+=theta;
                     }
                 }
 
             }
-
+            System.out.println("Radii: " + Arrays.toString(initRadii));
             System.out.println("Stabilities:" + Arrays.toString(stabs) + "\n Posterior Match:" + Arrays.toString(match));
         normalizeScore(score);
         return score;
@@ -1192,7 +1212,7 @@ public class PiPrefDiv4 implements ComparablePD {
     {
         for(int i = 0; i < corrs.length;i++)
         {
-            if(1-corrs[i]<radii) //TODO Is this correct?
+            if(1-corrs[i]<radii)
                 curr[i]++;
 
         }

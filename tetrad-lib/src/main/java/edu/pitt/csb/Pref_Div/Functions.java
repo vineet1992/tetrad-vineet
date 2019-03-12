@@ -234,6 +234,8 @@ public class Functions
 
         /***Construct mapping between indices and nodes***/
         HashMap<Integer,Integer> mapping = new HashMap<Integer,Integer>();
+
+        /***nodes at i is the ith variable in the array list***/
         Node [] nodes = new Node[items.size()];
 
         for(int i = 0; i < items.size();i++)
@@ -444,10 +446,13 @@ public class Functions
     //Requires that theory intensity is specified a priori for each gene object in g1
     public static ArrayList<Gene> computeAllIntensities(ArrayList<Gene> g1, double a, DataSet data, String target,boolean usePc,boolean normalize,boolean pvals,double threshold)
     {
+        /***Compute unsupervised intensity if there is no target variable***/
         if(target==null || target.equals(""))
         {
             return computeIntensitiesUnsupervised(g1,a,data);
         }
+
+        /***If the target variable is discrete then pull out the number of categories***/
         boolean cont = data.getVariable(target) instanceof ContinuousVariable;
         int numCats = -1;
         if(!cont) {
@@ -457,15 +462,24 @@ public class Functions
 
 
 
+        /***Get target variable column***/
         int y = data.getColumn(data.getVariable(target));
         Node one = data.getVariable(target);
+
+        /***Get data as a 2-D double array***/
         double[][] temp = data.getDoubleData().transpose().toArray();
+
+
+        /***Compute covariance matrix if necessary***/
         TetradMatrix c = null;
         if(usePc && cont) {
             c = new CovarianceMatrix(data).getMatrix().ginverse();
         }
+
         IndTestCorrelationT ind = new IndTestCorrelationT(data,0.05);
         float [] corrs = new float[g1.size()];
+
+        /***For each gene in the gene list, compute correlation***/
         for(int i = 0; i < g1.size();i++) {
             Node two = data.getVariable(g1.get(i).symbol);
             if(usePc && cont)//Use Partial Correlation
@@ -488,10 +502,14 @@ public class Functions
             else //Use Mutual Information
                 corrs[i] = (float) mixedMI(temp[data.getColumn(data.getVariable(i))],temp[y],numCats);
         }
+
+        /****Optional: Normalize the correlations to mean 0 Gaussian Dist***/
         if(normalize)
             corrs = NPN(corrs,false);
         if(pvals)
             corrs = getPVals(corrs);
+
+        /***Set the fold change and intensity value to the correlation***/
         for (int i = 0; i < g1.size(); i++) {
                 try {
                     g1.get(i).foldChange = corrs[i];

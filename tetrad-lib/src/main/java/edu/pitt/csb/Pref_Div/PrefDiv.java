@@ -285,15 +285,21 @@ public class PrefDiv implements ComparablePD {
     //Add all significantly correlated genes to each key in the hashmap
     private void addAllToClusters()
     {
+        /***For each selected gene...***/
         for(Gene g:clusters.keySet())
         {
             List<Gene>list = new ArrayList<Gene>();
 
+            /***For each gene in the gene list***/
             for(int i = 0; i < items.size();i++)
             {
+
+                /***Get the index in the correlation matrix based upon the placement in the gene list***/
                 int index = getIndex(g,items.get(i));
                 if(g.ID==items.get(i).ID)
                     continue;
+
+
                 if(usingPrior && withPrior[index] && distance(g,items.get(i)) < radiusWP)
                 {
                     list.add(items.get(i));

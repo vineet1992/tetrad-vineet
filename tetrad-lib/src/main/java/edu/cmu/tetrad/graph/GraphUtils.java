@@ -450,7 +450,6 @@ public final class GraphUtils {
      *
 **/
 
-    //TODO Something is fishy about this method
     public static Graph randomGraphForwardEdgesClusters(int numNodes, int numComponents,
                                                         int numConnectedComponents,int numEdges,boolean evenDistribution,
                                                         boolean connected, int maxDegree, int maxIndegree, int maxOutdegree)
@@ -459,6 +458,9 @@ public final class GraphUtils {
         clusters = new HashMap<>();
         int []nodesPerGraph = new int[numComponents];
         int []edgesPerGraph = new int[numComponents];
+
+
+        /***Evenly distribute nodes and edges among clusters***/
         if(evenDistribution) { //Evenly distribute nodes and edges among clusters, this works fine
             int ng = (numNodes - 1) / numComponents; //Don't include target variable in this calculation
             int extraNodes = (numNodes - 1) % numComponents; //Fix uneven division problems to get the specified number of edges exactly
@@ -477,7 +479,9 @@ public final class GraphUtils {
                     System.exit(-1);
                 }
             }
-        }else
+        }
+        /***Otherwise, randomly choose the amount of edges per cluster***/
+        else
         {
             NormalDistribution n_nodes = new NormalDistribution((numNodes-1)/numComponents,(numNodes-1)/(numComponents*3));
             int effectiveEdges = numEdges-numConnectedComponents;
@@ -503,6 +507,9 @@ public final class GraphUtils {
 
         Graph [] components = new Graph[numComponents];
         int nodeCount = 0;
+
+
+        /***For each graph, randomly generate based upon a max number of edges***/
         for(int i = 0; i < numComponents;i++)
         {
             List<Node> nodes = new ArrayList<>();
@@ -513,13 +520,20 @@ public final class GraphUtils {
                 temp.add(i);
                 clusters.put("X" + (j+nodeCount),temp);
             }
+
             nodeCount+=nodesPerGraph[i];
             components[i]  = randomGraph(nodes, 0, edgesPerGraph[i], maxDegree,
                     maxIndegree, maxOutdegree, connected);
         }
+
+
+        /***Add a target variable to the graph***/
         Graph finalGraph = new EdgeListGraphSingleConnections();
         finalGraph.addNode(new GraphNode("Target"));
         Random rand = new Random();
+
+
+        /***Merge all components together and randomly add connections to target**/
         for(int i = 0; i < numComponents;i++)
         {
             for(int j = 0; j <components[i].getNodes().size();j++)
@@ -542,8 +556,6 @@ public final class GraphUtils {
 
         return finalGraph;
 
-
-        //TODO if connected, randomly add edges between components as well
     }
 
 

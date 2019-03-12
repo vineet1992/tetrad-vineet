@@ -145,16 +145,22 @@ public class ClusterSim {
 
     public double friendlyClusterSim()
     {
+        /***Convert estimated and true clusters to lists and compute costs***/
         List<List<Gene>> one = convertToGeneList(m1);
         List<List<Gene>> two = convertToGeneList(m2);
         double [][] costs = computeCostMatrix(one,two);
+
+
+
         /***This mapping consists of merged clusters if two cluster sets like the same real pathway***/
         HashMap<Integer,List<Gene>> mergedClusters = new HashMap<Integer,List<Gene>>();
+
+
         //For each estimated cluster
         for(int i = 0; i < costs.length;i++)
         {
             int bestIndex = -1;
-            double lowestCost = 1;
+            double lowestCost = 1.0;
             //Look at the true clusters
             for(int j = 0; j< costs[i].length;j++)
             {

@@ -24,6 +24,7 @@ public class MixedLeeHastieSimulation implements Simulation {
     private GeneralizedSemIm instModel;
     private boolean realPathways; //Should pathways be simulated more realistically
 
+
     public void simulate(Parameters parameters) {
         this.dataSets = new ArrayList<>();
         if (graph == null) {

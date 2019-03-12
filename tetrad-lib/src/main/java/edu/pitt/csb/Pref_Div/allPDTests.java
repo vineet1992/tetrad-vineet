@@ -13,7 +13,6 @@ import edu.pitt.csb.Pref_Div.Comparisons.PrefDivComparator;
 import edu.pitt.csb.Priors.runPriors;
 import edu.pitt.csb.mgm.MixedUtils;
 import edu.pitt.csb.mgm.STEPS;
-import edu.pitt.dbmi.data.Dataset;
 
 import java.io.*;
 import java.util.*;
@@ -31,7 +30,7 @@ public class allPDTests {
 
 
 
-    static int numRuns = 20;
+    static int numRuns = 15;
     static int numGenes = 500;
 
     static boolean boot = false; //Should we use bootstrap samples for PiPrefDiv
@@ -45,8 +44,8 @@ public class allPDTests {
 
     static int numPriors = 5; //Number of prior knowledge sources
     static int numReliable = 5; //Number of reliable sources
-    static int numComponents = 50; //How many components do we have for cluster simulation?
-    static int minTargetParents = 15; //How many true parents of the target are there?
+    static int numComponents = 25; //How many components do we have for cluster simulation?
+    static int minTargetParents = 10; //How many true parents of the target are there?
     static boolean amountRandom = false; //Should the priors have a random amount of prior knowledge?
     static boolean targetContinuous = true; //Is the target variable continuous?
     static boolean evenDistribution = true; //Is the distribution of nodes in each cluster even?
@@ -63,11 +62,11 @@ public class allPDTests {
     public static void main(String [] args) {
 
 
-        double [] ap = new double[]{0.01,0.05,0.1,0.3};
-        //double [] ap = new double[]{1.0};
+        double [] ap = new double[]{0.1,0.3,0.6};
+        //double [] ap = new double[]{1.0,0.5,0.1};
         int [] nr = new int[]{0,1,3,5};
         //int [] nr = new int[]{5};
-        int [] ss = new int[]{200};
+        int [] ss = new int[]{50};
 
         for(int ii = 0; ii < ap.length;ii++) {
             amountPrior = ap[ii];
@@ -287,7 +286,7 @@ public class allPDTests {
                             p.setParallel(false);
                             p.setPartialCorrs(partialCorr);
                             p.setPdStability(pdStability);
-                            p.setVerbose();
+                            //p.setVerbose();
 
                             PiPrefDiv4 noPrior = new PiPrefDiv4(toRun,"Target",minTargetParents,numParams);
                             noPrior.setSubsamples(subs);
@@ -295,10 +294,13 @@ public class allPDTests {
                             noPrior.setParallel(false);
                             noPrior.setPartialCorrs(partialCorr);
                             noPrior.setPdStability(pdStability);
-                            noPrior.setVerbose();
+                           // noPrior.setVerbose();
 
                             //TODO Switch back and include no priors as an option
                             ArrayList<Gene> selected = p.selectGenes(boot, numSamples, dFile);
+
+                            //selected = p.selectGenes(0,1,dFile);
+
                             ArrayList<Gene> npGenes = noPrior.selectGenes(boot,numSamples);
 
                             //ArrayList<Gene> selected = p.selectGenes(boot,numSamples,useCausalGraph);
@@ -308,6 +310,8 @@ public class allPDTests {
                             double npClustAccuracy = npCompare.getClusterAccuracy(numComponents);
                             double featAccuracy = -1;
                             double npFeatAccuracy = -1;
+
+
                             /***Are all the correct clusters represented in the selected features***/
                             double repAccuracy = compare.getRepresentAccuracy();
                             double npRepAccuracy = npCompare.getRepresentAccuracy();
@@ -345,7 +349,7 @@ public class allPDTests {
                                     Map<Gene,List<Gene>> npCluster = noPrior.getLastCluster();
 
                                     System.out.println("Cluster: " + lastCluster);
-                                    System.out.println("Cluster: " + npCluster);
+                                    System.out.println("Cluster, No Prior: " + npCluster);
 
 
 
@@ -409,7 +413,7 @@ public class allPDTests {
                                     System.out.println(g.getAdjacentNodes(g.getNode("Target")));
                                     Map<Gene, List<Gene>> lastCluster = p.getLastCluster();
                                     System.out.println("Cluster: " + lastCluster);
-
+                                    System.out.println("True clusters: " + clusters);
 
 
 
@@ -431,7 +435,7 @@ public class allPDTests {
                                     }
 
                                     out.get(curr).println(j + "\t" + p.getLastRadius()[0] + "\t" + p.getLastRadius()[1] + "\t" + noPrior.getLastRadius()[0] + "\t" +
-                                            results[0] + "\t" + results[1] + "\t" + npParam[0] + "\t"  + clustAccuracy + "\t" +  npClustAccuracy  + "\t" +
+                                            results[0] + "\t" + results[1] + "\t" + npParam[0] + "\t"  + friendlyClust + "\t" +  npFriendly  + "\t" +
                                             results[2] + "\t" + npParam[1]);
 
 
@@ -847,7 +851,7 @@ public class allPDTests {
 
                         PrefDivComparator pdc = new PrefDivComparator(p,"Target",g,clusters);
 
-                        result[i][2] = pdc.getClusterAccuracy(numComponents);
+                        result[i][2] = pdc.getFriendlyCluster(numComponents);
 
                         String type = "F1";
                         if (selected.size() == g.getAdjacentNodes(g.getNode("Target")).size())
@@ -862,24 +866,56 @@ public class allPDTests {
     /*** Serial implementation of the above parallel method***/
     private static double[] getBestParams(double [] radiiNP, double [] radii, int numComponents,PiPrefDiv4 p, String [] dFile,Map<String,List<Integer>> clusters,Graph g, DataSet toRun,DataSet test)
     {
-        double[] result = new double[3];
 
-        //Find optimal parameters for no priors, and then loop again for with priors
-        for (int i = 0; i < radii.length; i++) {
-            for (int j = 0; j < radiiNP.length; j++) {
-                p.selectGenes(radiiNP[j],radii[i],dFile);
+            double[] result = new double[3];
 
-                PrefDivComparator pdc = new PrefDivComparator(p,"Target",g,clusters);
+            double [][]allResults = new double[radii.length][radiiNP.length];
 
-                if(pdc.getClusterAccuracy(numComponents)> result[2])
-                {
-                     result[2] = pdc.getClusterAccuracy(numComponents);
-                    result[0] = radii[i];
-                    result[1] = radiiNP[j];
+            //Find optimal parameters for no priors, and then loop again for with priors
+            for (int i = 0; i < radii.length; i++) {
+
+
+                for (int j = 0; j < radiiNP.length; j++) {
+
+                    p.selectGenes(radiiNP[j], radii[i], dFile);
+
+                    PrefDivComparator pdc = new PrefDivComparator(p, "Target", g, clusters);
+                    double acc = pdc.getFriendlyCluster(numComponents);
+                    allResults[i][j] = acc;
+
+
+                    if (acc > result[2]) {
+                        result[2] = acc;
+                        result[1] = radii[i];
+                        result[0] = radiiNP[j];
+                    }
                 }
-             }
+            }
+        try {
+            PrintStream out =new PrintStream("Parameter_Search.txt");
+            for(int j = 0; j < radiiNP.length;j++)
+              out.print(radiiNP[j] + "\t");
+            out.println();
+
+            for(int i = 0; i < radii.length;i++)
+            {
+                out.print(radii[i] + "\t");
+                for(int j =0 ; j < radiiNP.length;j++)
+                {
+                    out.print(allResults[i][j] + "\t");
+
+                }
+                out.println();
+            }
+
+            return result;
         }
-        return result;
+        catch(Exception e)
+        {
+            e.printStackTrace();
+            System.exit(-1);
+        }
+        return null;
     }
 
 
