@@ -288,7 +288,7 @@ public final class GraphUtils {
      * and multiple genes in a pathway can affect the target
      */
     public static Graph randomGraphRealPathways(int numNodes, int numComponents, int numConnectedComponents, int maxDegree,
-                                                int maxIndegree, int maxOutdegree,int avgPathways,int avgCauses) {
+                                                int maxIndegree, int maxOutdegree,int avgPathways,int avgCauses, boolean latentControl) {
         Random rand = new Random();
 
         //TODO Issues: Sometimes a node might not be involved in any edges, sometimes the graph contains cycles during the merging step, any others?
@@ -366,6 +366,18 @@ public final class GraphUtils {
             List<Node>currNodes = nodesInPaths.get(i);
             Graph currGraph = randomGraphRandomForwardEdges(currNodes,0,numEdges,maxDegree,maxIndegree,maxOutdegree,true);
 
+            /***Add a master regulator if need be***/
+            if(latentControl)
+            {
+                Node latent = new GraphNode("L" + i);
+                latent.setNodeType(NodeType.LATENT);
+                currGraph.addNode(latent);
+                for(Node x: currGraph.getNodes())
+                {
+                    if(x!=latent)
+                        currGraph.addDirectedEdge(latent,x);
+                }
+            }
 
             if(fullGraph==null)
                 fullGraph = currGraph;
@@ -406,6 +418,7 @@ public final class GraphUtils {
             }
         }
 
+        /***Generate true clusters***/
         System.out.println("Done");
         clusters = new HashMap<String,List<Integer>>();
         for(Node n: pathways.keySet())
@@ -413,7 +426,6 @@ public final class GraphUtils {
             clusters.put(n.getName(),pathways.get(n));
         }
 
-        /***For debugging***/
 
         return fullGraph;
     }
@@ -448,11 +460,11 @@ public final class GraphUtils {
     * the approximate size of each of the components,
      * whether or not there should be connections between components (later, for now assume no)
      *
-**/
+    **/
 
     public static Graph randomGraphForwardEdgesClusters(int numNodes, int numComponents,
                                                         int numConnectedComponents,int numEdges,boolean evenDistribution,
-                                                        boolean connected, int maxDegree, int maxIndegree, int maxOutdegree)
+                                                        boolean connected, int maxDegree, int maxIndegree, int maxOutdegree, boolean latentControl)
     {
 
         clusters = new HashMap<>();
@@ -464,13 +476,18 @@ public final class GraphUtils {
         if(evenDistribution) { //Evenly distribute nodes and edges among clusters, this works fine
             int ng = (numNodes - 1) / numComponents; //Don't include target variable in this calculation
             int extraNodes = (numNodes - 1) % numComponents; //Fix uneven division problems to get the specified number of edges exactly
+
+            /***For each component, compute how many nodes and edges are in the component***/
             for (int i = 0; i < numComponents; i++) {
+
+                /***Distribute excess nodes (if nodes % components != 0) to the first set of components***/
                 if (extraNodes != 0) {
                     nodesPerGraph[i] = ng + 1;
                     extraNodes--;
                 } else
                     nodesPerGraph[i] = ng;
 
+                /***Edges per graph are the maximum possible***/
                 edgesPerGraph[i] = (nodesPerGraph[i]*(nodesPerGraph[i]-1))/2;
 
                 if(edgesPerGraph[i] > (nodesPerGraph[i]*(nodesPerGraph[i]-1)/2))
@@ -483,11 +500,13 @@ public final class GraphUtils {
         /***Otherwise, randomly choose the amount of edges per cluster***/
         else
         {
+            /***Mean should be around the user-specified number of edges***/
             NormalDistribution n_nodes = new NormalDistribution((numNodes-1)/numComponents,(numNodes-1)/(numComponents*3));
             int effectiveEdges = numEdges-numConnectedComponents;
             NormalDistribution n_edges = new NormalDistribution(effectiveEdges/numComponents,effectiveEdges/(3*numComponents));
-            int nodesSum = 0;
-            int edgesSum = 0;
+
+
+            /***For each component sample these distributions to get # of nodes and # of edges***/
             for(int i = 0; i < numComponents;i++)
             {
                 nodesPerGraph[i] = (int)n_nodes.sample();
@@ -500,6 +519,9 @@ public final class GraphUtils {
                     edgesPerGraph[i] = (int) n_edges.sample();
             }
         }
+
+
+
         System.out.println(Arrays.toString(nodesPerGraph));
         System.out.println(Arrays.toString(edgesPerGraph));
 
@@ -509,7 +531,7 @@ public final class GraphUtils {
         int nodeCount = 0;
 
 
-        /***For each graph, randomly generate based upon a max number of edges***/
+        /***For each graph, randomly generate based upon the computed number of nodes and edges***/
         for(int i = 0; i < numComponents;i++)
         {
             List<Node> nodes = new ArrayList<>();
@@ -519,11 +541,29 @@ public final class GraphUtils {
                 List<Integer> temp = new ArrayList<Integer>();
                 temp.add(i);
                 clusters.put("X" + (j+nodeCount),temp);
+
+
             }
 
+            /***Generate the random cluster***/
             nodeCount+=nodesPerGraph[i];
             components[i]  = randomGraph(nodes, 0, edgesPerGraph[i], maxDegree,
                     maxIndegree, maxOutdegree, connected);
+
+            /***Add a master regulator of this cluster***/
+
+            if(latentControl)
+            {
+                Node latent = new GraphNode("L" + i);
+                latent.setNodeType(NodeType.LATENT);
+                components[i].addNode(latent);
+                for(Node x:components[i].getNodes())
+                {
+                    if(x!=latent)
+                        components[i].addDirectedEdge(latent,x);
+                }
+
+            }
         }
 
 
@@ -540,11 +580,19 @@ public final class GraphUtils {
                 finalGraph.addNode(components[i].getNodes().get(j));
             for(Edge e: components[i].getEdges())
                 finalGraph.addEdge(e);
+
+            /***For causal components, connect a node to the target***/
             if(i < numConnectedComponents) {
                 List<Node> temp = components[i].getNodes();
+
+                /***Randomly choose a node from the component***/
                 Node toAdd = temp.get(rand.nextInt(temp.size()));
-                while(components[i].getAdjacentNodes(toAdd).size() < 1)
+
+                /***Don't choose a node that isn't actually connected to the cluster at all or a regulator latent***/
+                while(components[i].getAdjacentNodes(toAdd).size() < 1 || toAdd.getName().startsWith("L"))
                     toAdd = temp.get(rand.nextInt(temp.size()));
+
+                /***Connect the variable to the target***/
                 finalGraph.addDirectedEdge(finalGraph.getNode(toAdd.getName()),finalGraph.getNode("Target"));
             }
         }

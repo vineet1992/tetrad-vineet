@@ -23,7 +23,17 @@ public class MixedLeeHastieSimulation implements Simulation {
     private Graph graph;
     private GeneralizedSemIm instModel;
     private boolean realPathways; //Should pathways be simulated more realistically
+    private boolean latentControl; //Should each element in a pathway be controlled by a single master regulator?
 
+
+    /***
+     *
+     * @param lc Should a latent variable control each element in a pathway?
+     */
+    public void setLatentControl(boolean lc)
+    {
+        latentControl = lc;
+    }
 
     public void simulate(Parameters parameters) {
         this.dataSets = new ArrayList<>();
@@ -99,19 +109,19 @@ public class MixedLeeHastieSimulation implements Simulation {
             if(realPathways)
             {
                 this.graph = GraphUtils.randomGraphRealPathways(parameters.getInt("numMeasures"),parameters.getInt("numComponents"),parameters.getInt("numConnectedComponents"),
-                        parameters.getInt("maxDegree"),parameters.getInt("maxIndegree"),parameters.getInt("maxOutdegree"),parameters.getInt("avgPathways"),parameters.getInt("avgCauses"));
+                        parameters.getInt("maxDegree"),parameters.getInt("maxIndegree"),parameters.getInt("maxOutdegree"),parameters.getInt("avgPathways"),parameters.getInt("avgCauses"),latentControl);
             }else
             {
                 this.graph = GraphUtils.randomGraphForwardEdgesClusters(parameters.getInt("numMeasures"),parameters.getInt("numComponents"),parameters.getInt("numConnectedComponents"),
                         parameters.getInt("numEdges"),evenDistribution,true,parameters.getInt("maxDegree")
-                        ,parameters.getInt("maxIndegree"),parameters.getInt("maxOutdegree"));
+                        ,parameters.getInt("maxIndegree"),parameters.getInt("maxOutdegree"),latentControl);
             }
 
 
         }
         for (int i = 0; i < parameters.getInt("numRuns"); i++) {
             DataSet dataSet = simulateClustered(graph, parameters,parameters.getInt("targetContinuous"));
-            dataSet = DataUtils.standardizeData(dataSet);
+            //dataSet = DataUtils.standardizeData(dataSet);
 
             dataSets.add(dataSet);
         }

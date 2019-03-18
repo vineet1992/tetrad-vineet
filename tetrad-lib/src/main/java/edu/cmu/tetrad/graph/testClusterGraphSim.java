@@ -19,7 +19,7 @@ public class testClusterGraphSim {
         int maxOutDegree = 10;
 
         PrintStream out = new PrintStream("Graph_Test.txt");
-        out.println(GraphUtils.randomGraphForwardEdgesClusters(numNodes,numComponents,numConnectedComponents,numEdges,evenDistribution,connected,maxDegree,maxInDegree,maxOutDegree));
+        out.println(GraphUtils.randomGraphForwardEdgesClusters(numNodes,numComponents,numConnectedComponents,numEdges,evenDistribution,connected,maxDegree,maxInDegree,maxOutDegree,true));
         out.flush();
         out.close();
     }
