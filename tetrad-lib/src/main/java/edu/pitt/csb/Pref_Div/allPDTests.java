@@ -32,7 +32,7 @@ public class allPDTests {
 
 
 
-    static int numRuns = 25;
+    static int numRuns = 10;
     static int numGenes = 600;
 
     static boolean boot = false; //Should we use bootstrap samples for PiPrefDiv
@@ -64,11 +64,11 @@ public class allPDTests {
     public static void main(String [] args) {
 
 
-        //double [] ap = new double[]{0.1,0.3,0.6};
-        double [] ap = new double[]{1.0,0.5,0.1};
-        //int [] nr = new int[]{3,5,1,0};
-        int [] nr = new int[]{5};
-        int [] ss = new int[]{50,200};
+        double [] ap = new double[]{0.6,0.3,0.1};
+        //double [] ap = new double[]{1.0,0.5};
+        int [] nr = new int[]{3,5,1,0};
+        //int [] nr = new int[]{5};
+        int [] ss = new int[]{200};
 
         for(int ii = 0; ii < ap.length;ii++) {
             amountPrior = ap[ii];
@@ -76,6 +76,9 @@ public class allPDTests {
                 numReliable = nr[jj];
                 for (int kk = 0; kk < ss.length; kk++) {
                     sampleSize = ss[kk];
+
+                    if(nr[jj]==0 && ap[ii]==0.1) //TODO REMOVE THIS AFTER THIS EXPERIMENT
+                        continue;
 
                     ArrayList<Integer> experiment = new ArrayList<Integer>();
                     experiment.add(0);

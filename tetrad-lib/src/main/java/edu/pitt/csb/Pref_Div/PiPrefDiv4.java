@@ -65,6 +65,7 @@ public class PiPrefDiv4 implements ComparablePD {
     private boolean [] dPriorsWT; // Contains which features have prior dissimilarity information (excludes the target variable)
     private boolean saveMemory = false; //Should we conserve disc space and use the slower version of PiPrefDiv
     private List<Gene> lastSelected; //Last set of selected genes
+    private double wpCutoff = 0.5; //Cutoff for inclusion into the withprior set TODO Set at 0.5 right now, but this should be tuned
     private Random rand = new Random(42);
 
     private int targetIndex = 0; //Index of the target variable
@@ -133,6 +134,7 @@ public class PiPrefDiv4 implements ComparablePD {
     public boolean[] getDissimilarityPriors(){return dPriorsWT;}
     public double [] getLastIntensityWeights(){return new double[10];}
     public List<Gene> getLastSelected(){return lastSelected;}
+    public void setWPCutoff(double wp){wpCutoff = wp;}
 
 
     //Set numbe of folds
@@ -351,11 +353,13 @@ public class PiPrefDiv4 implements ComparablePD {
 
 
         /***Load which genes have prior info about relationship to target***/
-        iPriors = loadIPrior(dFile);
+        if(iPriors==null)
+            iPriors = loadIPrior(dFile);
 
 
         /***Load which gene-gene relationships have prior information (based upon the order in the dataset)***/
-        boolean [] tempPrior = getPriorNoTarget();
+        if(dPriorsWT==null)
+            dPriorsWT = getPriorNoTarget();
 
 
         /***Give intensity values to each gene in "temp"***/
@@ -363,7 +367,7 @@ public class PiPrefDiv4 implements ComparablePD {
 
 
         /***Compute correlation for each pair of genes***/
-        float [] meanDis = Functions.computeAllCorrelations(meanGenes,data,false,1,1,tempPrior);
+        float [] meanDis = Functions.computeAllCorrelations(meanGenes,data,false,1,1,dPriorsWT);
 
 
         /***Shuffle and sort the list of genes based upon intensity value***/
@@ -394,8 +398,7 @@ public class PiPrefDiv4 implements ComparablePD {
         rpd = new RunPrefDiv(meanDis,meanGenes,data,LOOCV);
 
 
-        rpd.setWithPrior(tempPrior);
-        dPriorsWT = tempPrior;
+        rpd.setWithPrior(dPriorsWT);
 
 
         rpd.setAllParams(radiiNP,radiiWP);
@@ -956,7 +959,8 @@ public class PiPrefDiv4 implements ComparablePD {
             float [] prior = Functions.loadTheoryMatrix(dFile[j],false,numGenes+1);
             for(int i = 0; i < mean.length;i++)
             {
-                if(prior[i]>0) {
+                /***TODO is this if statement right?***/
+                if(prior[i]>0 && mean[i] > 0) {
                     vars[i] += weights[j] * (tao[j] * tao[j] + Math.pow((mean[i]*subsamples.length - prior[i]*subsamples.length), 2));
                     totalWeight[i] += weights[j];
                 }
@@ -1190,6 +1194,11 @@ public class PiPrefDiv4 implements ComparablePD {
         float [] varDis = getVarMixture(simWeights,simTao,meanDis,dFile);
 
 
+        //Load Intensity prior using non -1 entries from meandis
+        iPriors = loadIPrior(meanDis);
+
+        //Load dissimilarity prior using non -1 entries from meandis
+        dPriorsWT = loadPriorsNoTarget(meanDis);
 
         //Get posterior distributions of predicted dissimilarity and intensity from prior sources
         float[] uPost = getMeanPosterior(sums,meanDis, varDis);
@@ -1203,6 +1212,38 @@ public class PiPrefDiv4 implements ComparablePD {
         return scoresSim;
     }
 
+
+    /***
+     *
+     * @param means Mean similarity scores from the prior knowledge sources
+     * @return boolean [] where true means that some source gave information about gene-gene relationship i
+     */
+    private boolean [] loadPriorsNoTarget(float [] means)
+    {
+        boolean [] prior = new boolean[numGenes*(numGenes-1)/2];
+        for(int i = numGenes;i<means.length;i++)
+        {
+            if(means[i]>0)
+                prior[i-numGenes] = true;
+        }
+        return prior;
+    }
+
+    /***
+     *
+     * @param meanDis Mean similarity scores from the prior knowledge sources
+     * @return boolean [] where true means that some source gave information
+     */
+    private boolean[] loadIPrior(float [] meanDis)
+    {
+        boolean [] prior = new boolean[numGenes];
+        for(int i = 0; i < numGenes;i++)
+        {
+            if(meanDis[i] >0)
+                prior[i] = true;
+        }
+        return prior;
+    }
 
 
     private synchronized void addGeneConnections(float [] corrs, int [] curr, double radii)
@@ -1234,7 +1275,7 @@ public class PiPrefDiv4 implements ComparablePD {
 
     //Give an array of filenames for all theory files, load each one into a row of the matrix to get all theory information in a single matrix
     //This computes the phi function from the paper
-    public static float[] loadTheoryFiles(String [] dFile, double [] weights, int numGenes)
+    private float[] loadTheoryFiles(String [] dFile, double [] weights, int numGenes)
     {
         float [] result = new float[numGenes*(numGenes+1)/2];
         float [] totalWeight = new float[result.length];
@@ -1261,6 +1302,10 @@ public class PiPrefDiv4 implements ComparablePD {
                 result[i] = -1;
             else
                 result[i] /= totalWeight[i];
+
+            /**TODO Make sure this is right, no prior information if it says the edge probability doesn't exist***/
+            if(result[i] < wpCutoff)
+                result[i] = -1;
         }
         return result;
 
