@@ -8,6 +8,8 @@ import edu.cmu.tetrad.graph.Node;
 import edu.cmu.tetrad.regression.RegressionDataset;
 import edu.cmu.tetrad.regression.RegressionResult;
 import edu.cmu.tetrad.util.ForkJoinPoolInstance;
+import edu.cmu.tetrad.util.StatUtils;
+import edu.cmu.tetrad.util.TetradMatrix;
 import edu.pitt.csb.Pref_Div.Comparisons.ClusterSim;
 import edu.pitt.csb.Pref_Div.Comparisons.PrefDivComparator;
 import edu.pitt.csb.Priors.runPriors;
@@ -30,8 +32,8 @@ public class allPDTests {
 
 
 
-    static int numRuns = 15;
-    static int numGenes = 500;
+    static int numRuns = 25;
+    static int numGenes = 600;
 
     static boolean boot = false; //Should we use bootstrap samples for PiPrefDiv
     static boolean loocv = false; //Should we use leave-one-out CV for PiPrefDiv
@@ -44,8 +46,8 @@ public class allPDTests {
 
     static int numPriors = 5; //Number of prior knowledge sources
     static int numReliable = 5; //Number of reliable sources
-    static int numComponents = 25; //How many components do we have for cluster simulation?
-    static int minTargetParents = 10; //How many true parents of the target are there?
+    static int numComponents = 80; //How many components do we have for cluster simulation?
+    static int minTargetParents = 40; //How many true parents of the target are there?
     static boolean amountRandom = false; //Should the priors have a random amount of prior knowledge?
     static boolean targetContinuous = true; //Is the target variable continuous?
     static boolean evenDistribution = true; //Is the distribution of nodes in each cluster even?
@@ -62,11 +64,11 @@ public class allPDTests {
     public static void main(String [] args) {
 
 
-        double [] ap = new double[]{0.1,0.3,0.6};
-        //double [] ap = new double[]{1.0,0.5,0.1};
-        int [] nr = new int[]{0,1,3,5};
-        //int [] nr = new int[]{5};
-        int [] ss = new int[]{50};
+        //double [] ap = new double[]{0.1,0.3,0.6};
+        double [] ap = new double[]{1.0,0.5,0.1};
+        //int [] nr = new int[]{3,5,1,0};
+        int [] nr = new int[]{5};
+        int [] ss = new int[]{50,200};
 
         for(int ii = 0; ii < ap.length;ii++) {
             amountPrior = ap[ii];
@@ -143,6 +145,7 @@ public class allPDTests {
                                 out.get(curr).print("Run\t");
                                 for (int i = 0; i < allTypes.length; i++)
                                     out.get(curr).print(allTypes[i] + "\t" + (allTypes[i]+"_NP") + "\t");
+                                out.get(curr).print("Perfect_Acc");
                                 out.get(curr).println();
                             }
 
@@ -172,8 +175,21 @@ public class allPDTests {
                             Graph g = null;
                             DataSet d = null;
                             File graphFile = new File("Graphs/Graph_" + numGenes + "_" + minTargetParents + "_" + numComponents + "_" + evenDistribution + "_" + j + ".txt");
-                            if (graphFile.exists())
+                            if (graphFile.exists()) {
                                 g = GraphUtils.loadGraphTxt(graphFile);
+
+
+                                /***Remove any nodes in the graph that are latents***/
+                                List<Node> toRemove = new ArrayList<Node>();
+                                for (Node n : g.getNodes()) {
+                                    if (n.getName().startsWith("L"))
+                                        toRemove.add(n);
+                                }
+                                g.removeNodes(toRemove);
+
+
+
+                            }
                             else {
                                 System.err.println("Couldn't find graph file with these parameters, please double check");
                             }
@@ -279,6 +295,10 @@ public class allPDTests {
                                 }
                                 toRun = d.subsetRows(trainInds);
                                 test.removeRows(trainInds);
+
+                                /***Must be standardized separately using same parameters***/
+                                standardizeData(toRun,test);
+
 
                             PiPrefDiv4 p = new PiPrefDiv4(toRun, "Target", minTargetParents, numParams);
                             p.setSubsamples(subs);
@@ -509,8 +529,33 @@ public class allPDTests {
                                         out.get(curr).print(predAccuracy + "\t");
 
 
+
+
                                     }
-                                    out.get(curr).println();
+
+                                    /***Code to get optimal predictions***/
+                                    List<Node> causes = g.getAdjacentNodes(g.getNode("Target"));
+                                    ArrayList<Gene> causalGenes = new ArrayList<Gene>();
+
+                                    for(Node n:causes)
+                                    {
+                                        Gene temp = new Gene(0);
+                                        temp.symbol = n.getName();
+                                        causalGenes.add(temp);
+                                    }
+
+                                    DataSet train = RunPrefDiv.summarizeData(toRun, causalGenes, lastCluster, RunPrefDiv.ClusterType.NONE);
+                                    train = getCausalFeatures(train,"Target");
+
+                                    DataSet summarizedTest = RunPrefDiv.summarizeData(test, causalGenes, lastCluster, RunPrefDiv.ClusterType.NONE);
+                                    DataSet causesTest = subsetByCols(train,summarizedTest);
+
+                                    PiPrefDiv4 ignore = new PiPrefDiv4(d,"Target",10);
+
+                                    PrefDivComparator pdc = new PrefDivComparator(ignore,"Target",g,clusters);
+
+
+                                    out.get(curr).println(pdc.getPredictionAccuracy(train,causesTest));
                                 }
                                 /***Summarization Method Tests***/
                                 else if (x == 3) {
@@ -570,6 +615,7 @@ public class allPDTests {
                         System.err.println("Error with printstream");
                         e.printStackTrace();
                         System.exit(-1);
+
                     }
                 }
             }
@@ -578,6 +624,32 @@ public class allPDTests {
 
     }
 
+
+    /***
+     *
+     * Standardizes both datasets based on the mean and sd of the training set (prevent information leak to testing set)
+     * @param train Trainind Dataset
+     * @param test Testing Dataset
+     */
+    public static void standardizeData(DataSet train, DataSet test)
+    {
+        TetradMatrix trainData = train.getDoubleData();
+        for(int i = 0; i < train.getNumColumns();i++)
+        {
+            double [] col = trainData.getColumn(i).toArray();
+            double mean = StatUtils.mean(col);
+            double sd = StatUtils.sd(col);
+            for(int j = 0; j < train.getNumRows();j++)
+            {
+                train.setDouble(j,i,(train.getDouble(j,i)-mean)/sd);
+            }
+
+            for(int j = 0; j < test.getNumRows();j++)
+            {
+                test.setDouble(j,i,(test.getDouble(j,i)-mean)/sd);
+            }
+        }
+    }
 
     public static DataSet subsetByCols(DataSet train, DataSet test)
     {
@@ -917,61 +989,6 @@ public class allPDTests {
         }
         return null;
     }
-
-
-    /***
-     *
-     * @param genes List of genes with intensity values filled
-     * @param iPrior Boolean [] specifying if we had prior information for gene i
-     * @param threshNP Threshold for genes that we did not have prior information for
-     * @param threshWP Threshold for genes that we had prior information for
-     * @return A new list of genes with intensities under the threshold shrunk to zero
-     */
-    private static synchronized ArrayList<Gene> shrinkByThreshold(ArrayList<Gene> genes, boolean [] iPrior, float threshNP, float threshWP)
-    {
-        ArrayList<Gene> curr = new ArrayList<Gene>();
-        for(int i = 0; i < genes.size();i++)
-        {
-            Gene t = new Gene(i);
-            t.symbol = genes.get(i).symbol;
-            if((iPrior[i] && genes.get(i).intensityValue>=threshWP) || (!iPrior[i] && genes.get(i).intensityValue >= threshNP))
-            {
-                t.intensityValue =genes.get(i).intensityValue;
-            }
-            else
-            {
-                t.intensityValue = 0;
-            }
-            curr.add(t);
-        }
-        return curr;
-    }
-
-    /***
-     *
-     * @param genes List of genes with correlations to the target variable stored in the intensityValue
-     * @param thresh An absolute threshold to shrink correlations to 0 (Must be greater than the threshold to be non-zero)
-     * @return A List of genes with shrunk correlations
-     */
-    private static synchronized ArrayList<Gene> shrinkByThreshold(ArrayList<Gene> genes, float thresh)
-        {
-            ArrayList<Gene> curr = new ArrayList<Gene>();
-            for(int i = 0; i < genes.size();i++)
-            {
-                Gene t = new Gene(i);
-                t.symbol = genes.get(i).symbol;
-                if(genes.get(i).intensityValue>=(1-thresh))
-                {
-                    t.intensityValue =genes.get(i).intensityValue;
-                }
-                else
-                {
-                    t.intensityValue = 0;
-                }
-                curr.add(t);
-            }
-            return curr;
-        }
 
     //Dissimilarity (in multiple files), this loads from a single one and you call it many times
     public static int getAmountPrior(String file)

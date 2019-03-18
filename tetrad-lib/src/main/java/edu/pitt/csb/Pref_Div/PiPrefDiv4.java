@@ -35,7 +35,7 @@ public class PiPrefDiv4 implements ComparablePD {
     private DataSet data; //The current expression dataset to be analyzed, assumes that all variables are fair game for Pref-Div except the target
     private String target; //The target variable of interest
     private double [] initRadii; //Initial radius values to test
-    private double lowRadii = 0.25; //Low range of radius values to test
+    private double lowRadii = 0.3; //Low range of radius values to test
     private double highRadii = 1; //High range of radius values to test
     private int numRadii = 40; //Number of radius values to test
     private int [][] subsamples; //subsamples for repeated Pref-Div
@@ -303,9 +303,6 @@ public class PiPrefDiv4 implements ComparablePD {
         /***Shuffle and sort the list of genes***/
         Collections.shuffle(meanGenes,rand);
         Collections.sort(meanGenes,Gene.IntensityComparator);
-
-
-
 
 
         /***Create RunPrefDiv wrapper object and set all parameters***/

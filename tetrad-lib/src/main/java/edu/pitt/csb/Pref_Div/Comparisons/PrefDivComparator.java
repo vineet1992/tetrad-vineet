@@ -229,8 +229,7 @@ public class PrefDivComparator {
         //Extract last set of selected genes
             List<Gene> selected = est.getLastSelected();
 
-            //Standardize the test dataset to mean 0 SD 1
-            test = DataUtils.standardizeData(test);
+
 
 
             //Create regression dataset and use selected features as regressors
