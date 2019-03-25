@@ -28,9 +28,14 @@ import java.util.*;
 public class justSimulatePrefDiv {
 
 
-    public static double[] reliableParams = new double[]{0.6, 1.0, 0, 0.8}; //True Low, True High, False Low, False High
+    public static double[] reliableParams = new double[]{10,2,2,10}; //True Low, True High, False Low, False High
 
-    public static double[] unreliableParams = new double[]{0, 1, 0, 1};
+    public static double[] unreliableParams = new double[]{4,4,4,4}; //True Low, True High, False Low, False High
+
+    /***For when random priors are used***/
+    private static double alphaMean = 10;
+    private static double betaMean = 2;
+
 
 
 
@@ -48,12 +53,12 @@ public class justSimulatePrefDiv {
 
     public static Random rand = new Random();
 
-    public static int numGenes = 500;
+    public static int numGenes = 3000;
 
     public static void main(String[] args) {
-        double[] ap = new double[]{0.1, 0.3, 0.6};
-        int[] nr = new int[]{0, 1, 3, 5};
-        int[] ss = new int[]{50, 200};
+        double[] ap = new double[]{0.25,0.5, 0.75};
+        int[] nr = new int[]{0,1,3,5};
+        int[] ss = new int[]{100,200};
 
         for (int xx = 0; xx < ap.length; xx++) {
             for (int y = 0; y < nr.length; y++) {
@@ -71,12 +76,14 @@ public class justSimulatePrefDiv {
                     int avgPathways = 1; //Average number of pathways a gene belongs to (only for realPathways simulation)
                     int avgCauses = 1; //Average number of genes in a relevant pathway causally related to the target
 
+                    double varLow = 0.01; //Low value for variance of variables
+                    double varHigh = 2;  //High value for variance of variables
 
-                    int numPriors = 10; //Number of prior knowledge sources
+                    int numPriors = 5; //Number of prior knowledge sources
                     int numReliable = nr[y]; //Number of reliable sources
-                    int numComponents = 100; //How many components do we have for cluster simulation?
-                    int minTargetParents = 50; //How many true parents of the target are there?
-                    boolean noiseRandom = false; //Should the priors have random amounts of reliability?
+                    int numComponents = 300; //How many components do we have for cluster simulation?
+                    int minTargetParents = 75; //How many true parents of the target are there?
+                    boolean noiseRandom = true; //Should the priors have random amounts of reliability?
 
 
                     boolean amountRandom = false; //Should the priors have a random amount of prior knowledge?
@@ -232,6 +239,9 @@ public class justSimulatePrefDiv {
                             p.setValue("targetContinuous", 1);
                         else
                             p.setValue("targetContinuous", 0);
+
+                        p.setValue("varLow",varLow);
+                        p.setValue("varHigh",varHigh);
 
                         if (g != null) {
                             m.setTrueGraph(g);
@@ -758,6 +768,9 @@ public class justSimulatePrefDiv {
      */
     public static double generateDissimilarity(File prior, Graph g, DataSet data, String target, int numReliable, double amountPrior, boolean amountRandom, boolean noiseRandom, int k, float[] prob, boolean simulateTogether) {
 
+
+
+
         List<Node> allNodes = data.getVariables();
         double[][] dissim = new double[numGenes][numGenes];
 
@@ -771,9 +784,34 @@ public class justSimulatePrefDiv {
             amount = rand.nextDouble() * amountLimit;
         }
         if (noiseRandom) {
-            reliableParams[0] = rand.nextDouble() * 0.8 + 0.2;
-            reliableParams[3] = rand.nextDouble() * 0.8;
+            NormalDistribution nd = new NormalDistribution(alphaMean,1);
+            reliableParams[0] = nd.sample();
+            reliableParams[3] = nd.sample();
+
+
+            nd = new NormalDistribution(betaMean,1);
+            double x = nd.sample();
+            while(x <=0)
+                x = nd.sample();
+            reliableParams[1] = x;
+            x = nd.sample();
+            while(x <=0)
+                x= nd.sample();
+            reliableParams[2] = x;
         }
+
+
+        double [] params = reliableParams;
+        if(k >= numReliable)
+        {
+            params = unreliableParams;
+        }
+
+        BetaDistribution trueDist = new BetaDistribution(params[0],params[1]);
+        BetaDistribution falseDist = new BetaDistribution(params[2],params[3]);
+
+
+
         try {
             int index = 0;
 
@@ -801,10 +839,10 @@ public class justSimulatePrefDiv {
                         dissim[row][col] = -1;
                     } else if (i > j) {
                         dissim[row][col] = dissim[col][row];
-                    } else if (k < numReliable) {
+                    } else {
                         if (g.getEdge(curr, curr2) != null) {
                             if (prob[index] < amount) {
-                                double val = rand.nextDouble() * (reliableParams[1] - reliableParams[0]) + reliableParams[0];
+                                double val = trueDist.sample();
 
                                 dissim[row][col] = val;
                                 reliability += val;
@@ -816,7 +854,7 @@ public class justSimulatePrefDiv {
                             }
                         } else {
                             if (prob[index] < amount) {
-                                double val = rand.nextDouble() * (reliableParams[3] - reliableParams[2]) + reliableParams[2];
+                                double val = falseDist.sample();
 
                                 dissim[row][col] = val;
                                 reliability -= val;
@@ -824,29 +862,6 @@ public class justSimulatePrefDiv {
                             } else {
                                 dissim[row][col] = -1;
                             }
-                        }
-                        index++;
-                    }
-                    //This prior is unreliable, needs to give bad information
-                    else {
-                        if (prob[index] < amount) {
-                            double val = -1;
-                            if (g.getEdge(curr, curr2) != null) {
-                                val = rand.nextDouble() * (unreliableParams[1] - unreliableParams[0]) + unreliableParams[0];
-
-                                dissim[row][col] = val;
-                                reliability += val;
-                                counts++;
-
-                            } else {
-                                val = rand.nextDouble() * (unreliableParams[3] - unreliableParams[2]) + unreliableParams[2];
-
-                                dissim[row][col] = val;
-                                reliability -= val;
-                                counts++;
-                            }
-                        } else {
-                            dissim[row][col] = -1;
                         }
                         index++;
                     }

@@ -13,13 +13,17 @@ import edu.cmu.tetrad.regression.RegressionDataset;
 import edu.cmu.tetrad.regression.RegressionResult;
 import edu.cmu.tetrad.search.CpcStable;
 import edu.cmu.tetrad.search.IndependenceTest;
+import edu.pitt.csb.Priors.PriorUtils;
 import edu.pitt.csb.Priors.mgmPriors;
 import edu.pitt.csb.Priors.realDataPriorTest;
 import edu.pitt.csb.Priors.runPriors;
 import edu.pitt.csb.mgm.IndTestMultinomialAJ;
 import edu.pitt.csb.mgm.MixedUtils;
+import edu.pitt.csb.mgm.STEPS;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -43,6 +47,8 @@ public class PriorPrediction {
         double lamHigh = 0.9;
         int start = 0;
         int end = 5;
+        boolean steps = false;
+        double g = 0.05;
 
         int index = 0;
         while(index < args.length) {
@@ -76,6 +82,21 @@ public class PriorPrediction {
                 end = Integer.parseInt(args[index + 1]);
                 index += 2;
             }
+            else if(args[index].equals("-steps"))
+            {
+                steps = true;
+                index++;
+            }
+            else if(args[index].equals("-g"))
+            {
+                g = Double.parseDouble(args[index+1]);
+                index+=2;
+            }
+            else
+            {
+                System.err.println("Unrecognized Command Line Option: " + args[index]);
+                System.exit(-1);
+            }
         }
 
 
@@ -91,34 +112,54 @@ public class PriorPrediction {
         if(loocv)
             ns = data.getNumRows();
 
+
+
         File f = new File("Predictions_" + runName);
         if(!f.exists())
             f.mkdir();
         File pd = new File(priorDir);
-        if(!pd.isDirectory())
-        {
-            System.out.println("Prior Directory doesn't exist...exiting");
-            System.exit(-1);
-        }
 
-        SparseDoubleMatrix2D [] priors = new SparseDoubleMatrix2D[pd.listFiles().length];
-        int ct = 0;
-        String [] priorNames = new String[pd.listFiles().length];
-        for(File ff: pd.listFiles())
-        {
-            priorNames[ct] = ff.getName();
-            priors[ct] = new SparseDoubleMatrix2D(realDataPriorTest.loadPrior(ff,data.getNumColumns()));
-            ct++;
-        }
-        //Two Output Files for both piMGM alone and piMGM with causal discovery algorithm downstream
-        //First file is list of features selected in each run
-        //Second file is True values and prediction made for each run
         PrintStream pi1 = new PrintStream(f.getName() + "/Predictions.txt");
         PrintStream pi2 = new PrintStream(f.getName() + "/Features.txt");
         pi1.println("Run\tPrediction_piMGM\tPrediction_CPC_MB\tPrediction_CPC\tActual");
         pi2.println("Run\tFeatures_piMGM\tFeatures_CPC_MB\tFeatures_CPC");
         if(end==-1)
             end = data.getNumRows();
+
+        SparseDoubleMatrix2D[] priors = new SparseDoubleMatrix2D[1];
+        String[] priorNames = new String[1];
+
+        if(!steps) {
+            if (!pd.isDirectory()) {
+                System.out.println("Prior Directory doesn't exist...exiting");
+                System.exit(-1);
+            }
+             priors = new SparseDoubleMatrix2D[pd.listFiles().length];
+            priorNames = new String[pd.listFiles().length];
+
+            int ct = 0;
+            for (File ff : pd.listFiles()) {
+                priorNames[ct] = ff.getName();
+                BufferedReader temp = new BufferedReader(new FileReader(ff));
+
+                //Assume this prior knowledge file is in sif format
+                if (temp.readLine().split("\t").length < data.getNumColumns()) {
+                    temp.close();
+                    priors[ct] = new SparseDoubleMatrix2D(PriorUtils.loadPriorSif(ff, data));
+                }
+                //Otherwise assume the full matrix is given
+                else {
+                    temp.close();
+                    priors[ct] = new SparseDoubleMatrix2D(PriorUtils.loadPrior(ff, data.getNumColumns()));
+                }
+                ct++;
+            }
+
+        }
+        //Two Output Files for both piMGM alone and piMGM with causal discovery algorithm downstream
+        //First file is list of features selected in each run
+        //Second file is True values and prediction made for each run
+
         for(int i = start; i < end;i++)
         {
             System.out.println("Running CV set " + i + " out of " + data.getNumRows());
@@ -135,9 +176,24 @@ public class PriorPrediction {
             DataSet temp = data.subsetRows(rows);
             int [][] samps = runPriors.genSubs(temp,ns,loocv);
             ns = samps.length;
-            mgmPriors p = new mgmPriors(ns,initLambdas,temp,priors,samps,true);
-            System.out.println("Running piMGM");
-            Graph out = p.runPriors();
+            Graph out;
+            mgmPriors p;
+
+            if(steps)
+            {
+                STEPS s = new STEPS(temp,initLambdas,g,samps);
+                s.runStepsArrayPar();
+                out = s.lastGraph;
+            }
+            else
+            {
+                p = new mgmPriors(ns,initLambdas,temp,priors,samps,true);
+                System.out.println("Running piMGM");
+                out = p.runPriors();
+                System.out.println("Priors: " + Arrays.toString(priorNames));
+                System.out.println("Weights: " + Arrays.toString(p.normalizedExpertWeights));
+                System.out.println("P-Values; " + Arrays.toString(p.uncorrectedPValues));
+            }
             IndependenceTest ind = new IndTestMultinomialAJ(temp,0.05);
             System.out.println("Running CPC Stable");
             CpcStable cpc = new CpcStable(ind);
@@ -181,9 +237,8 @@ public class PriorPrediction {
 
             pi1.flush();
             pi2.flush();
-            System.out.println("Priors: " + Arrays.toString(priorNames));
-            System.out.println("Weights: " + Arrays.toString(p.normalizedExpertWeights));
-            System.out.println("P-Values; " + Arrays.toString(p.uncorrectedPValues));
+
+
 
         }
         pi1.close();

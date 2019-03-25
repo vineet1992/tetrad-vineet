@@ -216,11 +216,11 @@ public class runPriors {
                 if(addedDummy)
                 {
                     addLines(new File(currFile));
-                    priors[i] = new SparseDoubleMatrix2D(realDataPriorTest.loadPrior(new File("temp_2.txt"),d.getNumColumns()));
+                    priors[i] = new SparseDoubleMatrix2D(PriorUtils.loadPrior(new File("temp_2.txt"),d.getNumColumns()));
                 }
                 else
                 {
-                    priors[i] = new SparseDoubleMatrix2D(realDataPriorTest.loadPrior(new File(currFile),d.getNumColumns()));
+                    priors[i] = new SparseDoubleMatrix2D(PriorUtils.loadPrior(new File(currFile),d.getNumColumns()));
                 }
             }
             //Delete maintenance files

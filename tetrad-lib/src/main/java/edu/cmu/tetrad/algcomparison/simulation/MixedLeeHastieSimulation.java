@@ -91,7 +91,7 @@ public class MixedLeeHastieSimulation implements Simulation {
         }
         Graph graph = MixedUtils.makeMixedGraph(dag, nd);
 
-        GeneralizedSemPm pm = MixedUtils.GaussianCategoricalPm(graph, "Split(-1.5,-.5,.5,1.5)");
+        GeneralizedSemPm pm = MixedUtils.GaussianCategoricalPm(graph, "Split(-1.5,-.5,.5,1.5)",parameters.getDouble("varLow"),parameters.getDouble("varHigh"));
         GeneralizedSemIm im = MixedUtils.GaussianCategoricalIm(pm);
 
         DataSet ds = im.simulateDataAvoidInfinity(parameters.getInt("sampleSize"), false);

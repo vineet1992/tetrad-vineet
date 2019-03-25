@@ -151,21 +151,24 @@ public class constructPrior {
     public static void outputPrior(DoubleMatrix2D prior,DataSet data, String file) throws Exception
     {
         PrintStream out = new PrintStream(file);
-        for(int i = 0; i < data.getNumColumns();i++)
+        /*for(int i = 0; i < data.getNumColumns();i++)
         {
             if(i==data.getNumColumns()-1)
                 out.println(data.getVariable(i).getName());
             else
             out.print(data.getVariable(i).getName() + "\t");
-        }
+        }*/
         for(int i = 0; i < prior.rows();i++)
         {
             for(int j = 0; j < prior.columns();j++)
             {
+                double res = prior.get(i,j);
+                if(res==0)
+                    res = -1;
                 if(j==prior.columns()-1)
-                    out.println(prior.get(i,j));
+                    out.println(res);
                 else
-                    out.print(prior.get(i,j)+"\t");
+                    out.print(res+"\t");
             }
         }
         out.flush();
@@ -239,8 +242,8 @@ public class constructPrior {
         while(b.ready())
         {
             String[]line = b.readLine().split("\t");
-            if(line[1].length()>2)
-                map.put(line[1],line[0]);
+            if(line.length>1 && line[1].length()>2)
+                map.put(line[0],line[1]);
         }
         b.close();
         return map;

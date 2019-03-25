@@ -32,22 +32,22 @@ public class allPDTests {
 
 
 
-    static int numRuns = 10;
-    static int numGenes = 600;
+    static int numRuns = 15;
+    static int numGenes = 500;
 
     static boolean boot = false; //Should we use bootstrap samples for PiPrefDiv
     static boolean loocv = false; //Should we use leave-one-out CV for PiPrefDiv
     static boolean useCausalGraph = false; //Are we selecting genes to then use a causal graph to find connections or direct selection?
     static int numSamples = 20; //Number of bootstrap/sub-sampled samples to use
     static int numParams = 30;//Number of parameters to sweep over
-    static boolean noiseRandom = false;//Is the reliability range of reliable and unreliable priors set randomly?
+    static boolean noiseRandom = true;//Is the reliability range of reliable and unreliable priors set randomly?
     static int numFolds = 5; //Number of Folds for CV to pick alpha
 
 
     static int numPriors = 5; //Number of prior knowledge sources
     static int numReliable = 5; //Number of reliable sources
-    static int numComponents = 80; //How many components do we have for cluster simulation?
-    static int minTargetParents = 40; //How many true parents of the target are there?
+    static int numComponents = 50; //How many components do we have for cluster simulation?
+    static int minTargetParents = 25; //How many true parents of the target are there?
     static boolean amountRandom = false; //Should the priors have a random amount of prior knowledge?
     static boolean targetContinuous = true; //Is the target variable continuous?
     static boolean evenDistribution = true; //Is the distribution of nodes in each cluster even?
@@ -64,11 +64,11 @@ public class allPDTests {
     public static void main(String [] args) {
 
 
-        double [] ap = new double[]{0.6,0.3,0.1};
+        double [] ap = new double[]{0.5,0.75};
         //double [] ap = new double[]{1.0,0.5};
         int [] nr = new int[]{3,5,1,0};
         //int [] nr = new int[]{5};
-        int [] ss = new int[]{200};
+        int [] ss = new int[]{50,200};
 
         for(int ii = 0; ii < ap.length;ii++) {
             amountPrior = ap[ii];
@@ -77,23 +77,19 @@ public class allPDTests {
                 for (int kk = 0; kk < ss.length; kk++) {
                     sampleSize = ss[kk];
 
-                    if(nr[jj]==0 && ap[ii]==0.1) //TODO REMOVE THIS AFTER THIS EXPERIMENT
-                        continue;
-
                     ArrayList<Integer> experiment = new ArrayList<Integer>();
                     experiment.add(0);
-                    experiment.add(1);
+                    //experiment.add(1);
                     experiment.add(2);
                     /*experiment.add(3);
-                    experiment.add(4);
-                    experiment.add(5);*/
+                    experiment.add(4);*/
+                    //experiment.add(5);
                     //0 ->prior evaluation, 1 -> Accuracy of chosen parameters vs Optimal
                     //2->With priors vs no Priors 3-> Comparing different summarization methods for clustered genes
                     //4->Realistic pathway tests where cluster determination is the key
                     //5 ->Summarization with graphical modeling
 
                     String[] types = new String[]{"FS", "Prediction", "Cluster","Friendly_Cluster"}; //Help to create file header for experiment 1
-                    String[] starts = new String[]{"Best_Radius", "Best_Accuracy", "Pred_Accuracy"}; //More help
 
                     String [] startsNP = new String[]{"Pred_Accuracy","Pred_Accuracy_NP"};
 
