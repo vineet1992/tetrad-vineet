@@ -44,10 +44,11 @@ public class PriorUtils {
     {
         double [][] temp = new double[numVariables][numVariables];
         BufferedReader b = new BufferedReader(new FileReader(data));
-        b.readLine();
         for(int i = 0; i < numVariables;i++)
         {
             String [] line = b.readLine().split("\t");
+            if(line.length < numVariables)
+                line = b.readLine().split("\t"); //To fix issues with header vs no header
             for(int j = 0; j < numVariables;j++)
             {
                 temp[i][j] = Double.parseDouble(line[j]);

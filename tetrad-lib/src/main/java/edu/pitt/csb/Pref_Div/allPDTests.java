@@ -32,8 +32,8 @@ public class allPDTests {
 
 
 
-    static int numRuns = 15;
-    static int numGenes = 500;
+    static int numRuns = 10;
+    static int numGenes = 3000;
 
     static boolean boot = false; //Should we use bootstrap samples for PiPrefDiv
     static boolean loocv = false; //Should we use leave-one-out CV for PiPrefDiv
@@ -46,8 +46,8 @@ public class allPDTests {
 
     static int numPriors = 5; //Number of prior knowledge sources
     static int numReliable = 5; //Number of reliable sources
-    static int numComponents = 50; //How many components do we have for cluster simulation?
-    static int minTargetParents = 25; //How many true parents of the target are there?
+    static int numComponents = 300; //How many components do we have for cluster simulation?
+    static int minTargetParents = 75; //How many true parents of the target are there?
     static boolean amountRandom = false; //Should the priors have a random amount of prior knowledge?
     static boolean targetContinuous = true; //Is the target variable continuous?
     static boolean evenDistribution = true; //Is the distribution of nodes in each cluster even?
@@ -61,14 +61,38 @@ public class allPDTests {
     static boolean pdStability = false;
     static boolean simulateTogether = true; //Is all prior knowledge contained in a single file?
 
+    /***For experiment 7 only***/
+    static double wpHigh = 0.95;
+    static double wpLow = 0.5;
+    static int numWp = 15;
+
+    /***For experiment 6 only***/
+    static int numFeatsHigh = 75;
+    static int numFeatsLow = 5;
+    static int numFeatsTotal = 10;
+
     public static void main(String [] args) {
 
 
         double [] ap = new double[]{0.5,0.75};
         //double [] ap = new double[]{1.0,0.5};
-        int [] nr = new int[]{3,5,1,0};
+        int [] nr = new int[]{1,3,5,0};
         //int [] nr = new int[]{5};
-        int [] ss = new int[]{50,200};
+        int [] ss = new int[]{100,200};
+
+        double [] wpCutoff = new double[numWp];
+        int [] numFeats = new int[numFeatsTotal];
+
+        for(int i = 0; i < wpCutoff.length;i++)
+        {
+            wpCutoff[i] = wpLow + (wpHigh-wpLow)*i/wpCutoff.length;
+        }
+
+        for(int i = 0; i < numFeats.length;i++)
+        {
+            numFeats[i] = numFeatsLow + (numFeatsHigh - numFeatsLow)*i/numFeatsTotal;
+        }
+
 
         for(int ii = 0; ii < ap.length;ii++) {
             amountPrior = ap[ii];
@@ -77,17 +101,25 @@ public class allPDTests {
                 for (int kk = 0; kk < ss.length; kk++) {
                     sampleSize = ss[kk];
 
+                    if(ii==0 && jj< 3)
+                        continue;
+
                     ArrayList<Integer> experiment = new ArrayList<Integer>();
                     experiment.add(0);
                     //experiment.add(1);
                     experiment.add(2);
-                    /*experiment.add(3);
-                    experiment.add(4);*/
-                    //experiment.add(5);
+                    //experiment.add(3);
+                    //experiment.add(4);
+                    experiment.add(5);
+                    //experiment.add(6);
+                    //experiment.add(7);
                     //0 ->prior evaluation, 1 -> Accuracy of chosen parameters vs Optimal
                     //2->With priors vs no Priors 3-> Comparing different summarization methods for clustered genes
                     //4->Realistic pathway tests where cluster determination is the key
                     //5 ->Summarization with graphical modeling
+
+                    //6 -> # of selected clusters sensitivity analysis
+                    //7 -> wpCutoff sensitivity analysis
 
                     String[] types = new String[]{"FS", "Prediction", "Cluster","Friendly_Cluster"}; //Help to create file header for experiment 1
 
@@ -118,7 +150,15 @@ public class allPDTests {
                                 start = "Real Clusters/Results/Cluster_Identification_";
                             } else if(x==5){
                                 start = "Summarization Causal/Results/Comparison_";
-                            } 
+                            }
+                            else if(x==6)
+                            {
+                                start = "Number Features/Results/Sensitivity_";
+                            }
+                            else if(x==7)
+                            {
+                                start = "Cutoff Comparison/Results/Sensitivity_";
+                            }
 
                             out.add(new PrintStream(start + numGenes + "_" + sampleSize + "_" + numRuns + "_" + numPriors + "_" + amountPrior + "_" + amountRandom + "_" + boot + "_" + loocv + "_" + evenDistribution + "_" + targetContinuous + "_" + useCausalGraph + "_" + numReliable + "_" + numComponents + "_" + minTargetParents + "_" + numParams + "_" + stabilitySelection + ".txt"));
 
@@ -159,6 +199,16 @@ public class allPDTests {
                                 out.get(curr).println("Radius_NP\tRadius_WP\tRadius");
 
 
+                            }
+                            else if(x==6)
+                            {
+                                //Run, Are Priors Included?, # of clusters selected, % of all clusters picked up, % of true clusters picked up, friendly cluster accuracy
+                                out.get(curr).println("Run\tWith_Prior\tParam\tAll_Clusters\tTrue_Clusters\tFriendly_Cluster");
+                            }
+                            else if(x==7)
+                            {
+                                //Run, Are priors included?, Parameter, Representation Acc, Cluster Acc, Friendly Cluster Acc, Prediction Acc
+                                out.get(curr).println("Run\tWith_Prior\tParam\tRep_Accuracy\tCluster_Accuracy\tFriendly_Cluster_Accuracy\tPrediction_Accuracy");
                             }
                             curr++;
                         }
@@ -599,6 +649,80 @@ public class allPDTests {
                                     }
                                     out.get(curr).println();
                                 }
+                                /***Experiment changing the selected # of clusters***/
+                                else if(x==6)
+                                {
+                                    for(int idx = 0; idx < numFeatsTotal;idx++)
+                                    {
+                                        /***Run with priors***/
+
+                                        PiPrefDiv4 wp = new PiPrefDiv4(toRun, "Target", numFeats[idx], numParams);
+                                        wp.setSubsamples(subs);
+                                        wp.setUseStabilitySelection(stabilitySelection);
+                                        wp.setParallel(false);
+                                        wp.setPartialCorrs(partialCorr);
+                                        wp.setPdStability(pdStability);
+                                        wp.selectGenes(boot,numSamples,dFile);
+
+                                        PrefDivComparator comp2 = new PrefDivComparator(wp,"Target",g,clusters);
+
+                                        out.get(curr).print(j + "\tT\t" + numFeats[idx] + "\t" + comp2.getNumClusters()/(double)numComponents + "\t" + comp2.getTrueClusters(numComponents)/(double)minTargetParents);
+                                        out.get(curr).println("\t" + comp2.getFriendlyCluster(numComponents));
+
+
+                                        if(ii==0 && jj==0) {
+                                            /***Run without priors if we haven't played with the number of priors/amount reliable yet***/
+
+                                            PiPrefDiv4 np = new PiPrefDiv4(toRun, "Target", numFeats[idx], numParams);
+                                            np.setSubsamples(subs);
+                                            np.setUseStabilitySelection(stabilitySelection);
+                                            np.setParallel(false);
+                                            np.setPartialCorrs(partialCorr);
+                                            np.setPdStability(pdStability);
+                                            np.selectGenes(boot, numSamples);
+                                            PrefDivComparator npComp2 = new PrefDivComparator(np, "Target", g, clusters);
+
+                                            out.get(curr).print(j + "\tF\t" + numFeats[idx] + "\t" + npComp2.getNumClusters() / (double) numComponents + "\t" + npComp2.getTrueClusters(numComponents) / (double) minTargetParents);
+                                            out.get(curr).println("\t" + npComp2.getFriendlyCluster(numComponents));
+                                        }
+
+
+                                    }
+                                    //Run, Are Priors Included?, # of clusters selected, % of all clusters picked up, % of true clusters picked up, friendly cluster accuracy
+
+
+                                }
+                                /***Experiment changing the wp Cutoff***/
+                                else if(x==7)
+                                {
+                                    for(int idx = 0; idx < numWp;idx++)
+                                    {
+                                        /***Run with priors***/
+
+                                        PiPrefDiv4 wp = new PiPrefDiv4(toRun, "Target", minTargetParents, numParams);
+                                        wp.setSubsamples(subs);
+                                        wp.setUseStabilitySelection(stabilitySelection);
+                                        wp.setParallel(false);
+                                        wp.setPartialCorrs(partialCorr);
+                                        wp.setPdStability(pdStability);
+                                        wp.setWPCutoff(wpCutoff[idx]);
+                                        wp.selectGenes(boot,numSamples,dFile);
+
+
+                                        PrefDivComparator comp2 = new PrefDivComparator(wp,"Target",g,clusters);
+
+
+                                        //Run, Are priors included?, Parameter, Representation Acc, Cluster Acc, Friendly Cluster Acc, Prediction Acc
+
+                                        out.get(curr).print(j + "\tT\t" + wpCutoff[idx] + "\t" + comp2.getFeatAccuracy("ACC")+ "\t" + comp2.getClusterAccuracy(numComponents));
+                                        out.get(curr).println("\t" + comp2.getFriendlyCluster(numComponents) + "\t" + comp2.getPredictionAccuracy(toRun,test));
+
+
+
+                                    }
+                                    out.get(curr).print(j + "\tF\t" + wpLow + "\t" + npCompare.getFeatAccuracy("ACC") + "\t" + npCompare.getClusterAccuracy(numComponents));
+                                    out.get(curr).println("\t" + npCompare.getFriendlyCluster(numComponents) + "\t" + npCompare.getPredictionAccuracy(toRun,test));
+                                }
 
                                 out.get(curr).flush();
                                 curr++;
@@ -671,7 +795,7 @@ public class allPDTests {
     public static DataSet getCausalFeatures(DataSet input,String target)
     {
         try{
-            runPriors.addDummy(input);
+            input = runPriors.addDummy(input);
             int numLambda = 40;
             double low = 0.05;
             double high = 0.9;

@@ -926,23 +926,13 @@ public class mgmPriors {
         return temp;
     }
 
-    private TetradMatrix abs(TetradMatrix t) {
-        TetradMatrix temp = new TetradMatrix(t.rows(), t.columns());
-        for (int i = 0; i < t.rows(); i++) {
-            for (int j = 0; j < t.columns(); j++) {
-                temp.set(i, j, Math.abs(t.get(i, j)));
-            }
-        }
-        return temp;
-    }
-
 
 
     private SparseDoubleMatrix2D getPhi(SparseDoubleMatrix2D priors) {
         SparseDoubleMatrix2D temp = new SparseDoubleMatrix2D(priors.rows(), priors.columns());
         for (int i = 0; i < priors.rows(); i++) {
             for (int j = i + 1; j < priors.rows(); j++) {
-                if(priors.get(i,j)==0)
+                if(priors.get(i,j)<=noPrior)
                     continue;
                 temp.set(i, j, priors.get(i, j) * numSubsamples);
             }
@@ -1774,7 +1764,7 @@ catch(org.apache.commons.math3.linear.SingularMatrixException e)
             {
                 for(int k = j +1; k < curr.columns();k++)
                 {
-                    if(curr.get(j,k)!=noPrior) {
+                    if(curr.get(j,k)>noPrior) {
                         temp[j][k] = true;
                         sourcePrior[j][k][i] = true;
                     }

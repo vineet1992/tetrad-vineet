@@ -5,6 +5,7 @@ import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.Node;
 import edu.cmu.tetrad.search.Fci;
 import edu.pitt.csb.Pref_Div.Comparisons.ClusterSim;
+import edu.pitt.csb.Priors.runPriors;
 import edu.pitt.csb.mgm.MixedUtils;
 import org.apache.commons.math3.ml.clustering.Cluster;
 import org.apache.commons.math3.stat.StatUtils;
@@ -125,11 +126,7 @@ public class PrefExperiment
 				else if(args[index].equals("-useCausalGraph"))
 				{
 					useGraph = true;
-					if(args.length==index+1)
-					{
-
-					}
-					else if(!args[index+1].startsWith("-"))
+					if(args.length!=index+1 && !args[index+1].startsWith("-"))
 					{
 						if(args[index+1].equals("piMGM"))
 						{
@@ -178,6 +175,11 @@ public class PrefExperiment
 					pathwayFile = args[index+1];
 					index+=2;
 				}
+				else
+				{
+					System.err.println("Unrecognized command line option " + args[index] + " ... ignoring");
+					index++;
+				}
 
 			}
 			catch(ArrayIndexOutOfBoundsException e)
@@ -217,11 +219,6 @@ public class PrefExperiment
 			outputGraph = "GRAPH_" + dataFile;
 		}
 
-		if(ctype!= RunPrefDiv.ClusterType.NONE && runPiMGM)
-		{
-			System.err.println("Do not have prior knowledge for aggregations of features, either do not use piMGM or do not use feature aggregation");
-			System.exit(-1);
-		}
 
 		DataSet data = null;
 		try {
@@ -301,20 +298,73 @@ public class PrefExperiment
 		{
 			File temp = new File("temp.txt");
 			PrintStream out = new PrintStream(temp);
+			if(data.isMixed())
+			{
+				/***Add back the discrete variables that were removed***/
+				DataSet discData = MixedUtils.getDiscreteData(data);
+				summarized = DataUtils.concatenate(summarized,discData);
+
+			}
+			else
+			{
+				/***Add a dummy variable to run causal modeling ***/
+				summarized = runPriors.addDummy(summarized);
+
+			}
 			out.println(summarized);
 			out.flush();
 			out.close();
 			if(runPiMGM)
 			{
 
-				//TODO Only use piMGM with no feature aggregation, figure out how to convert matrix to useable prior knowledge
+
+				System.out.print("Running piMGM to learn a causal model...");
+
+				if(ctype!= RunPrefDiv.ClusterType.NONE)
+				{
+					System.err.println("Using single variable priors on aggregate features.. could get weird results. If using piMGM, then use None clustertype");
+				}
+
+				String newPriorDir = directory + "/" + priorDir + "_SIF";
+				convertPriorsToSif(priorDir,newPriorDir,summarized,data);
+
+				String runDirectory = directory + "/piMGM";
+
+				String cmd = "java -jar runPriors.jar -run " + runDirectory + " -priors " + newPriorDir + " -makeScores -fullCounts -data temp.txt -sif";
+				Runtime.getRuntime().exec(cmd);
+
+				temp.deleteOnExit();
+				System.out.println("Done");
+
+
+				//TODO TEST THIS
 			}
 			else
 			{
 				System.out.print("Running StEPS to learn a causal model...");
 
 				String cmd = "java -jar causalDiscovery.jar -d temp.txt -mgm -steps -o " + outputGraph + " -maxCat 3";
-				Runtime.getRuntime().exec(cmd);
+
+				Runtime rt = Runtime.getRuntime();
+
+				Process proc = rt.exec(cmd);
+				BufferedReader stdInput = new BufferedReader(new
+						InputStreamReader(proc.getInputStream()));
+				BufferedReader stdError = new BufferedReader(new
+						InputStreamReader(proc.getErrorStream()));
+
+				// read the output from the command
+				System.out.println("Here is the standard output of the command:\n");
+				String s = null;
+				while ((s = stdInput.readLine()) != null) {
+					System.out.println(s);
+				}
+
+				// read any errors from the attempted command
+				while ((s = stdError.readLine()) != null) {
+					System.err.println(s);
+				}
+
 
 				temp.deleteOnExit();
 				System.out.println("Done");
@@ -329,6 +379,76 @@ public class PrefExperiment
 		out.println(summarized);
 		out.flush();
 		out.close();
+	}
+
+
+	/***
+	 *
+	 * @param priorDir A directory of prior knowledge files (these will be matrices with no labels)
+	 * @param newPriorDir A directory to write new prior knowledge files
+	 * @param summarized The summarized dataset after selecting features with piMGM
+	 * @param data The original dataset
+	 */
+	private static void convertPriorsToSif(String priorDir, String newPriorDir, DataSet summarized, DataSet data)
+	{
+
+		List<String> names = summarized.getVariableNames();
+		/**Loop through old priorDir and convert each to SIF for the new prior directory***/
+		File priors = new File(priorDir);
+		File [] oldPriors = priors.listFiles();
+		for(int i = 0; i < oldPriors.length;i++)
+		{
+			try {
+				BufferedReader b = new BufferedReader(new FileReader(oldPriors[i]));
+				PrintStream out = new PrintStream(newPriorDir + "/Prior_" + i + ".sif");
+				out.println(oldPriors[i].getName());
+
+				/***Loop through original prior information source***/
+				J:
+				for (int j = 0; j < data.getNumColumns(); j++) {
+					String[] currLine = b.readLine().split("\t");
+					String var1 = data.getVariable(j).getName();
+
+					int index1 = -1;
+					for (int x = 0; x < names.size(); x++) {
+						if (names.get(x).split("|")[0].contains(var1))
+							index1 = x;
+					}
+
+					if (index1 == -1)
+						continue J;
+
+					K:
+					for (int k = j + 1; k < data.getNumColumns(); k++) {
+						String var2 = data.getVariable(k).getName();
+
+
+						int index2 = -1;
+						for (int x = 0; x < names.size(); x++) {
+							if (names.get(x).split("|")[0].contains(var2))
+								index2 = x;
+						}
+
+						if (index2 == -1)
+							continue K;
+
+						/***Output any non-NULL prior info to SIF file***/
+						if (Double.parseDouble(currLine[k]) > 0)
+							out.println(names.get(index1) + "\t" + names.get(index2) + "\t" + Double.parseDouble(currLine[k]));
+
+
+					}
+				}
+				b.close();
+				out.flush();
+				out.close();
+			}
+			catch(Exception e)
+			{
+				System.err.println("Could not generate SIF prior " + i + ", need to debug!");
+			}
+		}
+
 	}
 
 

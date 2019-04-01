@@ -1,9 +1,7 @@
 package edu.pitt.csb.Priors;
 
 import cern.colt.matrix.impl.SparseDoubleMatrix2D;
-import edu.cmu.tetrad.data.ContinuousVariable;
-import edu.cmu.tetrad.data.DataSet;
-import edu.cmu.tetrad.data.DiscreteVariable;
+import edu.cmu.tetrad.data.*;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.util.StatUtils;
 import edu.cmu.tetrad.util.TetradMatrix;
@@ -162,7 +160,7 @@ public class runPriors {
         if(d.isContinuous())
         {
             System.out.print("Data is only continuous, adding a discrete variable...");
-            addDummy(d);
+            d = addDummy(d);
             System.out.println("Done");
             addedDummy = true;
         }
@@ -276,8 +274,26 @@ public class runPriors {
     }
 
 
-    public static void addDummy(DataSet d)
+    /****
+     *
+     * @param d The dataset to add the dummy variable to
+     * @return The dataset with the dummy variable added
+     */
+    public static DataSet addDummy(DataSet d)
     {
+        if(d instanceof BoxDataSet)
+        {
+            double [][] data = d.getDoubleData().toArray();
+            DataSet temp = new ColtDataSet(d.getNumRows(),d.getVariables());
+            for(int i = 0; i < data.length;i++)
+            {
+                for(int j = 0; j < data[i].length;j++)
+                {
+                    temp.setDouble(i,j,data[i][j]);
+                }
+            }
+            d = temp;
+        }
         Random rand = new Random();
         DiscreteVariable temp= new DiscreteVariable("Dummy",2);
         d.addVariable(temp);
@@ -286,6 +302,7 @@ public class runPriors {
         {
             d.setInt(i,column,rand.nextInt(temp.getNumCategories()));
         }
+        return d;
     }
 
     public static int [][] genSubs(DataSet d, int ns, boolean loocv)

@@ -302,7 +302,10 @@ public class RunPrefDiv {
                 col++;
                 String name = g.symbol;
                 for(Gene x:currGenes)
-                    name+= "," + x.symbol;
+                {
+                    if(!x.symbol.equals(g.symbol))
+                        name+= "|" + x.symbol;
+                }
                 nodes.add(new ContinuousVariable(name));
             }
             /***Transpose summarized data to prepare for conversion to Dataset***/

@@ -165,7 +165,7 @@ public class ExampleMixedSearch {
 
             if(!d.isMixed())
             {
-                runPriors.addDummy(d);
+                d = runPriors.addDummy(d);
             }
             if(runSteps)
             {

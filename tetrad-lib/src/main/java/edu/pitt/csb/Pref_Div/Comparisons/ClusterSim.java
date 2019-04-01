@@ -138,7 +138,9 @@ public class ClusterSim {
         double sim = 0;
         for(int k = 0; k < result.length;k++)
         {
-            sim+=costs[k][result[k]];
+            /***Only compute similarity between cluster sets that mapped***/
+            if(result[k]>=0)
+                sim+=costs[k][result[k]];
         }
         return 1-(sim/result.length);
     }

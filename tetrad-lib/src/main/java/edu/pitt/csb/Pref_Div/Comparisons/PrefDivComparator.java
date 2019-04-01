@@ -10,10 +10,7 @@ import edu.pitt.csb.Pref_Div.Gene;
 import edu.pitt.csb.Pref_Div.PiPrefDiv4;
 import edu.pitt.csb.Pref_Div.RunPrefDiv;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Created by vinee_000 on 2/21/2019.
@@ -53,6 +50,77 @@ public class PrefDivComparator {
 
     /***
      *
+     * @return The number of clusters represented by the clusters selected by the PrefDiv object
+     */
+    public int getNumClusters()
+    {
+        /**Estimated clusters**/
+        Map<Gene,List<Gene>> estClusters = this.est.getLastCluster();
+
+        /***Unique clusters touched***/
+        HashSet<Integer> set = new HashSet<Integer>();
+
+
+        /***Load up all of the unique clusters touched***/
+        for(Gene g:estClusters.keySet())
+        {
+            List<Integer> temp = trueClusters.get(g.symbol);
+            set.addAll(temp);
+
+            for(Gene gPrime: estClusters.get(g))
+            {
+                temp = trueClusters.get(gPrime.symbol);
+                set.addAll(temp);
+            }
+        }
+
+        /***Return this set***/
+        return set.size();
+
+    }
+
+    /***
+     *
+     * @param numReal Number of causally connected clusters
+     * @return The number of true clusters touched by
+     */
+    public int getTrueClusters(int numReal)
+    {
+        /**Estimated clusters**/
+        Map<Gene,List<Gene>> estClusters = this.est.getLastCluster();
+
+        /***Real clusters***/
+        Map<Gene,List<Gene>> realClusters = createRealCluster(numReal);
+
+        /***Convert representation type***/
+        Map<String,List<Integer>> trueClusters = convertRepresentation(realClusters);
+
+
+        HashSet<Integer> covered = new HashSet<Integer>();
+
+        for(Gene g:estClusters.keySet())
+        {
+            List<Gene> temp = estClusters.get(g);
+            temp.add(g);
+
+            List<Integer> indices = new ArrayList<Integer>();
+
+            for(Gene gene: temp)
+            {
+                /***If this gene isn't in any of the true causal clusters then this will be null***/
+                if(trueClusters.get(gene.symbol)!=null)
+                    indices.addAll(trueClusters.get(gene.symbol));
+            }
+            covered.addAll(indices);
+        }
+
+        return covered.size();
+
+
+    }
+
+    /***
+     *
      * @param numClusters Total number of clusters
      * @return cluster accuracy metric via Hungarian algorithm
      */
@@ -63,6 +131,42 @@ public class PrefDivComparator {
         return cs.clusterSim();
     }
 
+
+    /***
+     * Helper function to convert gene to list of gene to a string to list of integer representation of the clusters
+     * @return
+     */
+    private Map<String,List<Integer>> convertRepresentation(Map<Gene,List<Gene>> input)
+    {
+
+        Map<String,List<Integer>> result = new HashMap<String,List<Integer>>();
+        int x = 0;
+        for(Gene g:input.keySet())
+        {
+            List<Integer> temp = new ArrayList<Integer>();
+            if(result.get(g.symbol)!=null)
+            {
+                temp = result.get(g.symbol);
+            }
+            temp.add(x);
+            result.put(g.symbol,temp);
+            for(Gene gPrime: input.get(g))
+            {
+                temp = new ArrayList<Integer>();
+                if(result.get(gPrime.symbol)!=null)
+                {
+                    temp = result.get(gPrime.symbol);
+                }
+                temp.add(x);
+                result.put(gPrime.symbol,temp);
+
+            }
+            x++;
+        }
+
+        return result;
+
+    }
     /**
      *
      * @param numClusters Total number of clusters
