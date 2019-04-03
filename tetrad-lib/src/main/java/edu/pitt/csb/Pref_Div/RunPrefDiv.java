@@ -262,7 +262,11 @@ public class RunPrefDiv {
 
         if(type==ClusterType.NONE)
         {
-            return new DataSet[]{subset(train,genes),subset(test,genes)};
+            ArrayList<Gene> tempList = new ArrayList<Gene>(genes);
+            Gene temp = new Gene(-1);
+            temp.symbol="Target";
+            tempList.add(temp);
+            return new DataSet[]{subset(train,tempList),subset(test,tempList)};
         }
         else
         {

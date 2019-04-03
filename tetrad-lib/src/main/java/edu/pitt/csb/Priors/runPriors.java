@@ -343,6 +343,7 @@ public class runPriors {
                 }
             }
         }
+        System.out.println("Done");
         return samps;
     }
     public static synchronized int checkForVariance(DataSet d, DataSet full)
@@ -383,7 +384,6 @@ public class runPriors {
                 for(Integer ii: cats.keySet())
                 {
                     if(cats.get(ii)<2) {
-                        System.out.println(i + "\t" + cats);
                         return i;
                     }
                 }

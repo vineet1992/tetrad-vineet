@@ -39,7 +39,7 @@ public class PriorPrediction {
 
         String target = "IgG_Ratio";
         String priorDir = "Priors_All";
-        String dataFile = "Highest_Variance_Data_Prediction_Mayo.txt";
+        String dataFile = "Highest_Variance_Prediction_Log.txt";
         int numLambdas = 10;
         boolean loocv = true;
         int ns = 5;
@@ -181,9 +181,11 @@ public class PriorPrediction {
 
             if(steps)
             {
+                System.out.print("Running STEPS...");
                 STEPS s = new STEPS(temp,initLambdas,g,samps);
                 s.runStepsArrayPar();
                 out = s.lastGraph;
+                System.out.println("Done");
             }
             else
             {

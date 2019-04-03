@@ -1,23 +1,17 @@
 package edu.pitt.csb.Pref_Div;
 
-import cern.colt.matrix.impl.SparseDoubleMatrix2D;
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.data.DataUtils;
-import edu.cmu.tetrad.graph.Graph;
-import edu.cmu.tetrad.search.IndTestFisherZ;
 import edu.cmu.tetrad.util.ForkJoinPoolInstance;
+import edu.cmu.tetrad.util.StatUtils;
 import edu.cmu.tetrad.util.TetradMatrix;
 import edu.pitt.csb.Pref_Div.Comparisons.ComparablePD;
 import edu.pitt.csb.Priors.mgmPriors;
-import edu.pitt.csb.mgm.MGM;
 import edu.pitt.csb.stability.StabilityUtils;
-import org.apache.commons.math3.distribution.BinomialDistribution;
 import org.apache.commons.math3.distribution.NormalDistribution;
+import org.apache.commons.math3.util.CombinatoricsUtils;
 
 import java.io.*;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.IntBuffer;
 import java.util.*;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
@@ -53,11 +47,9 @@ public class PiPrefDiv4 implements ComparablePD {
     private PrintStream scoreStream; //Printstream to output parameter scores to file
     private double lastRadius; //Last Radius chosen via best score
     private int numFolds; //Number of folds for cross-validation
-    private boolean useStabilitySelection; //Should stability selection be used to select genes in PD?
     private DataSet summarizedData; //Summarized dataset using clusters as variables
     private boolean parallel; //Should we compute stabilities in parallel?
     private RunPrefDiv.ClusterType ctype; //Which clustering method should be used to produce summarized data?
-    private boolean pdStability; //Should we run Pref-Div when computing stabilities or just use correlationa with p-value threshold?
     private boolean partialCorrs; //Should we use partial correlations?
     private double lastRadiusWP; //Last Radius WP selected
     private boolean [] iPriors; //Contains which features have prior intensity information
@@ -65,10 +57,18 @@ public class PiPrefDiv4 implements ComparablePD {
     private boolean [] dPriorsWT; // Contains which features have prior dissimilarity information (excludes the target variable)
     private boolean saveMemory = false; //Should we conserve disc space and use the slower version of PiPrefDiv
     private List<Gene> lastSelected; //Last set of selected genes
-    private double wpCutoff = 0.5; //Cutoff for inclusion into the withprior set TODO Set at 0.5 right now, but this should be tuned
+    private double wpCutoff = 0.5; //Cutoff for inclusion into the withprior set
     private Random rand = new Random(42);
 
     private int targetIndex = 0; //Index of the target variable
+
+
+    /***TODO Fix up and remove this when done***/
+
+    public double [] constrictCorrs;
+
+
+    private boolean profiling = true;
 
 
     //Constructor that uses default parameters for both initial parameter ranges
@@ -123,11 +123,9 @@ public class PiPrefDiv4 implements ComparablePD {
     public double[] getLastRadius(){return new double[]{lastRadius,lastRadiusWP};}
     public double getLastRadiusWP(){return lastRadiusWP;}
     public void setOutputScores(PrintStream out){outputScores=true; scoreStream=out;}
-    public void setUseStabilitySelection(boolean b){useStabilitySelection = b;}
     public void setParallel(boolean b){parallel = b;}
     public void setClusterType(RunPrefDiv.ClusterType c){ctype = c;}
     public DataSet getSummarizedData(){return summarizedData;}
-    public void setPdStability(boolean p){pdStability = p;}
     public void setPartialCorrs(boolean pc){partialCorrs = pc;}
     public void saveMemory(){saveMemory = true;}
     public boolean[] getIntensityPriors(){return iPriors;}
@@ -180,6 +178,7 @@ public class PiPrefDiv4 implements ComparablePD {
     private double[] constrictRange(double[]init, DataSet data,boolean threshold)
     {
         int[] num = new int[init.length];
+
         for(int x = 0; x < subsamples.length; x++) {
 
             DataSet curr = data.subsetRows(subsamples[x]);
@@ -188,7 +187,17 @@ public class PiPrefDiv4 implements ComparablePD {
             tgt.symbol="Target";
             temp.add(tgt);
 
-            float[] corrs = Functions.computeAllCorrelations(temp, curr, partialCorrs, false, threshold, 1);
+
+
+            float [] corrs;
+            if(parallel)
+            {
+                corrs = Functions.computeAllCorrelationsPar(temp,curr);
+            }else
+            {
+                corrs = Functions.computeAllCorrelations(temp, curr, partialCorrs, false, threshold, 1);
+            }
+
 
             for (int i = 0; i < init.length; i++) {
                 if (!threshold)
@@ -294,6 +303,7 @@ public class PiPrefDiv4 implements ComparablePD {
         ArrayList<Gene> temp = createGenes(data,target,false);
 
 
+        long time = System.nanoTime();
         /***Add correlation to the target variable in the intensity value and fold change fields of each gene***/
         ArrayList<Gene> meanGenes = Functions.computeAllIntensities(temp,1,data,target,partialCorrs,false,false,1);
 
@@ -301,7 +311,15 @@ public class PiPrefDiv4 implements ComparablePD {
         /***Order of correlation is based upon the order of the genes in the array list (needs to be the same as the data order)***/
         float [] meanDis = Functions.computeAllCorrelations(meanGenes,data,partialCorrs,false,false,1);
 
+        if(profiling)
+        {
+            time = System.nanoTime()-time;
+            System.out.println("Computing Correlations/Intensities to select; " + time/Math.pow(10,9));
+        }
 
+
+
+        time = System.nanoTime();
         /***Shuffle and sort the list of genes***/
         Collections.shuffle(meanGenes,rand);
         Collections.sort(meanGenes,Gene.IntensityComparator);
@@ -333,6 +351,12 @@ public class PiPrefDiv4 implements ComparablePD {
             System.out.println("All clusters\n" + map);
         }*/
         lastSelected = top;
+        if(profiling)
+        {
+            time = System.nanoTime()-time;
+            System.out.println("Shuffling, sorting, Pref-Div; " + time/Math.pow(10,9));
+        }
+
         return top;
     }
 
@@ -433,10 +457,16 @@ public class PiPrefDiv4 implements ComparablePD {
      */
     public ArrayList<Gene> selectGenes(boolean boot, int numSamples)
     {
+        long time = System.nanoTime();
         if(data.isContinuous()) {
             System.out.print("Standardizing Data...");
             data = DataUtils.standardizeData(data);
             System.out.println("Done");
+        }
+        if(profiling)
+        {
+            time = System.nanoTime()-time;
+            System.out.println("Standardizing Data: " + time/Math.pow(10,9));
         }
 
         //Generate subsamples of the data
@@ -447,9 +477,17 @@ public class PiPrefDiv4 implements ComparablePD {
         }
         System.out.println("Done");
 
+
+        time = System.nanoTime();
         //Constrict parameter ranges
         System.out.print("Constricting Parameter Range...");
         initRadii = constrictRange(initRadii,data,false);
+
+        if(profiling)
+        {
+            time = System.nanoTime()-time;
+            System.out.println("Constricting Range; " + time/Math.pow(10,9));
+        }
 
         System.out.println("Done");
 
@@ -667,13 +705,17 @@ public class PiPrefDiv4 implements ComparablePD {
         return 4*f*(1-f);
     }
 
-    //Get theta value given that the gene showed up n times for these parameters, and sum times for all parameters
-    private double getTheta(int sum, int n)
+    /**
+     *
+     * @param sum Total number of times this feature appeared
+     * @param n Number of times the feature appeared according to this parameter value
+     * @param qj num subsamples * number of parameters tested
+     * @return The concordance between this parameter's prediction and all parameter's predictions
+     */
+    private double getTheta(int sum, int n,double qj)
     {
-        double P = sum/(double)(numRadii*subsamples.length);
-        //Given binomial with probability P, what's the probability the gene showed up n times in q subsamples
-        BinomialDistribution b = new BinomialDistribution(subsamples.length,P);
-        return b.probability(n);
+        double choose = CombinatoricsUtils.binomialCoefficient(subsamples.length,n);
+        return choose*Math.pow(sum/qj,n)*Math.pow(1-(sum/qj),subsamples.length-n);
     }
 
     //Overloaded version of getTheta for those selections where we have information from at least one prior information source
@@ -701,6 +743,120 @@ public class PiPrefDiv4 implements ComparablePD {
 
 
 
+
+    /**
+     * @param sums, Array of number of times each gene and gene-gene pair appeared
+     * @param uPost, Posterior mean for each gene OR each gene-gene pair appearence
+     * @param varPost, Posterior variance for each gene OR each gene-gene pair appearence
+     * @return Scores for each pair of radii, threshold params. Either for intensity or dissimilarity depending upon input
+     */
+    private double[] getScoresSeparatePar(final int [] sums, final float [] uPost, final float [] varPost)
+    {
+
+
+        final double [] score = new double[numRadii*2];
+
+        long readingTime = 0;
+        final double qj = numRadii*subsamples.length;
+
+
+        long time = System.nanoTime();
+
+        for (int i = 0; i < numRadii; i++) {
+
+            int [] curr;
+            if(saveMemory) {
+
+                curr = getCounts(i, true);
+
+            }
+            else {
+                curr = getCountsFromFile(i,true);
+
+
+            }
+
+
+
+            final int[] curr2 = curr;
+
+            final ForkJoinPool pool = ForkJoinPoolInstance.getInstance().getPool();
+
+            final int radIndex = i;
+
+            class StabilityAction extends RecursiveAction {
+                private int chunk;
+                private int from;
+                private int to;
+
+                public StabilityAction(int chunk, int from, int to){
+                    this.chunk = chunk;
+                    this.from = from;
+                    this.to = to;
+                }
+
+
+
+                @Override
+                protected void compute(){
+                    if (to - from <= chunk) {
+                        for (int s = from; s < to; s++) {
+                            double G = getG(curr2[s]); //Clusts[i][j][g] is number of times gene was selected in the subsamples for this parameter setting
+                            if (uPost[s] < 0)//No Prior information, contributes only stability to the score
+                            {
+
+
+                                double theta = getTheta(sums[s], curr2[s], qj); //sums is the total number of times this gene was selected across all parameter settings
+                                int index = radIndex+numRadii;
+                                addToScore(score,index,theta*(1-G));
+
+                            } else {
+
+                                if (varPost[s] < 0)
+                                    System.out.println(s);
+                                double theta = getTheta(uPost[s], varPost[s], curr2[s]);
+
+                                addToScore(score,radIndex,theta*(1-G));
+
+                            }
+                        }
+                    } else {
+                        List<StabilityAction> tasks = new ArrayList<>();
+
+                        final int mid = (to + from) / 2;
+
+                        tasks.add(new StabilityAction(chunk, from, mid));
+                        tasks.add(new StabilityAction(chunk, mid, to));
+
+                        invokeAll(tasks);
+
+                        return;
+                    }
+                }
+            }
+
+            final int chunk = uPost.length/Runtime.getRuntime().availableProcessors();
+            StabilityAction sa = new StabilityAction(chunk,0, uPost.length);
+            pool.invoke(sa);
+
+
+        }
+        System.out.println(Arrays.toString(score));
+        normalizeScore(score);
+
+        if(profiling)
+        {
+            readingTime += System.nanoTime()-time;
+        }
+        return score;
+    }
+
+    private synchronized void addToScore(double [] score,int index, double value)
+    {
+        score[index]+=value;
+    }
+
+
     /**
      * @param sums, Array of number of times each gene and gene-gene pair appeared
      * @param uPost, Posterior mean for each gene OR each gene-gene pair appearence
@@ -709,11 +865,20 @@ public class PiPrefDiv4 implements ComparablePD {
      */
     private double[] getScoresSeparate(int [] sums, float [] uPost, float [] varPost)
     {
+
+
+
         double [] score = new double[numRadii*2];
 
         /**Temporary for debugging**/
         double [] stabs = new double[numRadii];
         double [] match = new double[numRadii];
+
+        long readingTime = 0;
+        double qj = numRadii*subsamples.length;
+
+
+        long time = System.nanoTime();
 
         for (int i = 0; i < numRadii; i++) {
 
@@ -726,33 +891,53 @@ public class PiPrefDiv4 implements ComparablePD {
                 else {
                     curr = getCountsFromFile(i,true);
 
+
                 }
 
-                for(int g = 0; g < uPost.length;g++) //Loop through each gene
+
+
+            for(int g = 0; g < uPost.length;g++) //Loop through each gene
                 {
+
                     double G = getG(curr[g]); //Clusts[i][j][g] is number of times gene was selected in the subsamples for this parameter setting
                     if (uPost[g] < 0)//No Prior information, contributes only stability to the score
                     {
-                        double theta = getTheta(sums[g],curr[g]); //sums is the total number of times this gene was selected across all parameter settings
-                        score[i + numRadii] +=  theta * (1-G);
+
+
+                        double theta = getTheta(sums[g],curr[g],qj); //sums is the total number of times this gene was selected across all parameter settings
+
+
+                        //b.probability(curr[g]);
+
+
+                        score[i + numRadii] +=  (theta * (1-G));
+
 
                     }
                     else
                     {
+
                         if(varPost[g]<0)
                             System.out.println(g);
                         double theta = getTheta(uPost[g],varPost[g],curr[g]);
-                        /***TODO Change this back to stability and match if necessary***/
-                        score[i]+=theta *(1-G);
+                        score[i]+=(theta *(1-G));
                         stabs[i]+=(1-G);
                         match[i]+=theta;
+
                     }
                 }
 
-            }
-            System.out.println("Radii: " + Arrays.toString(initRadii));
-            System.out.println("Stabilities:" + Arrays.toString(stabs) + "\n Posterior Match:" + Arrays.toString(match));
+
+        }
+        System.out.println(Arrays.toString(score));
+
+
         normalizeScore(score);
+
+        if(profiling)
+        {
+            readingTime += System.nanoTime()-time;
+        }
         return score;
     }
 
@@ -829,12 +1014,12 @@ public class PiPrefDiv4 implements ComparablePD {
         int[] curr = new int[(numGenes*(numGenes+1))/2];
 
 
+        /***Shrink anyone that didn't meet radius threshold**/
         for (int x = 0; x < corrs.length; x++) {
             if (1 - corrs[x] < initRadii[i])
                 curr[x]++;
         }
 
-        /***EXPERIMENTAL***/
         if(!saveMemory) {
             try {
 
@@ -1093,13 +1278,29 @@ public class PiPrefDiv4 implements ComparablePD {
     {
         int [] sums = new int[(numGenes)*(numGenes+1)/2];
         boolean read = false;
+        long corrTime = 0;
+        long readTime = 0;
         for(int k = 0; k < subsamples.length;k++)
         {
+
             ArrayList<Gene> temp = createGenes(data,target,true);
             DataSet currData = data.subsetRows(subsamples[k]);
 
             //Threshold intensities and correlations after the fact
-            float [] corrs = Functions.computeAllCorrelations(temp,currData,partialCorrs,false,false,1);
+            float [] corrs;
+            long time = System.nanoTime();
+
+            if(parallel)
+            {
+                corrs = Functions.computeAllCorrelationsPar(temp,currData);
+            }
+            else
+            {
+                corrs = Functions.computeAllCorrelations(temp,currData,partialCorrs,false,false,1);
+            }
+            corrTime += System.nanoTime()-time;
+
+            time = System.nanoTime();
 
             for(int i = 0; i < initRadii.length;i++)
             {
@@ -1110,6 +1311,7 @@ public class PiPrefDiv4 implements ComparablePD {
                         sums[x]+=curr[x];
                     }
             }
+            readTime += System.nanoTime()-time;
             read = true;
         }
 
@@ -1118,14 +1320,31 @@ public class PiPrefDiv4 implements ComparablePD {
             System.out.println("Computed counts for intensities and correlations: " + Arrays.toString(sums));
         }
 
+        if(profiling)
+        {
+            System.out.println("Correlations across subsamples: " + corrTime/Math.pow(10,9));
+            System.out.println("Reading correlations across subsamples " + readTime/Math.pow(10,9));
+        }
 
 
 
-
+        long time = System.nanoTime();
         float [] uPost = new float[(numGenes*(numGenes+1))/2];
         for(int i = 0; i < uPost.length;i++)
             uPost[i] = -1;
-        double [] score = getScoresSeparate(sums,uPost,null);
+
+        double [] score;
+        if(parallel)
+        {
+            score = getScoresSeparatePar(sums,uPost,null);
+            constrictCorrs = score;
+        }
+        else
+        {
+            score = getScoresSeparate(sums,uPost,null);
+            constrictCorrs = score;
+
+        }
 
 
         double [] scoreResult = new double[numRadii];
@@ -1134,6 +1353,13 @@ public class PiPrefDiv4 implements ComparablePD {
         {
                 scoreResult[i] = score[i+numRadii];
         }
+
+        if(profiling)
+        {
+            time = System.nanoTime()-time;
+            System.out.println("Posterior Distribution: " + time/Math.pow(10,9));
+        }
+
 
         return scoreResult;
     }
@@ -1154,7 +1380,16 @@ public class PiPrefDiv4 implements ComparablePD {
             DataSet currData = data.subsetRows(subsamples[k]);
 
             //Threshold intensities and correlations after the fact
-            float [] corrs = Functions.computeAllCorrelations(temp,currData,partialCorrs,false,false,1);
+            float [] corrs;
+            if(parallel)
+            {
+                corrs = Functions.computeAllCorrelationsPar(temp,currData);
+
+            }else
+            {
+                corrs = Functions.computeAllCorrelations(temp,currData,partialCorrs,false,false,1);
+
+            }
 
             for(int i = 0; i < initRadii.length;i++)
             {

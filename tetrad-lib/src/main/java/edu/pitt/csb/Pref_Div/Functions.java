@@ -4,10 +4,8 @@ import edu.cmu.tetrad.data.CovarianceMatrix;
 import edu.cmu.tetrad.graph.Node;
 import edu.cmu.tetrad.search.*;
 import edu.cmu.tetrad.stat.correlation.*;
-import edu.cmu.tetrad.util.RandomUtil;
-import edu.cmu.tetrad.util.StatUtils;
-import edu.cmu.tetrad.util.TetradMatrix;
-import edu.cmu.tetrad.util.TetradVector;
+import edu.cmu.tetrad.util.*;
+import edu.pitt.csb.Pref_Div.Comparisons.PrefDivComparator;
 import edu.pitt.csb.mgm.IndTestMultinomialAJ;
 import edu.pitt.csb.mgm.MixedUtils;
 import org.apache.commons.math3.distribution.NormalDistribution;
@@ -22,6 +20,8 @@ import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.*;
 import java.io.*;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.RecursiveAction;
 
 import static java.lang.Math.abs;
 
@@ -316,6 +316,92 @@ public class Functions
 
         return corrs;
     }
+
+
+    /***
+     * THIS METHOD RUNS IN PARALLEL
+     * @param items List of Genes, only the symbol needs to be filled in
+     * @param d DataSet d, a dataset on which to compute correlations
+     * return  A float [] with all of the gene-gene correlations
+     ***/
+    public static float [] computeAllCorrelationsPar(final ArrayList<Gene> items, final DataSet d)
+    {
+
+        /***Construct mapping between indices and nodes***/
+        final HashMap<Integer,Integer> mapping = new HashMap<Integer,Integer>();
+
+
+        /***Ensure correct mapping from genes to nodes in data***/
+        for(int i = 0; i < items.size();i++)
+        {
+            Node temp = d.getVariable(items.get(i).symbol);
+            mapping.put(i,d.getColumn(temp));
+        }
+
+        /***Rows are variable, columns are samples***/
+        final double [][] datArray = d.getDoubleData().transpose().toArray();
+
+
+        int total = (items.size()*(items.size()-1))/2;
+        final float [] corrs = new float[total];
+
+        final ForkJoinPool pool = ForkJoinPoolInstance.getInstance().getPool();
+
+        class StabilityAction extends RecursiveAction {
+            private int chunk;
+            private int from;
+            private int to;
+
+            public StabilityAction(int chunk, int from, int to){
+                this.chunk = chunk;
+                this.from = from;
+                this.to = to;
+            }
+
+            @Override
+            protected void compute(){
+                if (to - from <= chunk) {
+                    for (int s = from; s < to; s++) {
+                        //RadiiWP is the columns, RadiiNP is the rows
+                        double[] one = datArray[mapping.get(s)];
+
+                        int index = Functions.getIndex(s,s+1,items.size());
+                        for(int i = s+1; i < items.size();i++)
+                        {
+                            double [] two = datArray[mapping.get(i)];
+
+                            corrs[index] = (float)Math.abs(StatUtils.correlation(one,two));
+
+
+                            index++;
+                        }
+                    }
+
+                    return;
+                } else {
+                    List<StabilityAction> tasks = new ArrayList<>();
+
+                    final int mid = (to + from) / 2;
+
+                    tasks.add(new StabilityAction(chunk, from, mid));
+                    tasks.add(new StabilityAction(chunk, mid, to));
+
+                    invokeAll(tasks);
+
+                    return;
+                }
+            }
+        }
+
+        final int chunk = 1;
+        StabilityAction sa = new StabilityAction(chunk,0, d.getNumColumns());
+        pool.invoke(sa);
+
+
+        return corrs;
+    }
+
+
 
 
     /***

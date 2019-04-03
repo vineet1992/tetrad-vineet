@@ -42,6 +42,9 @@ public class Survival {
                 }
             }
         }*/
+
+
+
         p = g.getNode("Survival");
 
         int col = d.getColumn(d.getVariable(p.getName()));

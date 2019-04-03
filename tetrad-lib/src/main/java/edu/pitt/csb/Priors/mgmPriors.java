@@ -1550,7 +1550,7 @@ public class mgmPriors {
 
     }
     public static double [] getLimit(TetradMatrix t) {
-        Random rand = new Random();
+        Random rand = new Random(42);
         ContinuousVariable v = new ContinuousVariable("Lambda");
         ContinuousVariable numEdges = new ContinuousVariable("Edges");
         List<Node> temp = new ArrayList<Node>();

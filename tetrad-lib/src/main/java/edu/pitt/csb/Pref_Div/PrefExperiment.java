@@ -314,9 +314,9 @@ public class PrefExperiment
 			out.println(summarized);
 			out.flush();
 			out.close();
+			String cmd = "";
 			if(runPiMGM)
 			{
-
 
 				System.out.print("Running piMGM to learn a causal model...");
 
@@ -326,49 +326,45 @@ public class PrefExperiment
 				}
 
 				String newPriorDir = directory + "/" + priorDir + "_SIF";
+				File npDir = new File(newPriorDir);
+				if(!npDir.isDirectory())
+					npDir.mkdir();
+
 				convertPriorsToSif(priorDir,newPriorDir,summarized,data);
 
 				String runDirectory = directory + "/piMGM";
 
-				String cmd = "java -jar runPriors.jar -run " + runDirectory + " -priors " + newPriorDir + " -makeScores -fullCounts -data temp.txt -sif";
-				Runtime.getRuntime().exec(cmd);
-
-				temp.deleteOnExit();
-				System.out.println("Done");
-
-
-				//TODO TEST THIS
+				cmd = "java -jar runPriors.jar -run " + runDirectory + " -priors " + newPriorDir + " -makeScores -fullCounts -data temp.txt -sif";
 			}
 			else
 			{
 				System.out.print("Running StEPS to learn a causal model...");
+				cmd = "java -jar causalDiscovery.jar -d temp.txt -mgm -steps -o " + outputGraph + " -maxCat 3";
 
-				String cmd = "java -jar causalDiscovery.jar -d temp.txt -mgm -steps -o " + outputGraph + " -maxCat 3";
-
-				Runtime rt = Runtime.getRuntime();
-
-				Process proc = rt.exec(cmd);
-				BufferedReader stdInput = new BufferedReader(new
-						InputStreamReader(proc.getInputStream()));
-				BufferedReader stdError = new BufferedReader(new
-						InputStreamReader(proc.getErrorStream()));
-
-				// read the output from the command
-				System.out.println("Here is the standard output of the command:\n");
-				String s = null;
-				while ((s = stdInput.readLine()) != null) {
-					System.out.println(s);
-				}
-
-				// read any errors from the attempted command
-				while ((s = stdError.readLine()) != null) {
-					System.err.println(s);
-				}
-
-
-				temp.deleteOnExit();
-				System.out.println("Done");
 			}
+
+			Runtime rt = Runtime.getRuntime();
+
+			Process proc = rt.exec(cmd);
+			BufferedReader stdInput = new BufferedReader(new
+					InputStreamReader(proc.getInputStream()));
+			BufferedReader stdError = new BufferedReader(new
+					InputStreamReader(proc.getErrorStream()));
+
+			// read the output from the command
+			String s = null;
+			while ((s = stdInput.readLine()) != null) {
+				System.out.println(s);
+			}
+
+			// read any errors from the attempted command
+			while ((s = stdError.readLine()) != null) {
+				System.err.println(s);
+			}
+
+
+			temp.deleteOnExit();
+			System.out.println("Done");
 
 		}
 
@@ -393,6 +389,8 @@ public class PrefExperiment
 	{
 
 		List<String> names = summarized.getVariableNames();
+
+
 		/**Loop through old priorDir and convert each to SIF for the new prior directory***/
 		File priors = new File(priorDir);
 		File [] oldPriors = priors.listFiles();
@@ -411,9 +409,10 @@ public class PrefExperiment
 
 					int index1 = -1;
 					for (int x = 0; x < names.size(); x++) {
-						if (names.get(x).split("|")[0].contains(var1))
+						if (names.get(x).split("\\|")[0].contains(var1))
 							index1 = x;
 					}
+
 
 					if (index1 == -1)
 						continue J;
@@ -425,7 +424,7 @@ public class PrefExperiment
 
 						int index2 = -1;
 						for (int x = 0; x < names.size(); x++) {
-							if (names.get(x).split("|")[0].contains(var2))
+							if (names.get(x).split("\\|")[0].contains(var2))
 								index2 = x;
 						}
 

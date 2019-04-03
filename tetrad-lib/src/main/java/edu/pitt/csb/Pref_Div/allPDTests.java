@@ -101,9 +101,6 @@ public class allPDTests {
                 for (int kk = 0; kk < ss.length; kk++) {
                     sampleSize = ss[kk];
 
-                    if(ii==0 && jj< 3)
-                        continue;
-
                     ArrayList<Integer> experiment = new ArrayList<Integer>();
                     experiment.add(0);
                     //experiment.add(1);
@@ -351,18 +348,14 @@ public class allPDTests {
 
                             PiPrefDiv4 p = new PiPrefDiv4(toRun, "Target", minTargetParents, numParams);
                             p.setSubsamples(subs);
-                            p.setUseStabilitySelection(stabilitySelection);
                             p.setParallel(false);
                             p.setPartialCorrs(partialCorr);
-                            p.setPdStability(pdStability);
                             //p.setVerbose();
 
                             PiPrefDiv4 noPrior = new PiPrefDiv4(toRun,"Target",minTargetParents,numParams);
                             noPrior.setSubsamples(subs);
-                            noPrior.setUseStabilitySelection(stabilitySelection);
                             noPrior.setParallel(false);
                             noPrior.setPartialCorrs(partialCorr);
-                            noPrior.setPdStability(pdStability);
                            // noPrior.setVerbose();
 
                             //TODO Switch back and include no priors as an option
@@ -658,10 +651,8 @@ public class allPDTests {
 
                                         PiPrefDiv4 wp = new PiPrefDiv4(toRun, "Target", numFeats[idx], numParams);
                                         wp.setSubsamples(subs);
-                                        wp.setUseStabilitySelection(stabilitySelection);
                                         wp.setParallel(false);
                                         wp.setPartialCorrs(partialCorr);
-                                        wp.setPdStability(pdStability);
                                         wp.selectGenes(boot,numSamples,dFile);
 
                                         PrefDivComparator comp2 = new PrefDivComparator(wp,"Target",g,clusters);
@@ -675,10 +666,8 @@ public class allPDTests {
 
                                             PiPrefDiv4 np = new PiPrefDiv4(toRun, "Target", numFeats[idx], numParams);
                                             np.setSubsamples(subs);
-                                            np.setUseStabilitySelection(stabilitySelection);
                                             np.setParallel(false);
                                             np.setPartialCorrs(partialCorr);
-                                            np.setPdStability(pdStability);
                                             np.selectGenes(boot, numSamples);
                                             PrefDivComparator npComp2 = new PrefDivComparator(np, "Target", g, clusters);
 
@@ -701,10 +690,8 @@ public class allPDTests {
 
                                         PiPrefDiv4 wp = new PiPrefDiv4(toRun, "Target", minTargetParents, numParams);
                                         wp.setSubsamples(subs);
-                                        wp.setUseStabilitySelection(stabilitySelection);
                                         wp.setParallel(false);
                                         wp.setPartialCorrs(partialCorr);
-                                        wp.setPdStability(pdStability);
                                         wp.setWPCutoff(wpCutoff[idx]);
                                         wp.selectGenes(boot,numSamples,dFile);
 
