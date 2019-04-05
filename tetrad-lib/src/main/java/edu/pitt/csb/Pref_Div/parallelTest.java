@@ -13,6 +13,8 @@ import java.util.ArrayList;
  */
 public class parallelTest {
 
+
+    /***TODO Change this script to use with prior parallelism to test***/
     public static void main(String [] args) throws Exception
     {
         int [] minTargetParents = new int[]{5,10,25,75,75};
@@ -22,12 +24,20 @@ public class parallelTest {
         PrintStream out = new PrintStream("Parallel_Results.txt");
         out.println("Run\tVariables\tTime\tParallel_Time\tErrors\tGene_Errors");
         int numParams = 20;
+        int numPriors = 5;
         int numSamples = 20;
+        int numReliable = 3;
+        double amountPrior = 0.5;
 
         for(int i = 0; i < numVariables.length;i++)
         {
             for(int j = 0; j < numRuns;j++)
             {
+
+                String[] dFile = new String[numPriors];
+                for (int k = 0; k < numPriors; k++) {
+                    dFile[k] = "Priors/Prior_" + numVariables[i] + "_" + minTargetParents[i] + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_true_" + numComponents[i] + "_true_false_true" + "_" + k + "_" + j + ".txt";
+                  }
                 File dataFile = new File("Data/Dataset_" + numVariables[i] + "_" + 200 + "_" + minTargetParents[i] + "_true_" + numComponents[i] + "_true_" + j + ".txt");
 
                 out.print(j + "\t" + numVariables[i] + "\t");
@@ -40,7 +50,7 @@ public class parallelTest {
                 noPrior.setPartialCorrs(false);
                 noPrior.setSubsamples(samps);
                 long time = System.nanoTime();
-                ArrayList<Gene> genes = noPrior.selectGenes(false,20);
+                ArrayList<Gene> genes = noPrior.selectGenes(false,20,dFile);
                 time = System.nanoTime()-time;
                 out.print(time/Math.pow(10,9) + "\t");
 
@@ -51,7 +61,7 @@ public class parallelTest {
                 noPrior2.setPartialCorrs(false);
                 noPrior2.setSubsamples(samps);
                 time = System.nanoTime();
-                ArrayList<Gene> genes2 = noPrior2.selectGenes(false,20);
+                ArrayList<Gene> genes2 = noPrior2.selectGenes(false,20,dFile);
                 time = System.nanoTime()-time;
 
 

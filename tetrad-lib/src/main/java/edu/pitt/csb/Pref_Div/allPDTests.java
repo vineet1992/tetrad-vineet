@@ -28,12 +28,8 @@ import java.util.concurrent.RecursiveAction;
 public class allPDTests {
 
 
-    //TODO Deal with Causal experiments
-
-
-
-    static int numRuns = 10;
-    static int numGenes = 3000;
+    static int numRuns = 15;
+    static int numGenes = 500;
 
     static boolean boot = false; //Should we use bootstrap samples for PiPrefDiv
     static boolean loocv = false; //Should we use leave-one-out CV for PiPrefDiv
@@ -46,8 +42,8 @@ public class allPDTests {
 
     static int numPriors = 5; //Number of prior knowledge sources
     static int numReliable = 5; //Number of reliable sources
-    static int numComponents = 300; //How many components do we have for cluster simulation?
-    static int minTargetParents = 75; //How many true parents of the target are there?
+    static int numComponents = 50; //How many components do we have for cluster simulation?
+    static int minTargetParents = 25; //How many true parents of the target are there?
     static boolean amountRandom = false; //Should the priors have a random amount of prior knowledge?
     static boolean targetContinuous = true; //Is the target variable continuous?
     static boolean evenDistribution = true; //Is the distribution of nodes in each cluster even?
@@ -76,9 +72,9 @@ public class allPDTests {
 
         double [] ap = new double[]{0.5,0.75};
         //double [] ap = new double[]{1.0,0.5};
-        int [] nr = new int[]{1,3,5,0};
+        int [] nr = new int[]{3,5};
         //int [] nr = new int[]{5};
-        int [] ss = new int[]{100,200};
+        int [] ss = new int[]{50,200};
 
         double [] wpCutoff = new double[numWp];
         int [] numFeats = new int[numFeatsTotal];
@@ -102,13 +98,13 @@ public class allPDTests {
                     sampleSize = ss[kk];
 
                     ArrayList<Integer> experiment = new ArrayList<Integer>();
-                    experiment.add(0);
+                    //experiment.add(0);
                     //experiment.add(1);
-                    experiment.add(2);
+                    //experiment.add(2);
                     //experiment.add(3);
                     //experiment.add(4);
-                    experiment.add(5);
-                    //experiment.add(6);
+                    //experiment.add(5);
+                    experiment.add(6);
                     //experiment.add(7);
                     //0 ->prior evaluation, 1 -> Accuracy of chosen parameters vs Optimal
                     //2->With priors vs no Priors 3-> Comparing different summarization methods for clustered genes
@@ -354,7 +350,7 @@ public class allPDTests {
 
                             PiPrefDiv4 noPrior = new PiPrefDiv4(toRun,"Target",minTargetParents,numParams);
                             noPrior.setSubsamples(subs);
-                            noPrior.setParallel(false);
+                            noPrior.setParallel(true);
                             noPrior.setPartialCorrs(partialCorr);
                            // noPrior.setVerbose();
 

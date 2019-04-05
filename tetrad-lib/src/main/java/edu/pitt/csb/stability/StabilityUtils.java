@@ -341,13 +341,13 @@ public class StabilityUtils {
         boolean done = false;
         while(!done)
         {
+            samp = subSampleNoReplacement(data.getNumRows(), b, N);
             done = true;
             for(int i = 0; i < samp.length;i++)
             {
                 if(runPriors.checkForVariance(data.subsetRows(samp[i]),data)!=-1)
                     done = false;
             }
-            samp = subSampleNoReplacement(data.getNumRows(), b, N);
             attempts--;
             if(attempts==0)
             {

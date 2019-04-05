@@ -346,6 +346,13 @@ public class runPriors {
         System.out.println("Done");
         return samps;
     }
+
+    /***
+     *
+     * @param d Subset version of the dataset
+     * @param full Full version of the dataset
+     * @return -1 if the subset version has sufficient variance in each variable, the first offending column otherwise
+     */
     public static synchronized int checkForVariance(DataSet d, DataSet full)
     {
         TetradMatrix t = d.getDoubleData();
@@ -353,8 +360,11 @@ public class runPriors {
         {
             if(d.getVariable(i)instanceof ContinuousVariable)
             {
+                /**Extract column i**/
                 double [] curr = t.getColumn(i).toArray();
                 curr = StatUtils.standardizeData(curr);
+
+                /**Ensure variance is positive***/
                 double var = StatUtils.variance(curr);
                 if(var <= 0.0001) {
                     System.out.println(i + "\t" + var);
@@ -364,29 +374,33 @@ public class runPriors {
             }
             else
             {
+                /***Hashmap of all unique values in this column to how many times it appeared in the subset data***/
                 HashMap<Integer,Integer> cats = new HashMap<Integer,Integer>();
-                for(int j = 0; j < full.getNumRows();j++)
-                {
-                    cats.put(full.getInt(j,i),0);
-                }
                 for(int j = 0; j < d.getNumRows();j++)
                 {
                     if(cats.get(d.getInt(j,i))==null)
-                    {
-                        System.err.println("Found a category not in the full dataset");
-                        System.exit(-1);
-                    }
+                        cats.put(d.getInt(j,i),1);
                     else
-                    {
                         cats.put(d.getInt(j,i),cats.get(d.getInt(j,i))+1);
+                }
+
+
+
+                for(int j = 0; j < full.getNumRows();j++) {
+                    /***Category in the full dataset is missing in the subset dataset***/
+                    if (cats.get(full.getInt(j, i)) == null) {
+                        return i;
                     }
                 }
+
+                /***Are we too small in unique values for any column?***/
                 for(Integer ii: cats.keySet())
                 {
                     if(cats.get(ii)<2) {
                         return i;
                     }
                 }
+
             }
         }
         return -1;

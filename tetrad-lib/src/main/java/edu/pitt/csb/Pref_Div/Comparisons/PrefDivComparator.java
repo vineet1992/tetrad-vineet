@@ -79,6 +79,28 @@ public class PrefDivComparator {
 
     }
 
+    private Set<Integer> getTrueClustIndices()
+    {
+
+
+        Set<Integer> result = new HashSet<Integer>();
+        Set<String> parents = new HashSet<String>();
+
+        for(Node n: trueGraph.getParents(trueGraph.getNode(target)))
+        {
+            parents.add(n.getName());
+        }
+
+
+        for(String s: trueClusters.keySet())
+        {
+            if(parents.contains(s))
+            {
+                result.addAll(trueClusters.get(s));
+            }
+        }
+        return result;
+    }
     /***
      *
      * @param numReal Number of causally connected clusters
@@ -95,9 +117,15 @@ public class PrefDivComparator {
         /***Convert representation type***/
         Map<String,List<Integer>> trueClusters = convertRepresentation(realClusters);
 
+        /***Which cluster indices are causally related?***/
+        Set<Integer> trueIndices = getTrueClustIndices();
+
+        //X34 -> 1,2,3
 
         HashSet<Integer> covered = new HashSet<Integer>();
 
+
+        /***Loop over estimated clusters***/
         for(Gene g:estClusters.keySet())
         {
             List<Gene> temp = estClusters.get(g);
@@ -111,6 +139,11 @@ public class PrefDivComparator {
                 if(trueClusters.get(gene.symbol)!=null)
                     indices.addAll(trueClusters.get(gene.symbol));
             }
+
+            /***Keep only the causal cluster indices***/
+            indices.retainAll(trueIndices);
+
+
             covered.addAll(indices);
         }
 
