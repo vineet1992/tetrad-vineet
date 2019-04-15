@@ -44,15 +44,25 @@ public class PriorUtils {
     {
         double [][] temp = new double[numVariables][numVariables];
         BufferedReader b = new BufferedReader(new FileReader(data));
-        for(int i = 0; i < numVariables;i++)
+        int row = 0;
+        while (b.ready())
         {
             String [] line = b.readLine().split("\t");
             if(line.length < numVariables)
+            {
+                if(row!=0)
+                {
+                    System.err.println("Error loading prior file " + data + " as a matrix");
+                    System.exit(-1);
+                }
                 line = b.readLine().split("\t"); //To fix issues with header vs no header
+
+            }
             for(int j = 0; j < numVariables;j++)
             {
-                temp[i][j] = Double.parseDouble(line[j]);
+                temp[row][j] = Double.parseDouble(line[j]);
             }
+            row++;
         }
         return temp;
     }

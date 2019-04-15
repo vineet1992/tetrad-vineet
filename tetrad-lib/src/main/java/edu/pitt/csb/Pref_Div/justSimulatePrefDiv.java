@@ -48,17 +48,17 @@ public class justSimulatePrefDiv {
     public static boolean latentControl = true; //Includes a master regulator for each cluster
 
 
-    public static boolean realPathways = false; //Pathways are more realistic (not tightly clustered, distinct groups)
+    public static boolean realPathways = true; //Pathways are more realistic (not tightly clustered, distinct groups)
     public static boolean priorsToClusters = true; //Only important if real pathway simulation -> Is "true" info cluster membership? Or is it edge existence?
 
     public static Random rand = new Random();
 
-    public static int numGenes = 7000;
+    public static int numGenes = 3000;
 
     public static void main(String[] args) {
-        double[] ap = new double[]{0.5};
-        int[] nr = new int[]{3};
-        int[] ss = new int[]{200};
+        double[] ap = new double[]{0.25,0.5,0.75};
+        int[] nr = new int[]{1,3,5};
+        int[] ss = new int[]{100,200};
 
         for (int xx = 0; xx < ap.length; xx++) {
             for (int y = 0; y < nr.length; y++) {
@@ -66,7 +66,7 @@ public class justSimulatePrefDiv {
                 for (int z = 0; z < ss.length; z++) {
 
 
-                    int numRuns = 5;
+                    int numRuns = 10;
                     int sampleSize = ss[z];
                     double amountPrior = ap[xx];//percentage of edges to have prior knowledge for
                     boolean boot = false; //Should we use bootstrap samples for PiPrefDiv

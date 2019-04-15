@@ -291,7 +291,6 @@ public final class GraphUtils {
                                                 int maxIndegree, int maxOutdegree,int avgPathways,int avgCauses, boolean latentControl) {
         Random rand = new Random();
 
-        //TODO Issues: Sometimes a node might not be involved in any edges, sometimes the graph contains cycles during the merging step, any others?
         System.out.print("Assigning Genes to Pathways...");
         /***STEP 1 Assign Genes to Pathways***/
 
@@ -313,38 +312,41 @@ public final class GraphUtils {
 
         ExponentialDistribution ed = new ExponentialDistribution((double)avgPathways);
 
-        for (int i = 0; i < numNodes; i++) {
-            //How many paths are gene N involved in?
-            int np = (int) ed.sample();
-            if(np<1)
-                np = 1;
-            if(np > numComponents)
-                np = numComponents;
+        while(!ensurePaths(numGenesInPathways)) {
+            System.out.println("Generating pathways again...");
+            pathways = new HashMap<Node,List<Integer>>();
+            nodesInPaths = new HashMap<Integer,List<Node>>();
+            numGenesInPathways = new int[numComponents];
+            for (int i = 0; i < numNodes; i++) {
+                //How many paths are gene N involved in?
+                int np = (int) ed.sample();
+                if (np < 1)
+                    np = 1;
+                if (np > numComponents)
+                    np = numComponents;
 
-            //Store pathways for Gene N
-            ArrayList<Integer> currPaths = new ArrayList<Integer>();
+                //Store pathways for Gene N
+                ArrayList<Integer> currPaths = new ArrayList<Integer>();
 
-            for (int j = 0; j < np; j++) {
-                int temp = rand.nextInt(numComponents);
-                while(currPaths.contains(temp))
-                {
-                    temp = rand.nextInt(numComponents);
+                for (int j = 0; j < np; j++) {
+                    int temp = rand.nextInt(numComponents);
+                    while (currPaths.contains(temp)) {
+                        temp = rand.nextInt(numComponents);
+                    }
+                    numGenesInPathways[temp]++;
+                    currPaths.add(temp);
+                    if (nodesInPaths.get(temp) == null) {
+                        List<Node> nodes = new ArrayList<Node>();
+                        nodes.add(allNodes.get(i));
+                        nodesInPaths.put(temp, nodes);
+                    } else {
+                        List<Node> nodes = nodesInPaths.get(temp);
+                        nodes.add(allNodes.get(i));
+                        nodesInPaths.put(temp, nodes);
+                    }
                 }
-                numGenesInPathways[temp]++;
-                currPaths.add(temp);
-                if(nodesInPaths.get(temp)==null)
-                {
-                    List<Node> nodes = new ArrayList<Node>();
-                    nodes.add(allNodes.get(i));
-                    nodesInPaths.put(temp,nodes);
-                }else
-                {
-                    List<Node> nodes = nodesInPaths.get(temp);
-                    nodes.add(allNodes.get(i));
-                    nodesInPaths.put(temp,nodes);
-                }
+                pathways.put(allNodes.get(i), currPaths);
             }
-            pathways.put(allNodes.get(i), currPaths);
         }
 
         System.out.println("Done");
@@ -428,6 +430,16 @@ public final class GraphUtils {
 
 
         return fullGraph;
+    }
+
+    private static boolean ensurePaths(int [] paths)
+    {
+        for(int i = 0; i < paths.length;i++)
+        {
+            if(paths[i]<2)
+                return false;
+        }
+        return true;
     }
 
     public static Graph mergeGraphs(Graph g1, Graph g2,List<Node>allNodes)

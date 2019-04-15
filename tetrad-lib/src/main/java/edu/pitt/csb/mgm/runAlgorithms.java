@@ -32,6 +32,7 @@ import edu.cmu.tetrad.graph.*;
 import edu.cmu.tetrad.performance.PerformanceTests;
 import edu.cmu.tetrad.search.*;
 import edu.pitt.csb.BioInf_Paper.CPSS;
+import edu.pitt.csb.Priors.runPriors;
 import edu.pitt.csb.stability.Bootstrap;
 import edu.pitt.csb.stability.DataGraphSearch;
 import edu.pitt.csb.stability.SearchWrappers;
@@ -346,8 +347,8 @@ public class runAlgorithms {
 
                 if (!d.isMixed())
                 {
-                    System.err.println("Cannot run StEPS on a dataset that isn't mixed discrete and continuous...exiting");
-                    System.exit(-1);
+                    d = runPriors.addDummy(d);
+                    System.err.println("Adding a dummy variable...");
                 }
 
 
@@ -403,10 +404,10 @@ public class runAlgorithms {
 
             //Workflow to run MGM based on optimal lambda or user specified lambda
             if(runMGM) {
-                if(!d.isMixed())
+                if (!d.isMixed())
                 {
-                    System.out.println("Dataset is not mixed continuous and discrete... cannot run MGM");
-                    System.exit(-1);
+                    d = runPriors.addDummy(d);
+                    System.err.println("Adding a dummy variable...");
                 }
                 if(runCPSS) //MGM with CPSS
                 {

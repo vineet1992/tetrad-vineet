@@ -184,7 +184,7 @@ public class PiPrefDiv4 implements ComparablePD {
             DataSet curr = data.subsetRows(subsamples[x]);
             ArrayList<Gene> temp = createGenes(data,target,false);
             Gene tgt = new Gene(temp.size());
-            tgt.symbol="Target";
+            tgt.symbol=target;
             temp.add(tgt);
 
 
@@ -841,7 +841,6 @@ public class PiPrefDiv4 implements ComparablePD {
 
 
         }
-        System.out.println(Arrays.toString(score));
         normalizeScore(score);
 
         if(profiling)
@@ -929,7 +928,6 @@ public class PiPrefDiv4 implements ComparablePD {
 
 
         }
-        System.out.println(Arrays.toString(score));
 
 
         normalizeScore(score);
@@ -1441,7 +1439,14 @@ public class PiPrefDiv4 implements ComparablePD {
 
         //Compute posterior probabilities and stability of each gene, synthesize these results into a score for each parameter setting
         double[] scoresSim;
-        scoresSim = getScoresSeparate(sums,uPost,varPost);
+        if(parallel) {
+            scoresSim = getScoresSeparate(sums, uPost, varPost);
+            constrictCorrs = scoresSim;
+        }
+        else {
+            scoresSim = getScoresSeparate(sums, uPost, varPost);
+            constrictCorrs = scoresSim;
+        }
         System.out.println("Done");
 
         return scoresSim;
