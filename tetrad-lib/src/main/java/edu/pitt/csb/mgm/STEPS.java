@@ -44,6 +44,8 @@ public class STEPS {
     public double [][] stabilities = null;
     private int [][] subs;
     private boolean computeStabs;
+    private boolean runFull = false; //Don't monotonize instability and kill method as soon as stability threshold is met
+
     public STEPS(DataSet dat,double [] lam,double g,int numSub)
     {
         N = numSub;
@@ -87,6 +89,7 @@ public class STEPS {
 
     }
 
+    public void runFull(){runFull = true;}
     public void setIterLimit(int iterLimit)
     {
         this.iterLimit = iterLimit;
@@ -195,9 +198,9 @@ public class STEPS {
             result[currIndex][1] = cdDestable;
             result[currIndex][2] = ddDestable;
             result[currIndex][3] = allDestable;
-            // System.out.println("CC:" + ccDestable);
-            // System.out.println("CD:" + cdDestable);
-            // System.out.println("DD:" + ddDestable);
+         //    System.out.println("CC:" + ccDestable);
+           //  System.out.println("CD:" + cdDestable);
+             //System.out.println("DD:" + ddDestable);
             if(ccDestable <= gamma && CC == -1)
                 CC = lambda[currIndex];
             if(cdDestable <= gamma && CD==-1)
@@ -219,7 +222,7 @@ public class STEPS {
                 DDMax = ddDestable;
                 DDMaxI = lambda[currIndex];
             }
-            if(CC!=-1 && CD != -1 && DD !=-1 && oneLamb!=-1)
+            if(!runFull && (CC!=-1 && CD != -1 && DD !=-1 && oneLamb!=-1))
                 break A;
             if(currIndex==lambda.length-1)
                 break A;
@@ -232,9 +235,20 @@ public class STEPS {
         if(DD==-1)
             DD = DDMaxI;
 
+        if(runFull)
+        {
+            int [] inds = getBestVals(result,gamma);
+            CC = lambda[inds[0]];
+            CD = lambda[inds[1]];
+            DD = lambda[inds[2]];
+            allMaxI = lambda[inds[3]];
+        }
+
+
+
         double [] lambda = {CC,CD,DD};
         System.out.println("Lambdas: " + Arrays.toString(lambda));
-        if(oneLamb==-1)
+        if(oneLamb==-1 || runFull)
             origLambda = allMaxI;
         else
             origLambda = oneLamb;
@@ -250,6 +264,34 @@ public class STEPS {
         return result;
     }
 
+    private int [] getBestVals(double [][] result, double gamma)
+    {
+        int [] lambda = new int[4];
+        A:for(int i = 0; i < 4; i ++)
+        {
+            int maxIndex = -1;
+            double max = -1;
+            for(int j = 0; j < result.length;j++)
+            {
+                if(result[j][i]>max)
+                {
+                    maxIndex = j;
+                    max = result[j][i];
+                }
+            }
+            for(int j = maxIndex;j<result.length;j++)
+            {
+                if(result[j][i] < gamma)
+                {
+                    lambda[i] = j;
+                    continue A;
+                }
+            }
+            if(lambda[i]==0)
+                lambda[i] = result.length-1;
+        }
+        return lambda;
+    }
     //returns a matrix where rows correspond to lambda values, and columns correspond to: 0 = CC, 1 = CD, 2 = DD, 3 = ALL
 
 

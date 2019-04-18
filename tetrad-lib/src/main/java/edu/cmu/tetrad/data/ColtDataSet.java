@@ -588,6 +588,7 @@ public final class ColtDataSet implements DataSet, TetradSerializable {
                 }
             }
         }
+        tetradMatrix = _data;
     }
 
     /**

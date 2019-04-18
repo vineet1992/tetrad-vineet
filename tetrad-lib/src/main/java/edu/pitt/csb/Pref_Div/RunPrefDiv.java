@@ -123,7 +123,7 @@ public class RunPrefDiv {
 
 
 
-    public ArrayList<Gene> runPD()
+    public ArrayList<Gene> runPD(String target)
     {
 
 
@@ -153,7 +153,7 @@ public class RunPrefDiv {
             lastGeneSet = p.diverset();
             lastClusters = p.clusters;
 
-            summarizedData = summarize(data,data,(ArrayList<Gene>)lastGeneSet.clone(),lastClusters,clusterType)[0];
+            summarizedData = summarize(data,data,(ArrayList<Gene>)lastGeneSet.clone(),lastClusters,clusterType,target)[0];
 
         return lastGeneSet;
 
@@ -161,13 +161,14 @@ public class RunPrefDiv {
 
 
     /*** Summarizes dataset dat, subsetted by the clusters given in clusters based on the cluster type "type"***/
-    public static DataSet summarizeData(DataSet dat,ArrayList<Gene> genes, Map<Gene,List<Gene>> clusters, ClusterType type )
+    public static DataSet summarizeData(DataSet dat,ArrayList<Gene> genes, Map<Gene,List<Gene>> clusters, ClusterType type,String target)
     {
+
         if(type==ClusterType.NONE)
         {
             ArrayList<Gene> tempList = new ArrayList<Gene>(genes);
             Gene temp = new Gene(-1);
-            temp.symbol="Target";
+            temp.symbol=target;
             tempList.add(temp);
             return subset(dat,tempList);
         }
@@ -213,17 +214,31 @@ public class RunPrefDiv {
 
             for(int i = 0; i < td.length;i++)
             {
-                td[i][td[i].length-1] = dat.getDouble(i,dat.getColumn(dat.getVariable("Target")));
+                td[i][td[i].length-1] = dat.getDouble(i,dat.getColumn(dat.getVariable(target)));
             }
-            nodes.add(new ContinuousVariable("Target"));
+
+            if(dat.getVariable(target)instanceof ContinuousVariable)
+            {
+                nodes.add(new ContinuousVariable(target));
+            }
+            else
+            {
+                DiscreteVariable dv = (DiscreteVariable)dat.getVariable(target);
+                nodes.add(new DiscreteVariable(target,dv.getCategories()));
+            }
 
 
             DataSet finalData = new ColtDataSet(td.length,nodes);
+
+
             for(int i = 0; i < td.length;i++)
             {
                 for(int j = 0; j < td[i].length;j++)
                 {
-                    finalData.setDouble(i,j,td[i][j]);
+                    if(j!=td[i].length-1 || dat.getVariable(target)instanceof ContinuousVariable)
+                        finalData.setDouble(i,j,td[i][j]);
+                    else
+                        finalData.setInt(i,j,dat.getInt(i,dat.getColumn(dat.getVariable(target))));
                 }
             }
             return finalData;
@@ -257,14 +272,16 @@ public class RunPrefDiv {
         }
         return data.subsetColumns(cols);
     }
-    private DataSet[] summarize(DataSet train,DataSet test, ArrayList<Gene> genes, Map<Gene,List<Gene>> clusters, ClusterType type)
+
+
+    private DataSet[] summarize(DataSet train,DataSet test, ArrayList<Gene> genes, Map<Gene,List<Gene>> clusters, ClusterType type,String target)
     {
 
         if(type==ClusterType.NONE)
         {
             ArrayList<Gene> tempList = new ArrayList<Gene>(genes);
             Gene temp = new Gene(-1);
-            temp.symbol="Target";
+            temp.symbol=target;
             tempList.add(temp);
             return new DataSet[]{subset(train,tempList),subset(test,tempList)};
         }
@@ -319,14 +336,15 @@ public class RunPrefDiv {
 
             for(int i = 0; i < trainData.length;i++)
             {
-                trainData[i][trainData[0].length-1] = train.getDouble(i,train.getColumn(train.getVariable("Target")));
+                trainData[i][trainData[0].length-1] = train.getDouble(i,train.getColumn(train.getVariable(target)));
             }
 
             for(int i = 0; i < testData.length;i++)
             {
-                testData[i][testData[0].length-1] = test.getDouble(i,test.getColumn(test.getVariable("Target")));
+                testData[i][testData[0].length-1] = test.getDouble(i,test.getColumn(test.getVariable(target)));
             }
-            nodes.add(new ContinuousVariable("Target"));
+
+            nodes.add(new ContinuousVariable(target));
             DataSet trainFinal = new BoxDataSet(new DoubleDataBox(trainData),nodes);
             DataSet testFinal = new BoxDataSet(new DoubleDataBox(testData),nodes);
             return new DataSet[]{trainFinal,testFinal};

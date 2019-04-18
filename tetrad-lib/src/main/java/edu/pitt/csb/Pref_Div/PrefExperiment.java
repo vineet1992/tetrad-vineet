@@ -1,12 +1,19 @@
 package edu.pitt.csb.Pref_Div;
+import edu.cmu.tetrad.data.ContinuousVariable;
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.data.DataUtils;
+import edu.cmu.tetrad.data.DiscreteVariable;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.Node;
+import edu.cmu.tetrad.regression.LogisticRegression;
+import edu.cmu.tetrad.regression.LogisticRegressionResult;
+import edu.cmu.tetrad.regression.RegressionResult;
 import edu.cmu.tetrad.search.Fci;
 import edu.pitt.csb.Pref_Div.Comparisons.ClusterSim;
+import edu.pitt.csb.Pref_Div.Comparisons.PrefDivComparator;
 import edu.pitt.csb.Priors.runPriors;
 import edu.pitt.csb.mgm.MixedUtils;
+import edu.pitt.csb.stability.StabilityUtils;
 import org.apache.commons.math3.ml.clustering.Cluster;
 import org.apache.commons.math3.stat.StatUtils;
 
@@ -54,25 +61,66 @@ public class PrefExperiment
 
 	static boolean runPiMGM = false; //Should we run piMGM to incorporate prior knowledge in undirected modeling (only if aggregation type is NONE)
 
-	static RunPrefDiv.ClusterType ctype; //Aggregation type used
+	static boolean innerCV = false; //Should we use an inner cross validation to determine which number of features to use?
+	static int numCVFolds = 3; //Number of internal cross-validation folds to tune hyperparameters
+	static int [] topKs  = new int[]{5,10,25,50}; //Range of top K values to test
+	static RunPrefDiv.ClusterType ctype = RunPrefDiv.ClusterType.NONE; //Aggregation type used
 
+	static String runName = "Pref_Div";
+
+	static int maxCat = 3; //Maximum number of categories for a discrete variable
 
 	static int pathwayLimit = 10; //How many genes must be present to include a pathway/gene list?
 	public static void main(String [] args) throws Exception
 	{
 
 
+		List<String> varsToRemove = new ArrayList<String>(); //Assume this is variables to remove completely from the data
+		List<String> varsToInclude = new ArrayList<String>(); //These variables will be included no matter what (in addition to the top K)
 		int index = 0;
-		while(index < args.length)
+		ARGS:while(index < args.length)
 		{
 			try {
 				if (args[index].equals("-ns")) {
 					numSamples = Integer.parseInt(args[index + 1]);
 					index += 2;
-				}  else if (args[index].equals("-t")) {
+				}
+
+				else if(args[index].equals("-disc"))
+				{
+					targetContinuous = false;
+					index++;
+				}
+				else if(args[index].equals("-cv"))
+				{
+					innerCV = true;
+					numCVFolds = Integer.parseInt(args[index+1]);
+					if((index+2)<args.length && !args[index+2].startsWith("-"))
+					{
+						String [] ks = args[index+2].split(",");
+						topKs = new int[ks.length];
+						for(int i = 0; i < ks.length;i++)
+						{
+							topKs[i] = Integer.parseInt(ks[i]);
+						}
+					}
+					index+=3;
+
+				}
+				else if(args[index].equals("-maxCat"))
+				{
+					maxCat = Integer.parseInt(args[index+1]);
+					index+=2;
+				}
+				else if (args[index].equals("-t")) {
 					target = args[index + 1];
 					index += 2;
-				} else if (args[index].equals("-data")) {
+				} else if(args[index].equals("-name"))
+				{
+					runName = args[index+1];
+					index+=2;
+				}
+				else if (args[index].equals("-data")) {
 					dataFile = args[index + 1];
 					index += 2;
 				} else if (args[index].equals("-outData")) {
@@ -95,6 +143,26 @@ public class PrefExperiment
 				{
 					numSelected = Integer.parseInt(args[index+1]);
 					index+=2;
+				}
+				else if(args[index].equals("-rv"))
+				{
+					index++;
+					while(index < args.length && !args[index].startsWith("-"))
+					{
+						varsToRemove.add(args[index]);
+						index++;
+					}
+				}
+				else if(args[index].equals("-keep"))
+				{
+					index++;
+					while(index < args.length && !args[index].startsWith("-"))
+					{
+						varsToInclude.add(args[index]);
+						index++;
+					}
+					if(index>=args.length)
+						break ARGS;
 				}
 				else if(args[index].equals("-loocv"))
 				{
@@ -177,6 +245,8 @@ public class PrefExperiment
 				}
 				else
 				{
+					if(index==args.length)
+						break ARGS;
 					System.err.println("Unrecognized command line option " + args[index] + " ... ignoring");
 					index++;
 				}
@@ -194,6 +264,24 @@ public class PrefExperiment
 			}
 		}
 
+		String workingDir = directory + "/" + runName;
+
+		File wDir = new File(workingDir);
+		if(!wDir.isDirectory())
+		{
+			System.out.println("Creating directory for this run: " + wDir.getName());
+			if(!wDir.mkdir())
+			{
+				System.err.println("Unable to create working directory: " + wDir);
+				System.exit(-1);
+			}
+		}
+		else
+		{
+			System.err.println("Working directory already exists, contents will be overwritten");
+		}
+
+
 		if(dataFile.equals(""))
 		{
 			System.err.println("No data file specified, usage: (-data <filename>)");
@@ -206,23 +294,26 @@ public class PrefExperiment
 
 		if(outputDataset.equals(""))
 		{
-			outputDataset = "OUT_" + dataFile;
+			outputDataset = "/OUT_" + dataFile;
 		}
 
 		if(outputClusters.equals(""))
 		{
-			outputClusters = "CLUST_" + dataFile;
+			outputClusters = "/CLUST_" + dataFile;
 		}
 
 		if(outputGraph.equals("") && useGraph)
 		{
 			outputGraph = "GRAPH_" + dataFile;
 		}
-
+		outputDataset = workingDir + "/" + outputDataset;
+		outputClusters = workingDir + "/" + outputClusters;
+		outputGraph = workingDir + "/" + outputGraph;
+		dataFile = directory + "/" + dataFile;
 
 		DataSet data = null;
 		try {
-			data = MixedUtils.loadDataSet2(dataFile);
+			data = MixedUtils.loadDataSet2(dataFile,maxCat);
 		}
 		catch(Exception e)
 		{
@@ -231,15 +322,67 @@ public class PrefExperiment
 			System.exit(-1);
 		}
 
-		if(data.isMixed())
+
+		/**Remove specified variables***/
+		for(String s: varsToRemove)
 		{
-			System.out.print("Mixed continuous and categorical dataset detected, extracting just the continuous data...");
-			int [] indices = MixedUtils.getContinuousInds(data.getVariables());
-			List<Node> varsToKeep = data.subsetColumns(indices).getVariables();
-			varsToKeep.add(data.getVariable(target));
-			data = data.subsetColumns(varsToKeep);
-			System.out.print("Done");
+			data.removeColumn(data.getVariable(s));
 		}
+
+
+		DataSet ensured = data;
+
+
+		/***Keep all categorical variables***/
+
+		System.out.print("Mixed continuous and categorical dataset detected, extracting just the continuous data...");
+		int [] indices = MixedUtils.getDiscreteInds(data.getVariables());
+
+		HashSet<Integer> indList = new HashSet<Integer>();
+		for(int x = 0; x < indices.length;x++)
+			indList.add(indices[x]);
+		/***Ensure we keep specified variables***/
+		for(String s: varsToInclude)
+		{
+			indList.add(data.getColumn(data.getVariable(s)));
+		}
+
+		/***Don't allow the target variable to be removed***/
+		if(indList.contains(data.getColumn(data.getVariable(target))))
+			indList.remove(data.getColumn(data.getVariable(target)));
+
+		indices = new int[indList.size()];
+		int count  = 0;
+		for(Integer x: indList)
+		{
+			indices[count] = x;
+			count++;
+		}
+
+
+
+
+		List<Node> varsToKeep = data.subsetColumns(indices).getVariables();
+		//varsToKeep.add(data.getVariable(target));
+
+		/***Get these variables into its own dataset and remove them from the PD dataset***/
+		ensured = data.subsetColumns(varsToKeep);
+		data.removeCols(indices);
+		System.out.print("Done");
+
+
+		List<String> colnames = data.getVariableNames();
+
+
+		DataSet predictionData = data.copy();
+		/***If target is discrete, then reload the dataset with it as a continuous variable for Pref-Div***/
+		if(!targetContinuous )
+		{
+			DiscreteVariable targetVar = (DiscreteVariable) data.getVariable(target);
+			int max = targetVar.getCategories().size()-1;
+			data = MixedUtils.loadDataSet2(dataFile,max);
+		}
+
 
 		PiPrefDiv4 ppd;
 		System.out.print("Initializing radii values in the range: (" + rLow + "," + rHigh + "}...");
@@ -251,7 +394,15 @@ public class PrefExperiment
 		System.out.println("Done");
 
 
-			ppd = new PiPrefDiv4(data,target,numSelected,initRadii);
+		if(innerCV)
+		{
+			System.out.print("Running internal CV to choose number of variables to select...");
+			numSelected = crossValidate(data,predictionData,initRadii,workingDir);
+			System.out.println("Done, choosing " + numSelected + " variables");
+		}
+
+
+		ppd = new PiPrefDiv4(data,target,numSelected,initRadii);
 
 
 		if(boot)
@@ -259,33 +410,21 @@ public class PrefExperiment
 		ppd.setLOOCV(loocv);
 		ppd.setVerbose();
 		ppd.setClusterType(ctype);
+		ppd.setParallel(true);
 
-		ArrayList<Gene> output;
-		Map<Gene,List<Gene>> map;
-		DataSet summarized;
+
 		if(noPrior)
-		{
 			System.out.println("Running PiPref-Div without prior information to select genes...");
-
-			output = ppd.selectGenes(boot,numSamples);
-
-		}else
-		{
+		else
 			System.out.println("Running PiPref-Div to select genes...");
 
-			File dDir = new File(directory + "/" + priorDir);
-			File [] files = dDir.listFiles();
+		ArrayList<Gene> output = runPrefDiv(ppd,workingDir);
+		Map<Gene,List<Gene>> map = ppd.getLastCluster();
+		DataSet summarized = ppd.getSummarizedData();
 
-			String [] diss = new String[files.length];
-			for(int i = 0; i < files.length;i++)
-			{
-				diss[i] = files[i].getAbsolutePath();
-			}
-			output = ppd.selectGenes(boot,numSamples,diss);
-		}
-
-		map = ppd.getLastCluster();
-		summarized = ppd.getSummarizedData();
+		/***Don't use continuous target variable for summarized dataset***/
+		if(!targetContinuous)
+			summarized = RunPrefDiv.summarizeData(predictionData,output,map,ctype,target);
 
 		if(!pathwayFile.equals(""))
 		{
@@ -294,18 +433,49 @@ public class PrefExperiment
 			System.out.println("Done");
 		}
 
+		/***Add back the saved variables***/
+		if(varsToInclude.size()>0) {
+
+
+			for(int i = 0; i < ensured.getNumColumns();i++)
+			{
+				boolean cont = true;
+				if(ensured.getVariable(i) instanceof ContinuousVariable)
+				{
+					summarized.addVariable(0,new ContinuousVariable(ensured.getVariable(i).getName()));
+
+				}
+				else
+				{
+					cont = false;
+					DiscreteVariable temp = (DiscreteVariable)ensured.getVariable(i);
+					summarized.addVariable(0,new DiscreteVariable(temp.getName(),temp.getCategories()));
+				}
+
+				for(int j = 0; j < ensured.getNumRows();j++)
+				{
+					if(cont)
+					{
+						summarized.setDouble(j,0,ensured.getDouble(j,i));
+					}else
+					{
+						summarized.setInt(j,0,ensured.getInt(j,i));
+					}
+				}
+			}
+		}
+
+
 		if(useGraph)
 		{
 			File temp = new File("temp.txt");
 			PrintStream out = new PrintStream(temp);
-			if(data.isMixed())
-			{
-				/***Add back the discrete variables that were removed***/
-				DataSet discData = MixedUtils.getDiscreteData(data);
-				summarized = DataUtils.concatenate(summarized,discData);
 
-			}
-			else
+
+
+
+
+			if(!summarized.isMixed())
 			{
 				/***Add a dummy variable to run causal modeling ***/
 				summarized = runPriors.addDummy(summarized);
@@ -330,9 +500,9 @@ public class PrefExperiment
 				if(!npDir.isDirectory())
 					npDir.mkdir();
 
-				convertPriorsToSif(priorDir,newPriorDir,summarized,data);
+				convertPriorsToSif(priorDir,newPriorDir,summarized,colnames);
 
-				String runDirectory = directory + "/piMGM";
+				String runDirectory = workingDir + "/piMGM";
 
 				cmd = "java -jar runPriors.jar -run " + runDirectory + " -priors " + newPriorDir + " -makeScores -fullCounts -data temp.txt -sif";
 			}
@@ -370,7 +540,7 @@ public class PrefExperiment
 
 		System.out.println(map);
 
-		printOutput(output,map,directory);
+		printOutput(output,map,workingDir);
 		PrintStream out = new PrintStream(outputDataset);
 		out.println(summarized);
 		out.flush();
@@ -378,14 +548,219 @@ public class PrefExperiment
 	}
 
 
+
+
+	public static void outputPriorWeights(String wd, String [] files, double [] weights, double [] tao,double[]p, double[]adjP)
+	{
+		try{
+			PrintStream out = new PrintStream(wd + "/Prior_Weights.txt");
+			out.println("Source\tNormalized_Weight\tTao\tP-Value\tAdjusted p-Value");
+			for(int i = 0; i < files.length;i++)
+			{
+				out.println(files[i] + "\t" + weights[i] + "\t" + tao[i] + "\t" + p[i] + "\t" + adjP[i]);
+			}
+			out.flush();
+			out.close();
+		}catch (Exception e)
+		{
+			System.err.println("Unable to print out prior weights");
+
+		}
+	}
+
+	private static ArrayList<Gene> runPrefDiv(PiPrefDiv4 ppd,String workingDir)
+	{
+		ArrayList<Gene> output = new ArrayList<Gene>();
+		if(noPrior)
+		{
+
+			output = ppd.selectGenes(boot,numSamples);
+
+		}else
+		{
+
+			File dDir = new File(directory + "/" + priorDir);
+			File [] files = dDir.listFiles();
+
+			String [] diss = new String[files.length];
+			for(int i = 0; i < files.length;i++)
+			{
+				diss[i] = files[i].getAbsolutePath();
+			}
+
+			output = ppd.selectGenes(boot,numSamples,diss);
+			double [] weights = ppd.getLastWeights();
+			double [] tao = ppd.getLastTao();
+			double [] pVals = ppd.getPValues();
+			double [] apVals = ppd.getAdjustP();
+			outputPriorWeights(workingDir,diss,weights,tao,pVals,apVals);
+		}
+		return output;
+
+	}
+
+
+	/***
+	 * Inner k-fold cross validation to determine the number of genes to select
+	 * @param data Dataset to run CV process on
+	 * @param predData When target variable is discrete, predData has the real dataset (with discrete target)
+	 * @param initRadii The initialRadii parameters to test
+	 * @param workingDir The working directory to print results to
+	 * @return The best value for the number of genes (in terms of minimizing prediction accuracy in a linear regression)
+	 */
+	private static int crossValidate(DataSet data,DataSet predData, double [] initRadii,String workingDir)
+	{
+		double loss = Double.MAX_VALUE;
+		int maxIndex = -1;
+		int [][] folds = StabilityUtils.generateSubsamples(numCVFolds,data.getNumRows());
+		for(int j = 0; j < numCVFolds;j++)
+			Arrays.sort(folds[j]);
+
+		for(int i = 0; i < topKs.length;i++)
+		{
+			int topK = topKs[i];
+			double predAccuracy = 0;
+
+
+
+			for(int j = 0; j < numCVFolds;j++)
+			{
+				DataSet testSet = data.subsetRows(folds[j]);
+				DataSet trainSet = data.copy();
+				trainSet.removeRows(folds[j]);
+
+				PiPrefDiv4 ppd = new PiPrefDiv4(trainSet,target,topK,initRadii);
+				ppd.setLOOCV(loocv);
+				ppd.setClusterType(ctype);
+				ppd.setParallel(true);
+				ppd.setQuiet();
+
+				ArrayList<Gene> selected = runPrefDiv(ppd,workingDir);
+
+				testSet = predData.subsetRows(folds[j]);
+				trainSet = predData.copy();
+				trainSet.removeRows(folds[j]);
+
+				standardizeContinuous(trainSet);
+				standardizeContinuous(testSet);
+
+				DataSet summarized = RunPrefDiv.summarizeData(trainSet, selected, ppd.getLastCluster(), ctype,target);
+				DataSet summarizedTest = RunPrefDiv.summarizeData(testSet, selected, ppd.getLastCluster(), ctype,target);
+
+				if(targetContinuous)
+				{
+					PrefDivComparator pdc = new PrefDivComparator(ppd,target,null,null);
+					try {
+						predAccuracy += pdc.getPredictionAccuracy(summarized, summarizedTest)/(double)numCVFolds;
+					}
+					catch(Exception e)
+					{
+						System.out.println(summarized);
+						predAccuracy = Double.NaN;
+					}
+				}
+				else
+				{
+
+					LogisticRegression lr = new LogisticRegression(summarized);
+					List<Node> regressors = summarized.getVariables();
+					regressors.remove(summarized.getVariable(target));
+					LogisticRegression.Result result = lr.regress((DiscreteVariable)summarized.getVariable(target),regressors);
+
+					predAccuracy += logRegPredict(summarizedTest,result);
+
+				}
+
+
+
+
+
+
+
+			}
+
+			System.out.println("Accuracy at: " + topKs[i] + " is " + predAccuracy);
+
+			if(predAccuracy < loss)
+			{
+				loss = predAccuracy;
+				maxIndex = i;
+			}
+		}
+		return topKs[maxIndex];
+	}
+
+
+	/***
+	 * Standardize only the continuous variables in the dataset
+	 * @param d a dataset to deal with
+	 */
+	private static void standardizeContinuous(DataSet d)
+	{
+		double [][] data = d.getDoubleData().transpose().toArray();
+		for(int i = 0; i < d.getNumColumns();i++)
+		{
+			if(d.getVariable(i)instanceof ContinuousVariable)
+			{
+				double mean = StatUtils.mean(data[i]);
+				double sd = Math.sqrt(StatUtils.variance(data[i],mean));
+
+				for(int j = 0; j <d.getNumRows();j++)
+				{
+					d.setDouble(j,i,(data[i][j]-mean)/sd);
+				}
+			}
+
+		}
+
+	}
+
+	/***
+	 *
+	 * @param test Testing dataset to apply this prediction model to
+	 * @param result Result from regressing on the training set
+	 * @return The accuracy from these predictions
+	 */
+	private static double logRegPredict(DataSet test, LogisticRegression.Result result)
+	{
+		double [] loss = new double[test.getNumRows()];
+		for(int i = 0; i < test.getNumRows();i++)
+		{
+			double logit = result.getIntercept();
+			double [] coefs = result.getCoefs();
+			List<String> names = result.getRegressorNames();
+			for(int j = 0; j < names.size();j++)
+			{
+				int col = test.getColumn(test.getVariable(names.get(j)));
+				logit += coefs[j+1]*test.getDouble(i,col);
+			}
+			double prob = 1/(1+Math.exp(-1*logit));
+
+			if(prob > 1-Math.pow(10,-15))
+				prob = 1-Math.pow(10,-15);
+			else if(prob < Math.pow(10,-15))
+				prob = Math.pow(10,-15);
+			loss[i] = logLoss(prob,test.getInt(i,test.getColumn(test.getVariable(target))));
+
+		}
+
+		return StatUtils.mean(loss);
+
+
+	}
+
+	private static double logLoss(double p, int y)
+	{
+		return -1*(y*Math.log(p) +(1-y)*Math.log(1-p));
+	}
 	/***
 	 *
 	 * @param priorDir A directory of prior knowledge files (these will be matrices with no labels)
 	 * @param newPriorDir A directory to write new prior knowledge files
 	 * @param summarized The summarized dataset after selecting features with piMGM
-	 * @param data The original dataset
+	 * @param colnames Column names of the original dataset
 	 */
-	private static void convertPriorsToSif(String priorDir, String newPriorDir, DataSet summarized, DataSet data)
+	private static void convertPriorsToSif(String priorDir, String newPriorDir, DataSet summarized, List<String> colnames)
 	{
 
 		List<String> names = summarized.getVariableNames();
@@ -396,6 +771,7 @@ public class PrefExperiment
 		File [] oldPriors = priors.listFiles();
 		for(int i = 0; i < oldPriors.length;i++)
 		{
+			System.out.println("Prior: " + oldPriors[i]);
 			try {
 				BufferedReader b = new BufferedReader(new FileReader(oldPriors[i]));
 				PrintStream out = new PrintStream(newPriorDir + "/Prior_" + i + ".sif");
@@ -403,9 +779,9 @@ public class PrefExperiment
 
 				/***Loop through original prior information source***/
 				J:
-				for (int j = 0; j < data.getNumColumns(); j++) {
+				for (int j = 0; j < colnames.size(); j++) {
 					String[] currLine = b.readLine().split("\t");
-					String var1 = data.getVariable(j).getName();
+					String var1 = colnames.get(j);
 
 					int index1 = -1;
 					for (int x = 0; x < names.size(); x++) {
@@ -418,8 +794,8 @@ public class PrefExperiment
 						continue J;
 
 					K:
-					for (int k = j + 1; k < data.getNumColumns(); k++) {
-						String var2 = data.getVariable(k).getName();
+					for (int k = j + 1; k < colnames.size(); k++) {
+						String var2 = colnames.get(k);
 
 
 						int index2 = -1;
@@ -433,7 +809,10 @@ public class PrefExperiment
 
 						/***Output any non-NULL prior info to SIF file***/
 						if (Double.parseDouble(currLine[k]) > 0)
+						{
 							out.println(names.get(index1) + "\t" + names.get(index2) + "\t" + Double.parseDouble(currLine[k]));
+							System.out.println("Connecting " + names.get(index1) + ", " + names.get(index2) + " score: " + Double.parseDouble(currLine[k]));
+						}
 
 
 					}
@@ -444,6 +823,7 @@ public class PrefExperiment
 			}
 			catch(Exception e)
 			{
+				e.printStackTrace();
 				System.err.println("Could not generate SIF prior " + i + ", need to debug!");
 			}
 		}
@@ -566,6 +946,7 @@ public class PrefExperiment
 				List<Gene> list = map.get(top.get(i));
 				if(list!=null) {
 					for (int j = 0; j < list.size(); j++) {
+						if(!list.get(j).symbol.equals(top.get(i).symbol))
 						out.print(list.get(j) + "\t");
 
 					}

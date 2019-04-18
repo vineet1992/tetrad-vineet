@@ -2,6 +2,7 @@ package edu.pitt.csb.Pref_Div;
 
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.data.DataUtils;
+import edu.cmu.tetrad.data.DiscreteVariable;
 import edu.cmu.tetrad.util.ForkJoinPoolInstance;
 import edu.cmu.tetrad.util.StatUtils;
 import edu.cmu.tetrad.util.TetradMatrix;
@@ -26,6 +27,8 @@ import java.util.concurrent.RecursiveAction;
 
 public class PiPrefDiv4 implements ComparablePD {
 
+
+    private int numSamples = 10000; //Number of null distribution samples to generate
     private DataSet data; //The current expression dataset to be analyzed, assumes that all variables are fair game for Pref-Div except the target
     private String target; //The target variable of interest
     private double [] initRadii; //Initial radius values to test
@@ -59,8 +62,12 @@ public class PiPrefDiv4 implements ComparablePD {
     private List<Gene> lastSelected; //Last set of selected genes
     private double wpCutoff = 0.5; //Cutoff for inclusion into the withprior set
     private Random rand = new Random(42);
+    private boolean quiet = false; //Suppress all output
+
 
     private int targetIndex = 0; //Index of the target variable
+    private double [] pvals; //P-value for each prior information source
+    private double [] adjustP; //Adjusted p-value for each prior information source
 
 
     /***TODO Fix up and remove this when done***/
@@ -114,12 +121,14 @@ public class PiPrefDiv4 implements ComparablePD {
     }
 
 
+    public void setQuiet(){this.quiet = true;}
     public void setSubsamples(int[][] subs){this.subsamples = subs;}
     public Map<Gene,List<Gene>> getLastCluster()
     {
         return lastCluster;
     }
-    public double[] getLastSimilarityWeights(){return lastSimilarityWeights;}
+    public double[] getLastWeights(){return lastSimilarityWeights;}
+    public double[] getLastTao(){return simTao;}
     public double[] getLastRadius(){return new double[]{lastRadius,lastRadiusWP};}
     public double getLastRadiusWP(){return lastRadiusWP;}
     public void setOutputScores(PrintStream out){outputScores=true; scoreStream=out;}
@@ -128,11 +137,11 @@ public class PiPrefDiv4 implements ComparablePD {
     public DataSet getSummarizedData(){return summarizedData;}
     public void setPartialCorrs(boolean pc){partialCorrs = pc;}
     public void saveMemory(){saveMemory = true;}
-    public boolean[] getIntensityPriors(){return iPriors;}
     public boolean[] getDissimilarityPriors(){return dPriorsWT;}
-    public double [] getLastIntensityWeights(){return new double[10];}
     public List<Gene> getLastSelected(){return lastSelected;}
     public void setWPCutoff(double wp){wpCutoff = wp;}
+    public double [] getPValues(){return pvals;}
+    public double [] getAdjustP(){return adjustP;}
 
 
     //Set numbe of folds
@@ -340,7 +349,7 @@ public class PiPrefDiv4 implements ComparablePD {
 
 
         /***Run Pref-Div and get selected features and clusters***/
-        ArrayList<Gene> top = rpd.runPD();
+        ArrayList<Gene> top = rpd.runPD(target);
         Map<Gene,List<Gene>> map = rpd.getClusters();
         summarizedData = rpd.getSummarizedData();
         lastCluster = map;
@@ -435,7 +444,7 @@ public class PiPrefDiv4 implements ComparablePD {
         if(clusterByCorrs)
             rpd.clusterByCorrs();
 
-        ArrayList<Gene> top = rpd.runPD();
+        ArrayList<Gene> top = rpd.runPD(target);
         Map<Gene,List<Gene>> map = rpd.getClusters();
         summarizedData = rpd.getSummarizedData();
         lastCluster = map;
@@ -459,9 +468,12 @@ public class PiPrefDiv4 implements ComparablePD {
     {
         long time = System.nanoTime();
         if(data.isContinuous()) {
-            System.out.print("Standardizing Data...");
+            if(!quiet)
+                System.out.print("Standardizing Data...");
             data = DataUtils.standardizeData(data);
-            System.out.println("Done");
+
+            if(!quiet)
+                System.out.println("Done");
         }
         if(profiling)
         {
@@ -470,17 +482,20 @@ public class PiPrefDiv4 implements ComparablePD {
         }
 
         //Generate subsamples of the data
-        System.out.print("Generating subsamples...");
+        if(!quiet)
+            System.out.print("Generating subsamples...");
         if(subsamples==null)
         {
             subsamples = genSubsamples(boot,numSamples,data,LOOCV);
         }
-        System.out.println("Done");
+        if(!quiet)
+            System.out.println("Done");
 
 
         time = System.nanoTime();
         //Constrict parameter ranges
-        System.out.print("Constricting Parameter Range...");
+        if(!quiet)
+         System.out.print("Constricting Parameter Range...");
         initRadii = constrictRange(initRadii,data,false);
 
         if(profiling)
@@ -489,7 +504,8 @@ public class PiPrefDiv4 implements ComparablePD {
             System.out.println("Constricting Range; " + time/Math.pow(10,9));
         }
 
-        System.out.println("Done");
+        if(!quiet)
+            System.out.println("Done");
 
         if(verbose)
         {
@@ -498,8 +514,9 @@ public class PiPrefDiv4 implements ComparablePD {
         }
 
 
+        if(!quiet)
         //Compute stability of each gene selection and each gene-gene relationship
-        System.out.print("Computing stability across radii and threshold values...");
+            System.out.print("Computing stability across radii and threshold values...");
 
 
         double[] scores = computeScores();
@@ -524,7 +541,8 @@ public class PiPrefDiv4 implements ComparablePD {
         }
 
 
-        System.out.println("Done");
+        if(!quiet)
+            System.out.println("Done");
 
 
 
@@ -546,33 +564,42 @@ public class PiPrefDiv4 implements ComparablePD {
     public ArrayList<Gene> selectGenes(boolean boot, int numSamples, String [] dFile)
     {
         if(data.isContinuous()) {
-            System.out.print("Standardizing Data...");
+            if(!quiet)
+                System.out.print("Standardizing Data...");
             data = DataUtils.standardizeData(data);
-            System.out.println("Done");
+
+            if(!quiet)
+                System.out.println("Done");
         }
 
         dPriors = new boolean[numGenes * (numGenes + 1) / 2];
 
         //Generate subsamples of the data
-        System.out.print("Generating subsamples...");
+        if(!quiet)
+            System.out.print("Generating subsamples...");
         if(subsamples==null)
         {
             subsamples = genSubsamples(boot,numSamples,data,LOOCV);
         }
-        System.out.println("Done");
+
+        if(!quiet)
+            System.out.println("Done");
 
         //Constrict parameter ranges
-        System.out.print("Constricting Parameter Range...");
+        if(!quiet)
+            System.out.print("Constricting Parameter Range...");
         initRadii = constrictRange(initRadii,data,false);
 
-        System.out.println("Done");
+        if(!quiet)
+            System.out.println("Done");
 
         if(verbose)
         {
             System.out.println("Selected radii range: (" + initRadii[0] + "," + initRadii[initRadii.length-1] + ")");
         }
 
-        //Compute stability of each gene selection and each gene-gene relationship
+        if(!quiet)
+            //Compute stability of each gene selection and each gene-gene relationship
         System.out.print("Computing stability across radii and threshold values...");
 
 
@@ -586,8 +613,8 @@ public class PiPrefDiv4 implements ComparablePD {
         lastRadius = bestRadiiNP;
         lastRadiusWP = bestRadii;
 
-
-        System.out.println("Done");
+        if(!quiet)
+            System.out.println("Done");
 
         if(verbose)
         {
@@ -1166,6 +1193,7 @@ public class PiPrefDiv4 implements ComparablePD {
     {
         //Same procedure as the intensity weights except don't load all sources at once for memory concerns
         double [] tao = new double[dFile.length];
+        pvals = new double[dFile.length];
         for(int i = 0; i < dFile.length;i++)
         {
             float [][] temp = new float[1][(numGenes*(numGenes+1)/2)];
@@ -1174,12 +1202,65 @@ public class PiPrefDiv4 implements ComparablePD {
 
             getPhi(temp[0],subsamples.length);
             tao[i] = getTao(temp,sums)[0];
+            pvals[i] = getPValue(tao[i],temp,sums);
+
+
         }
         simTao = tao;
         double [] alpha = mgmPriors.getAlpha(tao);
+        adjustP = mgmPriors.adjustPValues(pvals);
         return mgmPriors.getWeights(alpha);
 
     }
+
+    /***
+     *
+     * @param tao The current tao value to query the distribution against
+     * @param temp The current prior information source's info
+     * @param sums The data-driven frequency estimates
+     * @return The p-value of this tao against a set of randomly shuffled temp's
+     */
+    private double getPValue(double tao, float [][] temp, int [] sums)
+    {
+        float [][] t2 = new float[1][temp[0].length];
+        for(int i = 0; i < temp[0].length;i++)
+            t2[0][i] = temp[0][i];
+        double [] hist = new double[numSamples];
+
+        for(int i = 0; i < numSamples;i++)
+        {
+            /***Shuffle values in the array***/
+           t2[0] = RandomizeArray(t2[0]);
+
+
+            /***Compute tao***/
+
+            hist[i] = getTao(t2,sums)[0];
+
+
+        }
+        Arrays.sort(hist);
+        int index =0;
+        while(index < hist.length && tao > hist[index])
+        {
+            index++;
+        }
+        return index/(double)numSamples;
+    }
+
+    public static float[] RandomizeArray(float[] array){
+        Random rgen = new Random();  // Random number generator
+
+        for (int i=0; i<array.length; i++) {
+            int randomPosition = rgen.nextInt(array.length);
+            float temp = array[i];
+            array[i] = array[randomPosition];
+            array[randomPosition] = temp;
+        }
+
+        return array;
+    }
+
 
     private double [] getIntensityWeights(int[]sums, String iFile)
     {
@@ -1217,7 +1298,6 @@ public class PiPrefDiv4 implements ComparablePD {
     }
 
 
-    //TODO if no intensity priors given by a source, then NA is reported, need to deal with this
     private double [] getTao(float[][]phi, int[]counts)
     {
         double [] tao = new double[phi.length];
@@ -1407,18 +1487,20 @@ public class PiPrefDiv4 implements ComparablePD {
             System.out.println("Computed counts for intensities and correlations: " + Arrays.toString(sums));
         }
 
-        System.out.print("Computing similarity weights...");
+        if(!quiet)
+            System.out.print("Computing similarity weights...");
         //Compute similarity weights for each prior knowledge source
         double [] simWeights = getSimilarityWeights(sums,dFile);
         lastSimilarityWeights = simWeights;
-        System.out.println("Done");
+        if(!quiet)
+            System.out.println("Done");
         if(verbose)
         {
             System.out.println("Similarity weights: " + Arrays.toString(simWeights));
         }
 
-
-        System.out.print("Computing scores for similarities...");
+        if(!quiet)
+            System.out.print("Computing scores for similarities...");
         //Load each prior knowledge source, weighted by reliability
         float [] meanDis = loadTheoryFiles(dFile,simWeights,numGenes);
 
@@ -1447,7 +1529,8 @@ public class PiPrefDiv4 implements ComparablePD {
             scoresSim = getScoresSeparate(sums, uPost, varPost);
             constrictCorrs = scoresSim;
         }
-        System.out.println("Done");
+        if(!quiet)
+            System.out.println("Done");
 
         return scoresSim;
     }

@@ -424,21 +424,7 @@ public class allPDTests {
                                 }
                                 if (x == 0) //Evaluate prior knowledge
                                 {
-                                    if(!simulateTogether)
-                                    {
-                                        File ri = new File("Reliabilities_I_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + j + ".txt");
-                                        double[] reliInt = new double[numPriors];
-                                        BufferedReader b2 = new BufferedReader(new FileReader(ri));
-                                        for (int i = 0; i < numPriors; i++) {
-                                            reliInt[i] = Double.parseDouble(b2.readLine());
-                                        }
-                                        b2.close();
-                                        double []weights = p.getLastIntensityWeights();
 
-                                        for (int i = 0; i < numPriors; i++) {
-                                            out.get(curr).println(j + "\t" + getAmountPrior(priorIntensity, i) / ((double) g.getNumNodes() - 1) + "\t" + (i < numReliable) + "\tT\t" + weights[i] + "\t" + reliInt[i]);
-                                        }
-                                    }
 
                                     /***LOAD RELIABILITY SCORES***/
                                     File rd = new File("Reliabilities_D_" + numGenes + "_" + minTargetParents + "_" + numPriors + "_" + numReliable + "_" + amountPrior + "_" + targetContinuous + "_" + numComponents + "_" + evenDistribution + "_" + amountRandom + "_" + noiseRandom + "_" + j + ".txt");
@@ -452,7 +438,7 @@ public class allPDTests {
                                         reliDis[i] = Double.parseDouble(b.readLine());
                                     }
                                     b.close();
-                                    double [] weights = p.getLastSimilarityWeights();
+                                    double [] weights = p.getLastWeights();
 
 
                                     /***PRINT RESULTS TO FILE***/
@@ -525,10 +511,10 @@ public class allPDTests {
                                     for (int i = 0; i < allTypes.length; i++) {
                                         System.out.print("Running " + allTypes[i] + " with priors");
 
-                                        DataSet summarized = RunPrefDiv.summarizeData(toRun, selected, lastCluster, allTypes[i]);
+                                        DataSet summarized = RunPrefDiv.summarizeData(toRun, selected, lastCluster, allTypes[i],"Target");
                                         DataSet causes = getCausalFeatures(summarized,"Target");
 
-                                        DataSet summarizedTest = RunPrefDiv.summarizeData(test, selected, lastCluster, allTypes[i]);
+                                        DataSet summarizedTest = RunPrefDiv.summarizeData(test, selected, lastCluster, allTypes[i],"Target");
                                         DataSet causesTest = subsetByCols(causes,summarizedTest);
                                         PrefDivComparator pdc = new PrefDivComparator(p,"Target",g,clusters);
 
@@ -544,10 +530,10 @@ public class allPDTests {
                                         System.out.println("Done");
 
                                         System.out.print("Running " + allTypes[i] + " for no Priors...");
-                                        summarized = RunPrefDiv.summarizeData(toRun, npGenes, npCluster, allTypes[i]);
+                                        summarized = RunPrefDiv.summarizeData(toRun, npGenes, npCluster, allTypes[i],"Target");
                                         causes = getCausalFeatures(summarized,"Target");
 
-                                        summarizedTest = RunPrefDiv.summarizeData(test, npGenes, npCluster, allTypes[i]);
+                                        summarizedTest = RunPrefDiv.summarizeData(test, npGenes, npCluster, allTypes[i],"Target");
                                         causesTest = subsetByCols(causes,summarizedTest);
 
                                         pdc = new PrefDivComparator(noPrior,"Target",g,clusters);
@@ -579,10 +565,10 @@ public class allPDTests {
                                         causalGenes.add(temp);
                                     }
 
-                                    DataSet train = RunPrefDiv.summarizeData(toRun, causalGenes, lastCluster, RunPrefDiv.ClusterType.NONE);
+                                    DataSet train = RunPrefDiv.summarizeData(toRun, causalGenes, lastCluster, RunPrefDiv.ClusterType.NONE,"Target");
                                     train = getCausalFeatures(train,"Target");
 
-                                    DataSet summarizedTest = RunPrefDiv.summarizeData(test, causalGenes, lastCluster, RunPrefDiv.ClusterType.NONE);
+                                    DataSet summarizedTest = RunPrefDiv.summarizeData(test, causalGenes, lastCluster, RunPrefDiv.ClusterType.NONE,"Target");
                                     DataSet causesTest = subsetByCols(train,summarizedTest);
 
                                     PiPrefDiv4 ignore = new PiPrefDiv4(d,"Target",10);
@@ -600,8 +586,8 @@ public class allPDTests {
 
                                     for (int i = 0; i < allTypes.length; i++) {
 
-                                        DataSet summarized = RunPrefDiv.summarizeData(toRun, selected, lastCluster, allTypes[i]);
-                                        DataSet summarizedTest = RunPrefDiv.summarizeData(test, selected, lastCluster, allTypes[i]);
+                                        DataSet summarized = RunPrefDiv.summarizeData(toRun, selected, lastCluster, allTypes[i],"Target");
+                                        DataSet summarizedTest = RunPrefDiv.summarizeData(test, selected, lastCluster, allTypes[i],"Target");
 
                                         PrefDivComparator pdc = new PrefDivComparator(p,"Target",g,clusters);
                                         try {
@@ -615,8 +601,8 @@ public class allPDTests {
 
                                         out.get(curr).print(predAccuracy + "\t");
 
-                                        summarized = RunPrefDiv.summarizeData(toRun, npGenes, npCluster, allTypes[i]);
-                                        summarizedTest = RunPrefDiv.summarizeData(test, npGenes, npCluster, allTypes[i]);
+                                        summarized = RunPrefDiv.summarizeData(toRun, npGenes, npCluster, allTypes[i],"Target");
+                                        summarizedTest = RunPrefDiv.summarizeData(test, npGenes, npCluster, allTypes[i],"Target");
 
                                         pdc = new PrefDivComparator(noPrior,"Target",g,clusters);
                                         try {

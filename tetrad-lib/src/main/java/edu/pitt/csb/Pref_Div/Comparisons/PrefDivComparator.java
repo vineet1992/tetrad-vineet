@@ -381,14 +381,14 @@ public class PrefDivComparator {
             if(selected==null || regressors.size()==0)
             {
                 for (int i = 0; i < train.getNumColumns(); i++) {
-                    if(train.getVariable(i).getName().equals("Target"))
+                    if(train.getVariable(i).getName().equals(target))
                         continue;
                     regressors.add(train.getVariable(i));
                 }
             }
 
             //Learn a regression model on the train features
-            RegressionResult res = rd.regress(train.getVariable("Target"),regressors);
+            RegressionResult res = rd.regress(train.getVariable(target),regressors);
             int [] cols = new int[regressors.size()];
 
             for(int i = 0; i < regressors.size();i++)
@@ -409,7 +409,7 @@ public class PrefDivComparator {
 
                 }
                 pred[i] = res.getPredictedValue(x);
-                actual[i] = test.getDouble(i,test.getColumn(test.getVariable("Target")));
+                actual[i] = test.getDouble(i,test.getColumn(test.getVariable(target)));
 
 
             }

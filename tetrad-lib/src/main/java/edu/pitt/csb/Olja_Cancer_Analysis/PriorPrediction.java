@@ -50,6 +50,8 @@ public class PriorPrediction {
         boolean steps = false;
         double g = 0.05;
 
+        boolean runPD = false;
+
         int index = 0;
         while(index < args.length) {
             if (args[index].equals("-ns")) {

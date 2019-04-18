@@ -390,26 +390,25 @@ public final class BoxDataSet implements DataSet, TetradSerializable {
         }
 
         variables.add(index, variable);
+        DataBox db = dataBox.copy();
         resize(dataBox.numRows(), variables.size());
 
-        Number[][] _data =
-                new Number[dataBox.numRows()][dataBox.numCols()];
-
-        for (int j = 0; j < dataBox.numCols() + 1; j++) {
+        for (int j = 0; j < dataBox.numCols(); j++) {
             if (j < index) {
                 for (int i = 0; i < dataBox.numRows(); i++) {
-                    _data[i][j] = dataBox.get(i, j);
+                    dataBox.set(i,j,db.get(i, j));
                 }
             } else if (j == index) {
                 for (int i = 0; i < dataBox.numRows(); i++) {
-                    _data[i][j] = null;
+                    dataBox.set(i,j, null);
                 }
             } else {
                 for (int i = 0; i < dataBox.numRows(); i++) {
-                    _data[i][j] = dataBox.get(i, j - 1);
+                    dataBox.set(i,j,db.get(i, j - 1));
                 }
             }
         }
+
     }
 
     /**
@@ -1295,7 +1294,7 @@ public final class BoxDataSet implements DataSet, TetradSerializable {
      * @param cols The number of columns in the redimensioned data.
      */
     private void resize(int rows, int cols) {
-        DataBox _data = dataBox.like();
+        DataBox _data = new DoubleDataBox(rows,cols);
 
         for (int i = 0; i < _data.numRows(); i++) {
             for (int j = 0; j < _data.numCols(); j++) {

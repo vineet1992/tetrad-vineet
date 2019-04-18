@@ -28,19 +28,19 @@ public class priorTest {
         boolean excludeUnreliable = false; //Should piMGM exclude priors below p-value threshold
         double reliabilityThreshold = 0.05; //piMGM will exclude priors with adjusted p-value < 0.05
         double amountPrior = .1;
-        boolean reliable = true; //Are all priors reliable?
-        boolean diffNumPrior = true; //Does each prior provide with the same number of edges?
-        boolean correctEdges = true; //Determines whether or not we will use correct edges only for unreliable priors as well or not
+        boolean reliable = false; //Are all priors reliable?
+        boolean diffNumPrior = false; //Does each prior provide with the same number of edges?
+        boolean correctEdges = false; //Determines whether or not we will use correct edges only for unreliable priors as well or not
         boolean pureRandom = false; //Only for different number of edges given by each prior, this sets the priors to be purely random with reliability computed after the fact
-        boolean onlyPrior = true;
-        int reliableExperts = 5; //How many priors are reliable?
+        boolean onlyPrior = false;
+        int reliableExperts = 1; //How many priors are reliable?
         int numExperts = 5;
-        int numLambdas = 40;
-        int numVariables = 20;
+        int numLambdas = 20;
+        int numVariables = 100;
         int numEdges = 75;
-        int sampleSize = 400;
+        int sampleSize = 100;
         int numSubsamples = 10;
-        int numRuns = 5;
+        int numRuns = 25;
         int index = 0;
         int numCategories = 4;
         double gamma = 0.05;
@@ -184,7 +184,7 @@ public class priorTest {
         PrintStream orc = new PrintStream(directory + "/oracle_" + amountPrior + "_" + numExperts + "_" + numVariables + "_" + sampleSize + "_" + numSubsamples + ".txt");
         PrintStream one = new PrintStream(directory + "/mgm_one_steps_" + amountPrior + "_" + numExperts + "_" + numVariables + "_" + sampleSize + "_" + numSubsamples + ".txt");
         PrintStream orcOne = new PrintStream(directory + "/oracle_one_" + amountPrior + "_" + numExperts + "_" + numVariables + "_" + sampleSize + "_" + numSubsamples + ".txt");*/
-    NormalDistribution n = new NormalDistribution(numVariables,numVariables/2);
+    NormalDistribution n = new NormalDistribution(numVariables*2,numVariables/2);
         PrintStream [] pri = new PrintStream [algs.length];
         for(int i = 0; i < algs.length;i++) {
             if(!reliable)
@@ -323,15 +323,29 @@ public class priorTest {
 
                     if(!foundData) {
                         int b = (int) Math.floor(10 * Math.sqrt(c.getDataSet(0).getNumRows()));
-                        if (b > c.getDataSet(0).getNumRows())
+                        if (b >= c.getDataSet(0).getNumRows())
                             b = c.getDataSet(0).getNumRows() / 2;
                        subsamples = StabilityUtils.subSampleNoReplacement(c.getDataSet(0).getNumRows(), b, numSubsamples);
 
                     }
                     STEPS s = new STEPS(c.getDataSet(0), initLambdas, gamma, subsamples);
+                    s.runFull();
                     Graph steps = null;
                     if(foundSteps)
-                        steps = s.runStepsPar();
+                    {
+                        double [][] stabs = s.runStepsArrayPar();
+                        for(int x = 0;x < stabs.length;x++)
+                        {
+                            for(int y = 0; y < stabs[x].length;y++)
+                            {
+                                System.out.print(stabs[x][y] + "\t");
+
+                            }
+                            System.out.println();
+                        }
+                        steps = s.lastGraph;
+
+                    }
                     if(foundIt) {
                         m = new mgmPriors(numSubsamples, initLambdas, c.getDataSet(0), priors, c.getTrueGraph(),false,subsamples);
                         m.setLog(true);

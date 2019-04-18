@@ -393,13 +393,17 @@ public class runPriors {
                     }
                 }
 
-                /***Are we too small in unique values for any column?***/
+                /***Are we too small in category appearances for any column?***/
                 for(Integer ii: cats.keySet())
                 {
                     if(cats.get(ii)<2) {
                         return i;
                     }
                 }
+
+                /***Must have at least 2 unique categories for each categorical variable***/
+                if(cats.keySet().size()<2)
+                    return i;
 
             }
         }
