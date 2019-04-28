@@ -3,6 +3,7 @@ package edu.pitt.csb.Olja_Cancer_Analysis;
 import cern.colt.matrix.impl.SparseDoubleMatrix2D;
 import edu.cmu.tetrad.data.ContinuousVariable;
 import edu.cmu.tetrad.data.DataSet;
+import edu.cmu.tetrad.data.DataUtils;
 import edu.cmu.tetrad.data.DiscreteVariable;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.GraphUtils;
@@ -13,6 +14,7 @@ import edu.cmu.tetrad.regression.RegressionDataset;
 import edu.cmu.tetrad.regression.RegressionResult;
 import edu.cmu.tetrad.search.CpcStable;
 import edu.cmu.tetrad.search.IndependenceTest;
+import edu.pitt.csb.Pref_Div.RunPrefDiv;
 import edu.pitt.csb.Priors.PriorUtils;
 import edu.pitt.csb.Priors.mgmPriors;
 import edu.pitt.csb.Priors.realDataPriorTest;
@@ -21,10 +23,7 @@ import edu.pitt.csb.mgm.IndTestMultinomialAJ;
 import edu.pitt.csb.mgm.MixedUtils;
 import edu.pitt.csb.mgm.STEPS;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.PrintStream;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -41,6 +40,10 @@ public class PriorPrediction {
         String priorDir = "Priors_All";
         String dataFile = "Highest_Variance_Prediction_Log.txt";
         int numLambdas = 10;
+        boolean prefDiv = false;
+        int numSelect = 5;
+        RunPrefDiv.ClusterType ctype = RunPrefDiv.ClusterType.NONE;
+        boolean noGraph = false;
         boolean loocv = true;
         int ns = 5;
         double lamLow = 0.1;
@@ -49,8 +52,11 @@ public class PriorPrediction {
         int end = 5;
         boolean steps = false;
         double g = 0.05;
+        List<String> toRemove = new ArrayList<String>();
 
         boolean runPD = false;
+        boolean noPrior = false;
+
 
         int index = 0;
         while(index < args.length) {
@@ -94,6 +100,45 @@ public class PriorPrediction {
                 g = Double.parseDouble(args[index+1]);
                 index+=2;
             }
+            else if(args[index].equals("-pd"))
+            {
+                prefDiv = true;
+                numSelect = Integer.parseInt(args[index+1]);
+                index+=2;
+            }
+            else if(args[index].equals("-noGraph"))
+            {
+                noGraph = true; index++;
+            }
+            else if(args[index].equals("-noPrior"))
+            {
+                noPrior = true;index++;
+            }
+            else if(args[index].equals("-ctype"))
+            {
+                if(args[index+1].toLowerCase().equals("pca"))
+                {
+                    ctype = RunPrefDiv.ClusterType.PCA;
+                }
+                else if(args[index+1].toLowerCase().equals("median"))
+                {
+                    ctype = RunPrefDiv.ClusterType.MEDIAN;
+                }
+                else if(args[index+1].toLowerCase().equals("mean"))
+                {
+                    ctype = RunPrefDiv.ClusterType.MEAN;
+                }
+                index+=2;
+            }
+            else if(args[index].equals("-rv"))
+            {
+                while(index < args.length-1 && !args[index+1].startsWith("-"))
+                {
+                    index = index + 1;
+                    toRemove.add(args[index]);
+                }
+                index++;
+            }
             else
             {
                 System.err.println("Unrecognized Command Line Option: " + args[index]);
@@ -131,7 +176,7 @@ public class PriorPrediction {
         SparseDoubleMatrix2D[] priors = new SparseDoubleMatrix2D[1];
         String[] priorNames = new String[1];
 
-        if(!steps) {
+        if(!steps && !prefDiv) {
             if (!pd.isDirectory()) {
                 System.out.println("Prior Directory doesn't exist...exiting");
                 System.exit(-1);
@@ -181,6 +226,8 @@ public class PriorPrediction {
             Graph out;
             mgmPriors p;
 
+            DataSet predictionData = data;
+
             if(steps)
             {
                 System.out.print("Running STEPS...");
@@ -188,6 +235,82 @@ public class PriorPrediction {
                 s.runStepsArrayPar();
                 out = s.lastGraph;
                 System.out.println("Done");
+            }
+            else if(prefDiv)
+            {
+                PrintStream printer = new PrintStream("temp_train.txt");
+                printer.println(temp);
+                printer.flush();
+                printer.close();
+
+                DataSet test = data.copy();
+                test = test.subsetRows(new int[]{i});
+                printer = new PrintStream("temp_test.txt");
+                printer.println(test);
+                printer.flush();
+                printer.close();
+                String cmd = "java -jar PrefDiv.jar -data temp_train.txt -dataTest temp_test.txt -loocv " + " -t " + target + " -name temp -numSelect " + numSelect + " -keep ";
+
+                for(String s:toRemove)
+                {
+                    cmd= cmd + (s + " ");
+                }
+                if(!noPrior)
+                {
+                    cmd += "-priors " + priorDir + " ";
+                }
+
+                cmd = cmd + "-ctype ";
+                if(ctype== RunPrefDiv.ClusterType.PCA)
+                    cmd += "pca ";
+                else if(ctype== RunPrefDiv.ClusterType.MEAN)
+                    cmd += "mean ";
+                else if(ctype== RunPrefDiv.ClusterType.MEDIAN)
+                    cmd += "median ";
+                else
+                    cmd += "none ";
+                if(!noGraph)
+                {
+                    if(steps)
+                    {
+                        cmd += "-useCausalGraph";
+                    }
+                    else
+                    {
+                        cmd += "-useCausalGraph piMGM";
+                    }
+                }
+                Runtime rt = Runtime.getRuntime();
+
+                Process proc = rt.exec(cmd);
+                BufferedReader stdInput = new BufferedReader(new
+                        InputStreamReader(proc.getInputStream()));
+                BufferedReader stdError = new BufferedReader(new
+                        InputStreamReader(proc.getErrorStream()));
+
+                // read the output from the command
+                String s = null;
+                while ((s = stdInput.readLine()) != null) {
+                    System.out.println(s);
+                }
+
+                // read any errors from the attempted command
+                while ((s = stdError.readLine()) != null) {
+                    System.err.println(s);
+                }
+
+                out = GraphUtils.loadGraphTxt(new File("temp/graph.txt"));
+                /***Construct training and testing set by getting list of genes and clusters from files***/
+
+                DataSet train = MixedUtils.loadDataSet2("temp/summarized.txt");
+                test = MixedUtils.loadDataSet2("temp/summarized_test.txt");
+                DataSet full = DataUtils.concatenate(train,test);
+
+                predictionData = full;
+                temp = train;
+
+
+
             }
             else
             {
@@ -198,50 +321,90 @@ public class PriorPrediction {
                 System.out.println("Weights: " + Arrays.toString(p.normalizedExpertWeights));
                 System.out.println("P-Values; " + Arrays.toString(p.uncorrectedPValues));
             }
+
+            /***Running CPC-Stable***/
             IndependenceTest ind = new IndTestMultinomialAJ(temp,0.05);
             System.out.println("Running CPC Stable");
             CpcStable cpc = new CpcStable(ind);
             cpc.setInitialGraph(out);
             Graph cpcOut = cpc.search();
 
+
+
+            /***piMGM Predictions***/
+
             List<Node> neighbors = out.getAdjacentNodes(out.getNode(target));
             System.out.println("Adjacent To Target: " + neighbors);
-            double pred = getRegressionResult(neighbors,temp,data,i,target);
+            double pred = getRegressionResult(neighbors,temp,predictionData,i,target);
             double real = -1;
-            if(data.getVariable(target)instanceof DiscreteVariable)
+
+
+
+            if(predictionData.getVariable(target)instanceof DiscreteVariable)
             {
-                real = data.getInt(i,data.getColumn(data.getVariable(target)));
+                real = predictionData.getInt(i,predictionData.getColumn(predictionData.getVariable(target)));
             }else
             {
-                real = data.getDouble(i,data.getColumn(data.getVariable(target)));
+                real = predictionData.getDouble(i,predictionData.getColumn(predictionData.getVariable(target)));
             }
             System.out.println("piMGM Prediction: " + pred);
             pi1.print(i + "\t" + pred +"\t");
             pi2.print(i + "\t" + neighbors + "\t");
 
+            /***CPC-MarkovBlanket***/
             neighbors = markovBlanket(cpcOut,target);
             if(neighbors.size()==0) {
                 neighbors = out.getAdjacentNodes(out.getNode(target));
             }
-            pred = getRegressionResult(neighbors,temp,data,i,target);
+            pred = getRegressionResult(neighbors,temp,predictionData,i,target);
             System.out.println("CPC-MB Neighbors: " + neighbors);
             System.out.println("CPC-MB Prediction: " + pred);
+
+
+            /***CPC-Neighbors***/
+
             pi1.print(pred + "\t");
             pi2.print(neighbors + "\t");
             System.out.println("Actual value: " + real);
 
+
             neighbors = cpcOut.getAdjacentNodes(cpcOut.getNode(target));
             if(neighbors.size()==0)
                 neighbors = out.getAdjacentNodes(out.getNode(target));
-            pred = getRegressionResult(neighbors,temp,data,i,target);
+            pred = getRegressionResult(neighbors,temp,predictionData,i,target);
             System.out.println("CPC Neighbors: " + neighbors);
             System.out.println("CPC Prediction: " + pred);
+
+
+
             pi1.println(pred + "\t" + real);
-            pi2.println(neighbors);
+            pi2.print(neighbors);
 
             pi1.flush();
             pi2.flush();
 
+            /***Printing out pref-div selected features**/
+            if(prefDiv)
+            {
+                List<Node> vars = predictionData.getVariables();
+                pi2.print("\t[");
+                for(int x = 0; x < vars.size();x++)
+                {
+                    boolean found = false;
+                    for(String s:toRemove)
+                    {
+                        if(vars.get(x).getName().equals(s))
+                            found = true;
+
+                    }
+                    if(!found)
+                        pi2.print(vars.get(x)+ ",");
+
+                }
+                pi2.println("]");
+            }
+            else
+                pi2.println();
 
 
         }

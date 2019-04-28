@@ -35,6 +35,8 @@ public class justSimulatePrefDiv {
     /***For when random priors are used***/
     private static double alphaMean = 10;
     private static double betaMean = 2;
+    private static double unreliAlphaMean = 4;
+    private static double unreliBetaMean = 4;
 
 
 
@@ -48,17 +50,20 @@ public class justSimulatePrefDiv {
     public static boolean latentControl = true; //Includes a master regulator for each cluster
 
 
-    public static boolean realPathways = true; //Pathways are more realistic (not tightly clustered, distinct groups)
+    public static boolean realPathways = false; //Pathways are more realistic (not tightly clustered, distinct groups)
     public static boolean priorsToClusters = true; //Only important if real pathway simulation -> Is "true" info cluster membership? Or is it edge existence?
+
+    private static boolean unreliableRandom = true; //FOR PRIOR KNOLWEDGE EVALUATION ONLY
+
 
     public static Random rand = new Random();
 
-    public static int numGenes = 3000;
+    public static int numGenes = 500;
 
     public static void main(String[] args) {
-        double[] ap = new double[]{0.25,0.5,0.75};
+        double[] ap = new double[]{0.5};
         int[] nr = new int[]{1,3,5};
-        int[] ss = new int[]{100,200};
+        int[] ss = new int[]{50,200};
 
         for (int xx = 0; xx < ap.length; xx++) {
             for (int y = 0; y < nr.length; y++) {
@@ -66,7 +71,7 @@ public class justSimulatePrefDiv {
                 for (int z = 0; z < ss.length; z++) {
 
 
-                    int numRuns = 10;
+                    int numRuns = 15;
                     int sampleSize = ss[z];
                     double amountPrior = ap[xx];//percentage of edges to have prior knowledge for
                     boolean boot = false; //Should we use bootstrap samples for PiPrefDiv
@@ -81,12 +86,12 @@ public class justSimulatePrefDiv {
 
                     int numPriors = 5; //Number of prior knowledge sources
                     int numReliable = nr[y]; //Number of reliable sources
-                    int numComponents = 300; //How many components do we have for cluster simulation?
-                    int minTargetParents = 75; //How many true parents of the target are there?
+                    int numComponents = 50; //How many components do we have for cluster simulation?
+                    int minTargetParents = 25; //How many true parents of the target are there?
                     boolean noiseRandom = true; //Should the priors have random amounts of reliability?
 
 
-                    boolean amountRandom = false; //Should the priors have a random amount of prior knowledge?
+                    boolean amountRandom = true; //Should the priors have a random amount of prior knowledge?
                     boolean targetContinuous = true; //Is the target variable continuous?
                     boolean evenDistribution = true; //Is the distribution of nodes in each cluster even?
                     int numCategories = 4; //number of categories for discrete variables
@@ -798,6 +803,16 @@ public class justSimulatePrefDiv {
             while(x <=0)
                 x= nd.sample();
             reliableParams[2] = x;
+        }
+
+        if(unreliableRandom)
+        {
+            NormalDistribution nd = new NormalDistribution (unreliAlphaMean,1);
+            unreliableParams[0] = nd.sample();
+            unreliableParams[3] = nd.sample();
+            nd = new NormalDistribution(unreliBetaMean,1);
+            unreliableParams[1] = nd.sample();
+            unreliableParams[2] = nd.sample();
         }
 
 

@@ -29,7 +29,7 @@ public class parallelTest {
         int numReliable = 3;
         double amountPrior = 0.5;
 
-        for(int i = 0; i < numVariables.length;i++)
+        for(int i =0 ; i < numVariables.length;i++)
         {
             for(int j = 0; j < numRuns;j++)
             {
@@ -49,6 +49,7 @@ public class parallelTest {
                 noPrior.setParallel(false);
                 noPrior.setPartialCorrs(false);
                 noPrior.setSubsamples(samps);
+                noPrior.computePValue(true);
                 long time = System.nanoTime();
                 ArrayList<Gene> genes = noPrior.selectGenes(false,20,dFile);
                 time = System.nanoTime()-time;
@@ -60,6 +61,7 @@ public class parallelTest {
                 noPrior2.setParallel(true);
                 noPrior2.setPartialCorrs(false);
                 noPrior2.setSubsamples(samps);
+                noPrior2.computePValue(true);
                 time = System.nanoTime();
                 ArrayList<Gene> genes2 = noPrior2.selectGenes(false,20,dFile);
                 time = System.nanoTime()-time;

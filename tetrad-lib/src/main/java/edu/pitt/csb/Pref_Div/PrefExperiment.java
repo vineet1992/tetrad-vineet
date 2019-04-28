@@ -54,6 +54,8 @@ public class PrefExperiment
 
 	static String target = ""; //Target variable name
 
+	static String testPath = ""; //Path To Testing Set File
+
 	static String outputDataset = ""; //Should we output the summarized dataset?
 	static String outputClusters = ""; //Should we output clusters?
 	static String outputGraph = ""; //Should we output the causal graph?
@@ -65,6 +67,7 @@ public class PrefExperiment
 	static int numCVFolds = 3; //Number of internal cross-validation folds to tune hyperparameters
 	static int [] topKs  = new int[]{5,10,25,50}; //Range of top K values to test
 	static RunPrefDiv.ClusterType ctype = RunPrefDiv.ClusterType.NONE; //Aggregation type used
+	static boolean computeP = false;
 
 	static String runName = "Pref_Div";
 
@@ -120,8 +123,16 @@ public class PrefExperiment
 					runName = args[index+1];
 					index+=2;
 				}
+				else if(args[index].equals("-pval"))
+				{
+					computeP = true;
+					index++;
+				}
 				else if (args[index].equals("-data")) {
 					dataFile = args[index + 1];
+					index += 2;
+				} else if (args[index].equals("-dataTest")) {
+					testPath = args[index + 1];
 					index += 2;
 				} else if (args[index].equals("-outData")) {
 					outputDataset = args[index + 1];
@@ -291,6 +302,11 @@ public class PrefExperiment
 		{
 			System.out.println("No prior knowledge directory specified, running PiPrefDiv no Prior version");
 		}
+		if(target.equals(""))
+		{
+			System.err.println("Currently cannot handle no target variable..");
+			System.exit(-1);
+		}
 
 		if(outputDataset.equals(""))
 		{
@@ -322,11 +338,25 @@ public class PrefExperiment
 			System.exit(-1);
 		}
 
+		DataSet testData = null;
+		if(!testPath.equals(""))
+		{
+			try{
+				testData = MixedUtils.loadDataSet2(testPath,maxCat);
+			}catch(Exception e)
+			{
+				System.err.println("Couldn't load testing data from: " + testPath + " ... ignoring");
+				e.printStackTrace();
+			}
+		}
+
 
 		/**Remove specified variables***/
 		for(String s: varsToRemove)
 		{
 			data.removeColumn(data.getVariable(s));
+			if(testData!=null)
+				testData.removeColumn(testData.getVariable(s));
 		}
 
 
@@ -368,6 +398,16 @@ public class PrefExperiment
 		/***Get these variables into its own dataset and remove them from the PD dataset***/
 		ensured = data.subsetColumns(varsToKeep);
 		data.removeCols(indices);
+
+		/****Assumes that the testing data is in the same order as the training data, (it should be)***/
+		DataSet testEnsured = null;
+		if(testData!=null)
+		{
+			List<Node> testKeep = testData.subsetColumns(indices).getVariables();
+			testEnsured = testData.subsetColumns(testKeep);
+			testData.removeCols(indices);
+		}
+
 		System.out.print("Done");
 
 
@@ -411,6 +451,7 @@ public class PrefExperiment
 		ppd.setVerbose();
 		ppd.setClusterType(ctype);
 		ppd.setParallel(true);
+		ppd.computePValue(computeP);
 
 
 		if(noPrior)
@@ -421,6 +462,47 @@ public class PrefExperiment
 		ArrayList<Gene> output = runPrefDiv(ppd,workingDir);
 		Map<Gene,List<Gene>> map = ppd.getLastCluster();
 		DataSet summarized = ppd.getSummarizedData();
+
+		if(testData!=null)
+		{
+			DataSet testSummarized = RunPrefDiv.summarizeData(testEnsured,output,map,ctype,target);
+			/***Add back the saved variables***/
+			if(varsToInclude.size()>0) {
+
+
+				for(int i = 0; i < testEnsured.getNumColumns();i++)
+				{
+					boolean cont = true;
+					if(testEnsured.getVariable(i) instanceof ContinuousVariable)
+					{
+						testSummarized.addVariable(0,new ContinuousVariable(testEnsured.getVariable(i).getName()));
+					}
+					else
+					{
+						cont = false;
+						DiscreteVariable temp = (DiscreteVariable)testEnsured.getVariable(i);
+						testSummarized.addVariable(0,new DiscreteVariable(temp.getName(),temp.getCategories()));
+					}
+
+					for(int j = 0; j < testEnsured.getNumRows();j++)
+					{
+						if(cont)
+						{
+							testSummarized.setDouble(j,0,testEnsured.getDouble(j,i));
+						}else
+						{
+							testSummarized.setInt(j,0,testEnsured.getInt(j,i));
+						}
+					}
+				}
+			}
+
+			PrintStream out = new PrintStream(workingDir + "/summarized_test.txt");
+			out.println(summarized);
+			out.flush();
+			out.close();
+
+		}
 
 		/***Don't use continuous target variable for summarized dataset***/
 		if(!targetContinuous)
@@ -443,7 +525,6 @@ public class PrefExperiment
 				if(ensured.getVariable(i) instanceof ContinuousVariable)
 				{
 					summarized.addVariable(0,new ContinuousVariable(ensured.getVariable(i).getName()));
-
 				}
 				else
 				{
@@ -500,6 +581,7 @@ public class PrefExperiment
 				if(!npDir.isDirectory())
 					npDir.mkdir();
 
+				/**Old prior directory, new prior directory, summarized dataset, and column names from the original?***/
 				convertPriorsToSif(priorDir,newPriorDir,summarized,colnames);
 
 				String runDirectory = workingDir + "/piMGM";
@@ -550,14 +632,14 @@ public class PrefExperiment
 
 
 
-	public static void outputPriorWeights(String wd, String [] files, double [] weights, double [] tao,double[]p, double[]adjP)
+	public static void outputPriorWeights(String wd, String [] files, double [] weights, double [] tao, double [] normTao,double[]p, double[]adjP)
 	{
 		try{
 			PrintStream out = new PrintStream(wd + "/Prior_Weights.txt");
-			out.println("Source\tNormalized_Weight\tTao\tP-Value\tAdjusted p-Value");
+			out.println("Source\tNormalized_Weight\tTao\tNormalized_Tao\tP-Value\tAdjusted p-Value");
 			for(int i = 0; i < files.length;i++)
 			{
-				out.println(files[i] + "\t" + weights[i] + "\t" + tao[i] + "\t" + p[i] + "\t" + adjP[i]);
+				out.println(files[i] + "\t" + weights[i] + "\t" + tao[i] + "\t" + normTao[i] + "\t" + p[i] + "\t" + adjP[i]);
 			}
 			out.flush();
 			out.close();
@@ -593,7 +675,8 @@ public class PrefExperiment
 			double [] tao = ppd.getLastTao();
 			double [] pVals = ppd.getPValues();
 			double [] apVals = ppd.getAdjustP();
-			outputPriorWeights(workingDir,diss,weights,tao,pVals,apVals);
+			double [] normTao = ppd.getNormTao();
+			outputPriorWeights(workingDir,diss,weights,tao,normTao,pVals,apVals);
 		}
 		return output;
 
@@ -634,6 +717,7 @@ public class PrefExperiment
 				ppd.setClusterType(ctype);
 				ppd.setParallel(true);
 				ppd.setQuiet();
+				ppd.computePValue(false);
 
 				ArrayList<Gene> selected = runPrefDiv(ppd,workingDir);
 

@@ -28,8 +28,8 @@ import java.util.concurrent.RecursiveAction;
 public class allPDTests {
 
 
-    static int numRuns = 10;
-    static int numGenes = 3000;
+    static int numRuns = 15;
+    static int numGenes = 500;
 
     static boolean boot = false; //Should we use bootstrap samples for PiPrefDiv
     static boolean loocv = false; //Should we use leave-one-out CV for PiPrefDiv
@@ -42,9 +42,9 @@ public class allPDTests {
 
     static int numPriors = 5; //Number of prior knowledge sources
     static int numReliable = 5; //Number of reliable sources
-    static int numComponents = 300; //How many components do we have for cluster simulation?
-    static int minTargetParents = 75; //How many true parents of the target are there?
-    static boolean amountRandom = false; //Should the priors have a random amount of prior knowledge?
+    static int numComponents = 50; //How many components do we have for cluster simulation?
+    static int minTargetParents = 25; //How many true parents of the target are there?
+    static boolean amountRandom = true; //Should the priors have a random amount of prior knowledge?
     static boolean targetContinuous = true; //Is the target variable continuous?
     static boolean evenDistribution = true; //Is the distribution of nodes in each cluster even?
     static int numCategories = 4; //number of categories for discrete variables
@@ -52,14 +52,14 @@ public class allPDTests {
     static int sampleSize = 200;
     static double amountPrior = 0.3;
     static int[][] subs;
-    static boolean parallel = false; //Should we run the experiment with parallel processing?
+    static boolean parallel = true; //Should we run the experiment with parallel processing?
     static boolean partialCorr = false;
     static boolean pdStability = false;
     static boolean simulateTogether = true; //Is all prior knowledge contained in a single file?
 
     /***For experiment 7 only***/
     static double wpHigh = 0.95;
-    static double wpLow = 0.5;
+    static double wpLow = 0.25;
     static int numWp = 15;
 
     /***For experiment 6 only***/
@@ -70,11 +70,11 @@ public class allPDTests {
     public static void main(String [] args) {
 
 
-        double [] ap = new double[]{0.25,0.5,0.75};
+        double [] ap = new double[]{0.5};
         //double [] ap = new double[]{1.0,0.5};
         int [] nr = new int[]{1,3,5};
         //int [] nr = new int[]{5};
-        int [] ss = new int[]{100,200};
+        int [] ss = new int[]{50,200};
 
         double [] wpCutoff = new double[numWp];
         int [] numFeats = new int[numFeatsTotal];
@@ -100,10 +100,10 @@ public class allPDTests {
                     ArrayList<Integer> experiment = new ArrayList<Integer>();
                     experiment.add(0);
                     //experiment.add(1);
-                    experiment.add(2);
+                    //experiment.add(2);
                     //experiment.add(3);
                     //experiment.add(4);
-                    experiment.add(5);
+                    //experiment.add(5);
                     //experiment.add(6);
                     //experiment.add(7);
                     //0 ->prior evaluation, 1 -> Accuracy of chosen parameters vs Optimal
@@ -157,7 +157,7 @@ public class allPDTests {
 
 
                             if (x == 0) {
-                                out.get(curr).println("Run\tAmount_Prior\tReliable?\tIntensity?\tPredicted_Weight\tActual_Reliability");
+                                out.get(curr).println("Run\tAmount_Prior\tReliable?\tIntensity?\tPredicted_Weight\tActual_Reliability\tP_Value\tAdjusted_P\tNormalized_Tao");
                             } else if (x == 1) {
                                 out.get(curr).println("Run\tPredicted_Radius_NP\tPredicted_Radius_WP\tPredicted_Radius\tBest_Radius_NP\tBest_Radius_WP\tBest_Radius\tPredicted_Accuracy_WP\tPredicted_Accuracy_NP\tBest_Accuracy_WP\tBest_Accuracy_NP");
                             } else if(x==4)  {
@@ -346,13 +346,17 @@ public class allPDTests {
                             p.setSubsamples(subs);
                             p.setParallel(true);
                             p.setPartialCorrs(partialCorr);
+                            p.setQuiet();
+                            if(experiment.contains(0))
+                                p.computePValue(true);
                             //p.setVerbose();
 
                             PiPrefDiv4 noPrior = new PiPrefDiv4(toRun,"Target",minTargetParents,numParams);
                             noPrior.setSubsamples(subs);
                             noPrior.setParallel(true);
                             noPrior.setPartialCorrs(partialCorr);
-                           // noPrior.setVerbose();
+                            noPrior.setQuiet();
+
 
                             ArrayList<Gene> selected = p.selectGenes(boot, numSamples, dFile);
 
@@ -365,15 +369,25 @@ public class allPDTests {
                             double npClustAccuracy = npCompare.getClusterAccuracy(numComponents);
                             double featAccuracy = -1;
                             double npFeatAccuracy = -1;
+                            double predAccuracy = -1;
+                            double npPredAccuracy = -1;
 
 
                             /***Are all the correct clusters represented in the selected features***/
                             double repAccuracy = compare.getRepresentAccuracy();
                             double npRepAccuracy = npCompare.getRepresentAccuracy();
 
+
+
                             /**** Can we accurately predict the target variable on the test set***/
-                            double predAccuracy = compare.getPredictionAccuracy(toRun, test);
-                            double npPredAccuracy = npCompare.getPredictionAccuracy(toRun,test);
+                            try{
+                                predAccuracy = compare.getPredictionAccuracy(toRun, test);
+                                npPredAccuracy = npCompare.getPredictionAccuracy(toRun,test);
+                            }
+                            catch(Exception e)
+                            {
+
+                            }
 
 
                             /***Do we pick the correct causes of the target variable***/
@@ -439,12 +453,15 @@ public class allPDTests {
                                     }
                                     b.close();
                                     double [] weights = p.getLastWeights();
+                                    double [] pvals = p.getPValues();
+                                    double [] adjP = p.getAdjustP();
+                                    double [] normTao = p.getNormTao();
 
 
                                     /***PRINT RESULTS TO FILE***/
 
                                     for (int i = 0; i < numPriors; i++) {
-                                        out.get(curr).println(j + "\t" + (double) (getAmountPrior(dFile[i])) / (g.getNumNodes() * (g.getNumNodes() - 1) / 2) + "\t" + (i < numReliable) + "\tF\t" + weights[i] + "\t" + reliDis[i]);
+                                        out.get(curr).println(j + "\t" + (double) (getAmountPrior(dFile[i])) / (g.getNumNodes() * (g.getNumNodes() - 1) / 2) + "\t" + (i < numReliable) + "\tF\t" + weights[i] + "\t" + reliDis[i] + "\t" + pvals[i] + "\t" + adjP[i] + "\t" + normTao[i]);
                                     }
                                 }
                                 /***Evaluate Parameter Accuracy, by sweeping over potential parameter choices***/

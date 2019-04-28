@@ -393,7 +393,7 @@ public class Functions
             }
         }
 
-        final int chunk = 1;
+        final int chunk = d.getNumColumns()/Runtime.getRuntime().availableProcessors();
         StabilityAction sa = new StabilityAction(chunk,0, d.getNumColumns());
         pool.invoke(sa);
 

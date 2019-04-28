@@ -404,11 +404,7 @@ public final class GraphUtils {
         {
             Node two = fullGraph.getNode("Target");
             List<Node> currNodes = nodesInPaths.get(i);
-            int numParents = (int)ed.sample();
-            if(numParents==0)
-                numParents = 1;
-            if(numParents>currNodes.size())
-                numParents = currNodes.size();
+            int numParents = 1;
             for(int j =0 ;j < numParents;j++)
             {
                 Node one = currNodes.get(rand.nextInt(currNodes.size()));
