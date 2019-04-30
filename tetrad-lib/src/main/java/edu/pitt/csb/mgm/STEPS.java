@@ -45,6 +45,7 @@ public class STEPS {
     private int [][] subs;
     private boolean computeStabs;
     private boolean runFull = false; //Don't monotonize instability and kill method as soon as stability threshold is met
+    private boolean verbose = false;
 
     public STEPS(DataSet dat,double [] lam,double g,int numSub)
     {
@@ -95,6 +96,7 @@ public class STEPS {
         this.iterLimit = iterLimit;
     }
     public void setComputeStabs(boolean stabs){computeStabs = stabs;}
+    public void setVerbose(){verbose = true;}
     public double [][] runStepsArrayPar()
     {
         double [][] result = new double[lambda.length][4];
@@ -952,7 +954,13 @@ System.out.println("Lambdas: " + Arrays.toString(lambda));
         //  System.out.println("b:" + b);
         A:while(true) //go until we break by having instability better than threshold
         {
+
                 double [] lambdaCurr = {lambda[currIndex],lambda[currIndex],lambda[currIndex]};
+
+            if(verbose)
+            {
+                System.out.println("Running Lambda values " + Arrays.toString(lambdaCurr) );
+            }
                 DoubleMatrix2D adjMat;
                 if(subs!=null)
                     adjMat = StabilityUtils.StabilitySearchPar(d,new SearchWrappers.MGMWrapper(lambdaCurr),subs);
