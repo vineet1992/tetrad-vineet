@@ -87,6 +87,7 @@ public class runAlgorithms {
     private static double paramLowStars = -1;//Lov value of parameter range to test for StARS
     private static double paramHighStars = -1;//High value of parameter range to test for StARS
     private static Graph initGraph; //Initial Undirected Skeleton to use before running causal discovery
+    private static boolean verbose = false; //TODO Include more places where verbose output is given
     private static ArrayList<String> toRemove = new ArrayList<String>();
     public static void main(String[] args) throws Exception{
         try {
@@ -303,6 +304,11 @@ public class runAlgorithms {
                     runMGM = true;
                     count++;
                 }
+                else if(args[count].equals("-v"))
+                {
+                    verbose = true;
+                    count++;
+                }
                 else
                 {
                     throw new Exception("Unsupported Command Line Switch: " + args[count]);
@@ -373,6 +379,9 @@ public class runAlgorithms {
                      s = new STEPS(d,initLambdas,threshold,ns);
                 else
                     s = new STEPS(d,initLambdas,threshold,ns,b);
+
+                if(verbose)
+                    s.setVerbose();
                 s.setComputeStabs(outputStabs);
 
 
