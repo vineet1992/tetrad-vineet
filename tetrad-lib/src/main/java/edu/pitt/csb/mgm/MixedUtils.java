@@ -34,9 +34,7 @@ import edu.cmu.tetrad.util.RandomUtil;
 import edu.cmu.tetrad.util.StatUtils;
 
 
-import java.io.File;
-import java.io.IOException;
-import java.io.PrintStream;
+import java.io.*;
 import java.lang.reflect.Constructor;
 import java.text.ParseException;
 import java.util.*;
@@ -67,6 +65,47 @@ public class MixedUtils {
         reader.setVariablesSupplied(true);
         reader.setMaxIntegralDiscrete(maxDiscrete);
         return reader.parseTabular(file);
+    }
+
+    public static DataSet loadTestData(String filename, int maxDiscrete, DataSet trainData) throws Exception
+    {
+        DataSet testData = loadDataSet2(filename,maxDiscrete);
+
+        BufferedReader b = new BufferedReader(new FileReader(filename));
+
+        int count = 0;
+        while(b.ready())
+        {
+            String [] line = b.readLine().split("\t");
+            if(line.length >= trainData.getNumColumns())
+                count++;
+        }
+        if(count>2)
+        {
+            return testData;
+        }
+        b = new BufferedReader(new FileReader(filename));
+        testData = testData.subsetRows(new int[]{0});
+        boolean found = false;
+        while (b.ready()) {
+            String[] line = b.readLine().split("\t");
+            if (line.length >= trainData.getNumColumns() && found) {
+                for (int i = 0; i < line.length; i++) {
+                    if (trainData.getVariable(i) instanceof ContinuousVariable)
+                        testData.setDouble(0, i, Double.parseDouble(line[i]));
+                    else {
+                        DiscreteVariable v = (DiscreteVariable) trainData.getVariable(i);
+                        testData.removeColumn(testData.getVariable(i));
+                        testData.addVariable(i,v);
+                        testData.setInt(0, i, v.getIndex(line[i]));
+
+                    }
+                 }
+            } else if (line.length >= trainData.getNumColumns()) {
+                found = true;
+            }
+        }
+            return testData;
     }
 
     public static DataSet loadDataSet2(String filename) throws IOException {
@@ -501,6 +540,29 @@ public class MixedUtils {
 
     public static void concatenateTo(DataSet d1, DataSet d2)
     {
+        Map<Integer,Integer> mapping = new HashMap<Integer,Integer>();
+
+        for(int i = 0; i < d2.getNumColumns();i++)
+        {
+            mapping.put(i,d1.getColumn(d1.getVariable(d2.getVariable(i).getName())));
+        }
+
+        int row = d2.getNumRows();
+        for(int i = 0; i < d1.getNumRows();i++)
+        {
+            for(int j = 0; j < d2.getNumColumns();j++)
+            {
+                if(d2.getVariable(j)instanceof ContinuousVariable)
+                {
+                    d2.setDouble(row,j,d1.getDouble(i,j));
+                }
+                else
+                {
+                    d2.setInt(row,j,d1.getInt(i,j));
+                }
+            }
+            row++;
+        }
 
     }
     /**

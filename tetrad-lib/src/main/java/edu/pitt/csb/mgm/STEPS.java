@@ -959,7 +959,7 @@ System.out.println("Lambdas: " + Arrays.toString(lambda));
 
             if(verbose)
             {
-                System.out.println("Running Lambda values " + Arrays.toString(lambdaCurr) );
+                System.out.println("Running Lambda value: " + lambda[currIndex]);
             }
                 DoubleMatrix2D adjMat;
                 if(subs!=null)

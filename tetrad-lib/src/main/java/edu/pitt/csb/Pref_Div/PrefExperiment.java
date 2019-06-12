@@ -342,7 +342,11 @@ public class PrefExperiment
 		if(!testPath.equals(""))
 		{
 			try{
-				testData = MixedUtils.loadDataSet2(testPath,maxCat);
+				testData = MixedUtils.loadTestData(testPath,maxCat,data);
+
+				/***if dataset is less than two lines it needs to be loaded manually***/
+
+
 			}catch(Exception e)
 			{
 				System.err.println("Couldn't load testing data from: " + testPath + " ... ignoring");
@@ -415,12 +419,20 @@ public class PrefExperiment
 
 
 		DataSet predictionData = data.copy();
+
+
+		//TODO Change this, only for binary variables do we treat as continuous
 		/***If target is discrete, then reload the dataset with it as a continuous variable for Pref-Div***/
 		if(!targetContinuous )
 		{
 			DiscreteVariable targetVar = (DiscreteVariable) data.getVariable(target);
-			int max = targetVar.getCategories().size()-1;
-			data = MixedUtils.loadDataSet2(dataFile,max);
+			if(targetVar.getCategories().size()<3)
+			{
+				System.out.println("Binary target variable...converting to continuous");
+				int max = targetVar.getCategories().size()-1;
+				data = MixedUtils.loadDataSet2(dataFile,max);
+			}
+
 		}
 
 
@@ -437,7 +449,7 @@ public class PrefExperiment
 		if(innerCV)
 		{
 			System.out.print("Running internal CV to choose number of variables to select...");
-			numSelected = crossValidate(data,predictionData,initRadii,workingDir);
+			numSelected = crossValidate(data,predictionData,initRadii,workingDir,indices);
 			System.out.println("Done, choosing " + numSelected + " variables");
 		}
 
@@ -459,13 +471,13 @@ public class PrefExperiment
 		else
 			System.out.println("Running PiPref-Div to select genes...");
 
-		ArrayList<Gene> output = runPrefDiv(ppd,workingDir);
+		ArrayList<Gene> output = runPrefDiv(ppd,workingDir,indices);
 		Map<Gene,List<Gene>> map = ppd.getLastCluster();
 		DataSet summarized = ppd.getSummarizedData();
 
 		if(testData!=null)
 		{
-			DataSet testSummarized = RunPrefDiv.summarizeData(testEnsured,output,map,ctype,target);
+			DataSet testSummarized = RunPrefDiv.summarizeData(ppd.getData(),testData,output,map,ctype,target)[1];
 			/***Add back the saved variables***/
 			if(varsToInclude.size()>0) {
 
@@ -498,13 +510,14 @@ public class PrefExperiment
 			}
 
 			PrintStream out = new PrintStream(workingDir + "/summarized_test.txt");
-			out.println(summarized);
+			out.println(testSummarized);
 			out.flush();
 			out.close();
 
 		}
 
 		/***Don't use continuous target variable for summarized dataset***/
+		/***TODO What does this mean***/
 		if(!targetContinuous)
 			summarized = RunPrefDiv.summarizeData(predictionData,output,map,ctype,target);
 
@@ -581,6 +594,8 @@ public class PrefExperiment
 				if(!npDir.isDirectory())
 					npDir.mkdir();
 
+
+				/**TODO Check this function and make sure it can handle the new ordering of the data with ensured variables kept out***/
 				/**Old prior directory, new prior directory, summarized dataset, and column names from the original?***/
 				convertPriorsToSif(priorDir,newPriorDir,summarized,colnames);
 
@@ -650,18 +665,151 @@ public class PrefExperiment
 		}
 	}
 
-	private static ArrayList<Gene> runPrefDiv(PiPrefDiv4 ppd,String workingDir)
+
+	/***
+	 * Checks whether the prior information in the pDir matches the size of the data or the size of the data without the indices specified
+	 * This is to deal with the fact that some variables are ensured by the user, but may want to be used in the prior information for the
+	 * piMGM part of the analysis
+	 * @param data The Dataset to query against
+	 * @param indices The indices of the variables in the prior knowledge file that must be maintained
+	 * @param pDir The current prior knowledge directory
+	 * @return The prior knowledge directory that should be used or null if removing the indices from the priors still doesn't give the proper size
+	 */
+	private static String checkPriors(DataSet data, int [] indices,String pDir)
+	{
+
+		/***Load prior knowledge file and ensure it's the right size***/
+
+
+		try {
+			File[] dFile = new File(pDir).listFiles();
+			File tempPrior = new File(pDir + "/../temp_version");
+			tempPrior.mkdir();
+			for (int i = 0; i < dFile.length; i++) {
+				BufferedReader b = new BufferedReader(new FileReader(dFile[i]));
+				String [] line = b.readLine().split("\t");
+				int numLines = line.length;
+
+				PrintStream out = new PrintStream(tempPrior+"/" + dFile[i].getName());
+				/***Prior knowledge is not the right size regardless, return null***/
+				if(numLines!=data.getNumColumns() && data.getNumColumns()+indices.length != numLines)
+				{
+					return null;
+				}
+				else if(numLines!=data.getNumColumns())
+				{
+					/***Print the first line if it should be included***/
+					int rowCount = 0;
+					int colCount = 0;
+					boolean first = true;
+					if(indices[0]!=0) {
+						for (int j = 0; j < numLines; j++) {
+							if (colCount >= indices.length || j != indices[colCount]) {
+								if (first) {
+									out.print(line[j]);
+									first = false;
+								} else {
+									out.print("\t" + line[j]);
+								}
+							} else
+								colCount++;
+						}
+						out.println();
+
+					}
+					else
+					{
+						rowCount++;
+					}
+					/***Print the remaining lines***/
+
+
+
+
+					for(int j = 1; j < numLines;j++)
+					{
+						line = b.readLine().split("\t");
+						/**We print this row and ignore the necessary columns***/
+						if(rowCount >= indices.length || indices[rowCount]!=j) {
+							colCount = 0;
+							first = true;
+
+							for (int k = 0; k < line.length; k++) {
+								if (colCount >= indices.length || k != indices[colCount]) {
+									if (first) {
+										out.print(line[k]);
+										first = false;
+									} else {
+										out.print("\t" + line[k]);
+									}
+								} else
+									colCount++;
+
+							}
+							out.println();
+						}
+						/***Do not print this row***/
+						else
+						{
+							rowCount++;
+						}
+					}
+
+				}
+				else
+				{
+					/***Print the first line***/
+					out.print(line[0]);
+					for(int j = 1; j < line.length;j++)
+						out.print("\t" + line[j]);
+
+					out.println();
+					/***Print the remaining lines***/
+
+					for(int j = 1; j < numLines;j++)
+					{
+						line = b.readLine().split("\t");
+						out.print(line[0]);
+						for(int k = 1; k < line.length;k++)
+						{
+							out.print("\t" + line[k]);
+						}
+						out.println();
+					}
+				}
+				out.flush();
+				out.close();
+
+			}
+			return tempPrior.getAbsolutePath();
+		}catch(Exception e)
+		{
+			System.err.println("Error reading prior knowledge files to check priors...");
+			return null;
+		}
+
+	}
+
+
+	/***
+	 * Runs the PiPrefDiv algorithm for object ppd, using static class instance variables for the prior knowledge directory
+	 * @param ppd The PiPrefDiv object to run
+	 * @param workingDir The working directory to output results
+	 * @param indices The indices of variables that are certain to stay (to parse prior knowledge)
+	 * @return The selected variables by piPrefDiv
+	 */
+	private static ArrayList<Gene> runPrefDiv(PiPrefDiv4 ppd,String workingDir, int [] indices)
 	{
 		ArrayList<Gene> output = new ArrayList<Gene>();
 		if(noPrior)
 		{
-
 			output = ppd.selectGenes(boot,numSamples);
-
 		}else
 		{
 
-			File dDir = new File(directory + "/" + priorDir);
+			String workingPriorDir = checkPriors(ppd.getData(),indices,directory+"/"+priorDir);
+
+			File dDir = new File(workingPriorDir);
 			File [] files = dDir.listFiles();
 
 			String [] diss = new String[files.length];
@@ -669,6 +817,7 @@ public class PrefExperiment
 			{
 				diss[i] = files[i].getAbsolutePath();
 			}
+
 
 			output = ppd.selectGenes(boot,numSamples,diss);
 			double [] weights = ppd.getLastWeights();
@@ -691,7 +840,7 @@ public class PrefExperiment
 	 * @param workingDir The working directory to print results to
 	 * @return The best value for the number of genes (in terms of minimizing prediction accuracy in a linear regression)
 	 */
-	private static int crossValidate(DataSet data,DataSet predData, double [] initRadii,String workingDir)
+	private static int crossValidate(DataSet data,DataSet predData, double [] initRadii,String workingDir, int [] indices)
 	{
 		double loss = Double.MAX_VALUE;
 		int maxIndex = -1;
@@ -719,7 +868,7 @@ public class PrefExperiment
 				ppd.setQuiet();
 				ppd.computePValue(false);
 
-				ArrayList<Gene> selected = runPrefDiv(ppd,workingDir);
+				ArrayList<Gene> selected = runPrefDiv(ppd,workingDir,indices);
 
 				testSet = predData.subsetRows(folds[j]);
 				trainSet = predData.copy();

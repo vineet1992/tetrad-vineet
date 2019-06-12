@@ -851,7 +851,8 @@ public class priorTest {
                 }
             }
         }
-        return temp;
+        return GraphUtils.undirectedGraph(temp);
+
     }
     public static void removeMoral(Graph g)
     {

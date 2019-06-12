@@ -19,6 +19,7 @@ public final class Algorithm implements TetradSerializable {
     public static final Algorithm CPC = new Algorithm("CPC");
     public static final Algorithm PCMAX = new Algorithm("PC-Max");
     public static final Algorithm FGS = new Algorithm("FGES");
+    public static final Algorithm MFM = new Algorithm("MGM-FCI-MAX");
     public static final Algorithm FCIMAX = new Algorithm("FCI-MAX");
     public static final Algorithm MGM = new Algorithm("MGM");
     public static final Algorithm NONE = new Algorithm("No type");
@@ -59,6 +60,8 @@ public final class Algorithm implements TetradSerializable {
             return new SearchWrappers.PcMaxWrapper(params);
         else if(a==Algorithm.PCS)
             return new SearchWrappers.PcStableWrapper(params);
+        else if(a==Algorithm.MFM)
+            return new SearchWrappers.MFMWrapper(params);
         else
             return null;
     }

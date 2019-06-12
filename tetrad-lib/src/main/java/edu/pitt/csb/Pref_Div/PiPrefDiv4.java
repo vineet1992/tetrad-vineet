@@ -149,6 +149,8 @@ public class PiPrefDiv4 implements ComparablePD {
     public double [] getAdjustP(){return adjustP;}
     public void computePValue(boolean pvals){computeP = pvals;}
     public void profile(){profiling = true;}
+    public DataSet getData(){return data;}
+
     public double [] getNormTao()
     {
         if(normTao==null)
@@ -212,7 +214,11 @@ public class PiPrefDiv4 implements ComparablePD {
 
 
             float [] corrs;
-            if(parallel)
+            if(curr.isMixed())
+            {
+                corrs = Functions.computeAllAssociationsPar(temp,curr);
+            }
+            else if(parallel)
             {
                 corrs = Functions.computeAllCorrelationsPar(temp,curr);
             }else
@@ -326,12 +332,21 @@ public class PiPrefDiv4 implements ComparablePD {
 
 
         long time = System.nanoTime();
+
+
         /***Add correlation to the target variable in the intensity value and fold change fields of each gene***/
         ArrayList<Gene> meanGenes = Functions.computeAllIntensities(temp,1,data,target,partialCorrs,false,false,1);
 
 
         /***Order of correlation is based upon the order of the genes in the array list (needs to be the same as the data order)***/
-        float [] meanDis = Functions.computeAllCorrelations(meanGenes,data,partialCorrs,false,false,1);
+        float [] meanDis;
+        if(data.isMixed())
+        {
+            meanDis = Functions.computeAllAssociationsPar(meanGenes,data);
+        }else
+        {
+            meanDis = Functions.computeAllCorrelations(meanGenes,data,partialCorrs,false,false,1);
+        }
 
         if(profiling)
         {
@@ -413,7 +428,15 @@ public class PiPrefDiv4 implements ComparablePD {
 
 
         /***Compute correlation for each pair of genes***/
-        float [] meanDis = Functions.computeAllCorrelations(meanGenes,data,false,1,1,dPriorsWT);
+        float [] meanDis;
+        if(data.isMixed())
+        {
+            meanDis = Functions.computeAllAssociationsPar(meanGenes,data);
+        }else
+        {
+            meanDis = Functions.computeAllCorrelations(meanGenes,data,false,1,1,dPriorsWT);
+
+        }
 
 
         /***Shuffle and sort the list of genes based upon intensity value***/
@@ -1009,7 +1032,15 @@ public class PiPrefDiv4 implements ComparablePD {
         {
             ArrayList<Gene> temp = createGenes(data,target,true);
             DataSet currData = data.subsetRows(subsamples[k]);
-            float [] corrs = Functions.computeAllCorrelations(temp,currData,partialCorrs,false,false,1);
+            float [] corrs;
+            if(currData.isMixed())
+            {
+                corrs = Functions.computeAllAssociationsPar(temp,currData);
+            }
+            else
+            {
+                corrs = Functions.computeAllCorrelations(temp,currData,partialCorrs,false,false,1);
+            }
             addGeneConnections(corrs,curr,initRadii[i]);
 
         }
@@ -1494,7 +1525,12 @@ public class PiPrefDiv4 implements ComparablePD {
             float [] corrs;
             long time = System.nanoTime();
 
-            if(parallel)
+
+            if(currData.isMixed())
+            {
+                corrs = Functions.computeAllAssociationsPar(temp,currData);
+            }
+            else if(parallel)
             {
                 corrs = Functions.computeAllCorrelationsPar(temp,currData);
             }

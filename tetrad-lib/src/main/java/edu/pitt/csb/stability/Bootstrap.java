@@ -178,9 +178,14 @@ public class Bootstrap {
                         DataSet data1 = subset(subs[s]);
                         System.out.println("Running sample " + s);
                         DataGraphSearch gs = Algorithm.algToSearchWrapper(a,params);
-                        Graph gt = gs.search(data1);
-                        totalEdges[s] =gt.getNumEdges();
-                        addToGraphs(gt);
+                        try {
+                            Graph gt = gs.search(data1);
+                            totalEdges[s] = gt.getNumEdges();
+                            addToGraphs(gt);
+                        }catch(Exception e)
+                        {
+                            continue;
+                        }
                     }
 
                     return;
@@ -204,7 +209,6 @@ public class Bootstrap {
 
         pool.invoke(new StabilityAction(chunk, 0,B));
 
-        //TODO need to add directed edge counting for CPSS and undirected edge counting for bootstrap
 
 
         for(int i = 0 ; i< graphs.size();i++)
@@ -294,14 +298,14 @@ public class Bootstrap {
             {
                 double max = 0;
                 int index = -1;
-                for(int i = 0; i < theta.length;i++)
+                for(int i = 0; i < theta.length-1;i++)
                 {
                     if(theta[i][j][k] > max) {
                         max = theta[i][j][k];
                         index = i;
                     }
                 }
-                if(max>=bound && index!=7)
+                if(max > bound)
                 {
                     temp.addEdge(createEdge(data.getVariable(j),data.getVariable(k),index));
                 }

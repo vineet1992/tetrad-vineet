@@ -228,7 +228,7 @@ public class PriorPrediction {
 
             DataSet predictionData = data;
 
-            if(steps)
+            if(steps && !prefDiv)
             {
                 System.out.print("Running STEPS...");
                 STEPS s = new STEPS(temp,initLambdas,g,samps);
@@ -249,7 +249,7 @@ public class PriorPrediction {
                 printer.println(test);
                 printer.flush();
                 printer.close();
-                String cmd = "java -jar PrefDiv.jar -data temp_train.txt -dataTest temp_test.txt -loocv " + " -t " + target + " -name temp -numSelect " + numSelect + " -keep ";
+                String cmd = "java -jar PrefDiv.jar -data temp_train.txt -dataTest temp_test.txt -loocv " + "-t " + target + " -name temp_" + i + " -numSelect " + numSelect + " -keep ";
 
                 for(String s:toRemove)
                 {
@@ -299,12 +299,20 @@ public class PriorPrediction {
                     System.err.println(s);
                 }
 
-                out = GraphUtils.loadGraphTxt(new File("temp/graph.txt"));
+                if(steps)
+                {
+                    out = GraphUtils.loadGraphTxt(new File("temp_" + i + "/GRAPH_temp_train.txt"));
+                }
+                else
+                {
+                    out = GraphUtils.loadGraphTxt(new File("temp_" + i + "/piMGM/Graph.txt"));
+                }
                 /***Construct training and testing set by getting list of genes and clusters from files***/
 
-                DataSet train = MixedUtils.loadDataSet2("temp/summarized.txt");
-                test = MixedUtils.loadDataSet2("temp/summarized_test.txt");
-                DataSet full = DataUtils.concatenate(train,test);
+                DataSet train = MixedUtils.loadDataSet2("temp_" + i + "/OUT_temp_train.txt");
+                test = MixedUtils.loadTestData("temp_" + i + "/summarized_test.txt",3,train);
+                DataSet full = train.copy();
+                MixedUtils.concatenateTo(test,full);
 
                 predictionData = full;
                 temp = train;
@@ -330,22 +338,26 @@ public class PriorPrediction {
             Graph cpcOut = cpc.search();
 
 
+            int testIndex = i;
+
+            if(prefDiv)
+                testIndex = predictionData.getNumRows()-1;
 
             /***piMGM Predictions***/
 
             List<Node> neighbors = out.getAdjacentNodes(out.getNode(target));
             System.out.println("Adjacent To Target: " + neighbors);
-            double pred = getRegressionResult(neighbors,temp,predictionData,i,target);
+            double pred = getRegressionResult(neighbors,temp,predictionData,testIndex,target);
             double real = -1;
 
 
 
             if(predictionData.getVariable(target)instanceof DiscreteVariable)
             {
-                real = predictionData.getInt(i,predictionData.getColumn(predictionData.getVariable(target)));
+                real = predictionData.getInt(testIndex,predictionData.getColumn(predictionData.getVariable(target)));
             }else
             {
-                real = predictionData.getDouble(i,predictionData.getColumn(predictionData.getVariable(target)));
+                real = predictionData.getDouble(testIndex,predictionData.getColumn(predictionData.getVariable(target)));
             }
             System.out.println("piMGM Prediction: " + pred);
             pi1.print(i + "\t" + pred +"\t");
@@ -356,7 +368,7 @@ public class PriorPrediction {
             if(neighbors.size()==0) {
                 neighbors = out.getAdjacentNodes(out.getNode(target));
             }
-            pred = getRegressionResult(neighbors,temp,predictionData,i,target);
+            pred = getRegressionResult(neighbors,temp,predictionData,testIndex,target);
             System.out.println("CPC-MB Neighbors: " + neighbors);
             System.out.println("CPC-MB Prediction: " + pred);
 
@@ -371,7 +383,7 @@ public class PriorPrediction {
             neighbors = cpcOut.getAdjacentNodes(cpcOut.getNode(target));
             if(neighbors.size()==0)
                 neighbors = out.getAdjacentNodes(out.getNode(target));
-            pred = getRegressionResult(neighbors,temp,predictionData,i,target);
+            pred = getRegressionResult(neighbors,temp,predictionData,testIndex,target);
             System.out.println("CPC Neighbors: " + neighbors);
             System.out.println("CPC Prediction: " + pred);
 

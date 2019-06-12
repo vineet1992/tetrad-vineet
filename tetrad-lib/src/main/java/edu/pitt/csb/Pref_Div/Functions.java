@@ -403,6 +403,106 @@ public class Functions
 
 
 
+    /***
+     * THIS METHOD RUNS IN PARALLEL
+     * @param items List of Genes, only the symbol needs to be filled in
+     * @param d DataSet d, a dataset on which to compute correlations
+     * return  A float [] with all of the gene-gene correlations
+     ***/
+    public static float [] computeAllAssociationsPar(final ArrayList<Gene> items, final DataSet d)
+    {
+
+        /***Construct mapping between indices and nodes***/
+        final HashMap<Integer,Integer> mapping = new HashMap<Integer,Integer>();
+        final HashMap<Integer,Integer> categories = new HashMap<Integer,Integer>();
+
+        /***Ensure correct mapping from genes to nodes in data***/
+        for(int i = 0; i < items.size();i++)
+        {
+            Node temp = d.getVariable(items.get(i).symbol);
+            mapping.put(i,d.getColumn(temp));
+            if(temp instanceof DiscreteVariable)
+            {
+                DiscreteVariable dv = (DiscreteVariable)temp;
+                categories.put(i,dv.getNumCategories());
+            }
+        }
+
+        /***Rows are variable, columns are samples***/
+        final double [][] datArray = d.getDoubleData().transpose().toArray();
+
+
+        int total = (items.size()*(items.size()-1))/2;
+        final float [] corrs = new float[total];
+
+        final ForkJoinPool pool = ForkJoinPoolInstance.getInstance().getPool();
+
+        class StabilityAction extends RecursiveAction {
+            private int chunk;
+            private int from;
+            private int to;
+
+            public StabilityAction(int chunk, int from, int to){
+                this.chunk = chunk;
+                this.from = from;
+                this.to = to;
+            }
+
+            @Override
+            protected void compute(){
+                if (to - from <= chunk) {
+                    for (int s = from; s < to; s++) {
+                        //RadiiWP is the columns, RadiiNP is the rows
+                        double[] one = datArray[mapping.get(s)];
+
+                        int index = Functions.getIndex(s,s+1,items.size());
+                        for(int i = s+1; i < items.size();i++)
+                        {
+                            double [] two = datArray[mapping.get(i)];
+
+                            if(categories.get(s)!=null || categories.get(i)!=null)
+                            {
+                                //corrs[index] = (float)mixedMI(two,one,categories.get(s));
+                                IndTestMultinomialAJ ind = new IndTestMultinomialAJ(d,0.05,true);
+                                ind.isIndependent(d.getVariable(mapping.get(i)),d.getVariable(mapping.get(s)));
+                                corrs[index] = (float)(1-ind.getPValue());
+                            }
+                            else
+                            {
+                                corrs[index] = (float)Math.abs(StatUtils.correlation(one,two));
+                            }
+
+
+                            index++;
+                        }
+                    }
+
+                    return;
+                } else {
+                    List<StabilityAction> tasks = new ArrayList<>();
+
+                    final int mid = (to + from) / 2;
+
+                    tasks.add(new StabilityAction(chunk, from, mid));
+                    tasks.add(new StabilityAction(chunk, mid, to));
+
+                    invokeAll(tasks);
+
+                    return;
+                }
+            }
+        }
+
+        final int chunk = d.getNumColumns()/Runtime.getRuntime().availableProcessors();
+        StabilityAction sa = new StabilityAction(chunk,0, items.size());
+        pool.invoke(sa);
+
+
+        return corrs;
+    }
+
+
+
 
     /***
      *
@@ -452,6 +552,7 @@ public class Functions
         int total = (items.size()*(items.size()-1))/2;
         float [] corrs = new float[total];
         IndTestCorrelationT ind = new IndTestCorrelationT(d,0.05);
+        IndTestMultinomialAJ indDisc = new IndTestMultinomialAJ(d,0.05);
         for(int i = 0; i < items.size();i++)
         {
             Node one = nodes[i];
@@ -464,6 +565,16 @@ public class Functions
                     int x = mapping.get(i);
                     int y = mapping.get(j);
                     corrs[index] = (float)(-1*c.get(x,y)/(c.get(x,x)*c.get(y,y)));
+                }
+                else if(d.isMixed())
+                {
+                    indDisc.isIndependent(one,two);
+                    if(ind.getPValue()>threshold && !withPrior[index])
+                        corrs[index] = 0;
+                    else if(ind.getPValue()>thresholdWP && withPrior[index])
+                        corrs[index] = 0;
+                    else
+                        corrs[index] = (float) (1-ind.getPValue());
                 }
                 else {
                     ind.isIndependent(one,two);
@@ -562,7 +673,15 @@ public class Functions
             c = new CovarianceMatrix(data).getMatrix().ginverse();
         }
 
-        IndTestCorrelationT ind = new IndTestCorrelationT(data,0.05);
+        IndependenceTest ind;
+        if(data.isMixed())
+        {
+            ind = new IndTestMultinomialAJ(data,0.05,true);
+        }
+        else
+        {
+            ind = new IndTestCorrelationT(data,0.05);
+        }
         float [] corrs = new float[g1.size()];
 
         /***For each gene in the gene list, compute correlation***/
@@ -586,7 +705,10 @@ public class Functions
                     corrs[i] = (float) Math.abs(StatUtils.correlation(temp[y], temp[data.getColumn(data.getVariable(g1.get(i).symbol))]));
             }
             else //Use Mutual Information
-                corrs[i] = (float) mixedMI(temp[data.getColumn(data.getVariable(i))],temp[y],numCats);
+            {
+                ind.isIndependent(data.getVariable(i),one);
+                corrs[i] = (float)(1-ind.getPValue());
+            }
         }
 
         /****Optional: Normalize the correlations to mean 0 Gaussian Dist***/
@@ -694,7 +816,16 @@ public class Functions
             c = new CovarianceMatrix(data).getMatrix();
             c = c.ginverse();
         }
-        IndTestCorrelationT ind = new IndTestCorrelationT(data,0.05);
+
+        IndependenceTest ind;
+        if(data.isMixed())
+        {
+            ind  = new IndTestMultinomialAJ(data,0.05);
+        }
+        else
+        {
+           ind = new IndTestCorrelationT(data,0.05);
+        }
         float [] corrs = new float[g1.size()];
         for(int i = 0; i < g1.size();i++) {
             Node two = data.getVariable(g1.get(i).symbol);
@@ -714,7 +845,10 @@ public class Functions
                     corrs[i] = (float) Math.abs(StatUtils.correlation(temp[y], temp[data.getColumn(data.getVariable(g1.get(i).symbol))]));
             }
             else //Use Mutual Information
-                corrs[i] = (float) mixedMI(temp[data.getColumn(data.getVariable(i))],temp[y],numCats);
+            {
+                ind.isIndependent(one,two);
+                corrs[i] = (float) (1-ind.getPValue());
+            }
         }
         for (int i = 0; i < g1.size(); i++) {
 

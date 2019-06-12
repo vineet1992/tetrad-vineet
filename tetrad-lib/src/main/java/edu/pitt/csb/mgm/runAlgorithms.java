@@ -335,7 +335,7 @@ public class runAlgorithms {
                 System.out.println("No algorithm specified, and you are not running MGM\nTherefore no method will be run to analyze the data.\n Please use -runMGM to run MGM or -a <Algorithm Name> to run a causal discovery method");
                 System.exit(-1);
             }
-            String [] algos = {"FCI","FCI-MAX","PCS","CPC","MAX","FGES","None"};
+            String [] algos = {"MGM-FCI-MAX","FCI","FCI-MAX","PCS","CPC","MAX","FGES","None"};
             boolean foundAl = false;
             for(String x:algos)
             {
@@ -612,6 +612,12 @@ public class runAlgorithms {
                     {
                         System.out.println("Cannot output orientation stability without a specified causal discovery algorithm");
                     }
+                    else if(alg.equals("MGM-FCI-MAX"))
+                    {
+                        double [] param = new double[]{lambda[0],lambda[1],lambda[2],alpha};
+                        bs.runBootstrap(convert(alg),param);
+                        outputBootOrients(bs.getTabularOutput());
+                    }
                     else {
                         double param = 0;
                         if (alg.equals("FGES"))
@@ -644,7 +650,12 @@ public class runAlgorithms {
             else if(runBootstrap)
             {
                 Bootstrap bs = new Bootstrap(d,bootBound,numBoots);
-                if(!alg.equals("FGES") && !alg.equals("None")) {
+                if(alg.equals("MGM-FCI-MAX"))
+                {
+                    double [] param = new double[]{lambda[0],lambda[1],lambda[2],alpha};
+                    finalOutput = bs.runBootstrap(convert(alg),param);
+                }
+                else if(!alg.equals("FGES") && !alg.equals("None")) {
 
                     finalOutput = bs.runBootstrap(convert(alg),new double[]{alpha});
                 }
@@ -742,6 +753,10 @@ public class runAlgorithms {
         else if(alg.equals("None"))
         {
             a = Algorithm.MGM;
+        }
+        else if(alg.equals("MGM-FCI-MAX"))
+        {
+            a = Algorithm.MFM;
         }
         else
         {
