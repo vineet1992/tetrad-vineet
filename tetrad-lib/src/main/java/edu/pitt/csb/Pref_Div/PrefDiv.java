@@ -3,7 +3,6 @@ package edu.pitt.csb.Pref_Div;
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.search.Fges;
 import edu.cmu.tetrad.util.StatUtils;
-import javafx.collections.transformation.SortedList;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;

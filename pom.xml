@@ -8,9 +8,7 @@
 
     <name>Tetrad Project</name>
     <modules>
-        <module>tetrad-gui</module>
         <module>tetrad-lib</module>
-        <module>causal-cmd</module>
     </modules>
 
     <licenses>
@@ -114,6 +112,11 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
             <version>1.7.19</version>
+        </dependency>
+        <dependency>
+            <groupId>org.json</groupId>
+            <artifactId>json</artifactId>
+            <version>20190722</version>
         </dependency>
     </dependencies>
 </project>
