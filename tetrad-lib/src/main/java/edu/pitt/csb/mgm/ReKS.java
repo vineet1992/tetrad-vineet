@@ -7,7 +7,6 @@ import edu.cmu.tetrad.util.TetradVector;
 
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.stream.IntStream;
 
 /**
  * Created by vinee_000 on 9/1/2016.
