@@ -7,7 +7,6 @@ import edu.cmu.tetrad.graph.GraphUtils;
 import edu.cmu.tetrad.search.Fges;
 import edu.cmu.tetrad.util.StatUtils;
 import edu.pitt.csb.Pref_Div.Comparisons.ComparablePD;
-import javafx.collections.transformation.SortedList;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;

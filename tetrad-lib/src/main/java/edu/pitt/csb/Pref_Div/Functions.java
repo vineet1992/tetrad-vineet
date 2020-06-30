@@ -20,8 +20,7 @@ import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.*;
 import java.io.*;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.RecursiveAction;
+import java.util.concurrent.*;
 
 import static java.lang.Math.abs;
 
@@ -328,7 +327,7 @@ public class Functions
     {
 
         /***Construct mapping between indices and nodes***/
-        final HashMap<Integer,Integer> mapping = new HashMap<Integer,Integer>();
+        final ConcurrentHashMap<Integer,Integer> mapping = new ConcurrentHashMap<Integer,Integer>();
 
 
         /***Ensure correct mapping from genes to nodes in data***/
@@ -363,17 +362,22 @@ public class Functions
                 if (to - from <= chunk) {
                     for (int s = from; s < to; s++) {
                         //RadiiWP is the columns, RadiiNP is the rows
-                        double[] one = datArray[mapping.get(s)];
+                        try {
+                            double[] one = datArray[mapping.get(s)];
 
-                        int index = Functions.getIndex(s,s+1,items.size());
-                        for(int i = s+1; i < items.size();i++)
+                            int index = Functions.getIndex(s, s + 1, items.size());
+                            for (int i = s + 1; i < items.size(); i++) {
+                                double[] two = datArray[mapping.get(i)];
+
+                                corrs[index] = (float) Math.abs(StatUtils.correlation(one, two));
+
+
+                                index++;
+                            }
+                        }catch(Exception e)
                         {
-                            double [] two = datArray[mapping.get(i)];
-
-                            corrs[index] = (float)Math.abs(StatUtils.correlation(one,two));
-
-
-                            index++;
+                            System.out.println("Excpetion:");
+                            e.printStackTrace();
                         }
                     }
 
@@ -393,7 +397,10 @@ public class Functions
             }
         }
 
-        final int chunk = d.getNumColumns()/Runtime.getRuntime().availableProcessors();
+        int c = d.getNumColumns()/Runtime.getRuntime().availableProcessors();
+        if(c < 1)
+            c = 1;
+        final int chunk = c;
         StabilityAction sa = new StabilityAction(chunk,0, d.getNumColumns());
         pool.invoke(sa);
 
