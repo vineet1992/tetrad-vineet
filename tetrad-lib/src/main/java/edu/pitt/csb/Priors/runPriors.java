@@ -410,6 +410,62 @@ public class runPriors {
         return -1;
     }
 
+    /***
+     *
+     * @param d Subset version of the dataset
+     * @param full Full version of the dataset
+     * @return -1 if the subset version has sufficient variance in each variable, the first offending column otherwise
+     */
+    public static synchronized int checkForVariance2(DataSet d)
+    {
+        TetradMatrix t = d.getDoubleData();
+        for(int i = 0; i < d.getNumColumns();i++)
+        {
+            if(d.getVariable(i)instanceof ContinuousVariable)
+            {
+                /**Extract column i**/
+                double [] curr = t.getColumn(i).toArray();
+                curr = StatUtils.standardizeData(curr);
+
+                /**Ensure variance is positive***/
+                double var = StatUtils.variance(curr);
+                if(var <= 0.0001) {
+                    System.out.println(i + "\t" + var);
+                    return i;
+                }
+
+            }
+            else
+            {
+                /***Hashmap of all unique values in this column to how many times it appeared in the subset data***/
+                HashMap<Integer,Integer> cats = new HashMap<Integer,Integer>();
+                for(int j = 0; j < d.getNumRows();j++)
+                {
+                    if(cats.get(d.getInt(j,i))==null)
+                        cats.put(d.getInt(j,i),1);
+                    else
+                        cats.put(d.getInt(j,i),cats.get(d.getInt(j,i))+1);
+                }
+
+
+                /***Are we too small in category appearances for any column?***/
+                for(Integer ii: cats.keySet())
+                {
+                    if(cats.get(ii)<2) {
+                        return i;
+                    }
+                }
+
+                /***Must have at least 2 unique categories for each categorical variable***/
+                if(cats.keySet().size()<2)
+                    return i;
+
+            }
+        }
+        return -1;
+    }
+
+
     public static void printCounts(TetradMatrix t, DataSet d, String runName) throws Exception
     {
         PrintStream out = new PrintStream(runName + "/Edge_Counts.txt");

@@ -245,9 +245,19 @@ public class IndTestMultinomialAJ implements IndependenceTest {
             LogisticRegression.Result result0 = logisticRegression.regress((DiscreteVariable) _x, zList);
             LogisticRegression.Result result1 = logisticRegression.regress((DiscreteVariable) _x, yzList);
 
-            coeffsNull.viewColumn(i).assign(result0.getCoefs());
-            coeffsDep.viewColumn(i).assign(result1.getCoefs());
-
+            try {
+                if(result0==null || result1==null)
+                {
+                    this.lastP = 0.5;
+                    return false;
+                }
+                coeffsNull.viewColumn(i).assign(result0.getCoefs());
+                coeffsDep.viewColumn(i).assign(result1.getCoefs());
+            }
+            catch(Exception e)
+            {
+                e.printStackTrace();
+            }
             // Returns -2 LL
             //double ll0 = result0.getLogLikelihood();
             //double ll1 = result1.getLogLikelihood();

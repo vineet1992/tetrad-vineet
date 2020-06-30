@@ -177,7 +177,7 @@ public class StabilityUtils {
                 if (to - from <= chunk) {
                     for (int s = from; s < to; s++) {
                         DataSet dataSubSamp = data.subsetRows(samps[s]).copy();
-                        System.out.println("Running sample: " + s);
+                        //System.out.println("Running sample: " + s);
                         if(runPriors.checkForVariance(dataSubSamp,data)!=-1)
                         {
                             System.err.println("Variance issue with dataset: " + s);

@@ -4,6 +4,7 @@ import cern.colt.matrix.DoubleMatrix2D;
 import edu.cmu.tetrad.data.*;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.Node;
+import edu.cmu.tetrad.search.FciMax;
 import edu.cmu.tetrad.search.FciMaxP;
 import edu.cmu.tetrad.search.IndependenceTest;
 import edu.pitt.csb.mgm.IndTestMultinomialAJ;
@@ -27,13 +28,13 @@ import java.util.Arrays;
 public class lung_analysis {
     public static void main(String [] args)throws Exception
     {
-        boolean fiveByTwo = true;
+        boolean fiveByTwo = false;
         int N = 10;
         double alpha = 0.05;
         double g = 0.05;
-        String subDir = "Subsamples_Five_By_Two";
+        String subDir = "Subsamples_No_Location";
 
-        DataSet d = MixedUtils.loadDataSet2("MGM_Full_Data.txt", DelimiterType.TAB);
+        DataSet d = MixedUtils.loadDataSet2("MGM_Full_Data_Log.txt", DelimiterType.TAB);
 
        // d.removeColumn(d.getVariable("Score"));
 
@@ -41,13 +42,13 @@ public class lung_analysis {
 
       //  d.removeColumn(d.getVariable("Years_quit"));
 
-        /*Removed in the current analysis
+        //Removed in the current analysis
         d.removeColumn(d.getVariable("Nodule.size.group"));
         d.removeColumn(d.getVariable("Cigs_Per_Day"));
         d.removeColumn(d.getVariable("Smoke_Duration"));
         d.removeColumn(d.getVariable("GOLD4"));
         d.removeColumn(d.getVariable("Smk_Status"));
-        */
+
        // System.out.println(d);
         System.out.println(MixedUtils.getContinousData(d));
         System.out.println(MixedUtils.getDiscreteData(d));
@@ -68,19 +69,17 @@ public class lung_analysis {
             for (int i = 0; i < N; i++) {
                 subsamples[i] = d.copy();
                 Arrays.sort(subs[i]);
-                subsamples[i].removeRows(subs[i]);
-                PrintStream temp = new PrintStream(subDir + "/Training_Set_" + i + ".txt");
-                for (int j = 0; j < d.getNumRows(); j++) {
-                    if (Arrays.binarySearch(subs[i], j) < 0)
-                        temp.println(j + 1);
+                BufferedReader b = new BufferedReader(new FileReader(subDir + "/Training_Set_" + i + ".txt"));
+                ArrayList<Integer> trainInds = new ArrayList<Integer>();
+                while(b.ready())
+                {
+                    trainInds.add(Integer.parseInt(b.readLine()));
                 }
-                temp.flush();
-                temp.close();
-                temp = new PrintStream(subDir + "/Test_Set_" + i + ".txt");
-                for (int j = 0; j < subs[i].length; j++)
-                    temp.println(subs[i][j] + 1);
-                temp.flush();
-                temp.close();
+                int [] train = new int[trainInds.size()];
+                for(int j = 0; j < trainInds.size();j++)
+                    train[j] = trainInds.get(j)-1;
+
+                subs[i] = train;
             }
             System.out.println(Arrays.toString(subsamples));
             int numLambdas = 40;
@@ -90,12 +89,16 @@ public class lung_analysis {
             }
             IndependenceTest ind = new IndTestMultinomialAJ(d, alpha);
             STEPS s = new STEPS(d, lambda, g, subs);
+            //STEPS s = new STEPS(d, lambda, g,N);
+
             Graph g2 = s.runStepsPar();
             double[][] stab = s.stabilities;
 
-            double[] params = {s.lastLambda[0], s.lastLambda[1], s.lastLambda[2], 0.2};
+            double[] params = {s.lastLambda[0], s.lastLambda[1], s.lastLambda[2], alpha};
             DataGraphSearch gs = new SearchWrappers.MFMWrapper(params);
-            DoubleMatrix2D db = StabilityUtils.StabilitySearchPar(d, gs, subs);
+            //DoubleMatrix2D db = StabilityUtils.StabilitySearchPar(d, gs);
+
+        DoubleMatrix2D db = StabilityUtils.StabilitySearchPar(d, gs, subs);
             FciMaxP f = new FciMaxP(ind);
             f.setInitialGraph(g2);
             IKnowledge k2 = new Knowledge2();//Nothing will cause sex, education, age, and Lung Cancer won't cause anything else
@@ -110,9 +113,11 @@ public class lung_analysis {
 
             }
             f.setKnowledge(k2);
-            PrintStream out = new PrintStream("FCI_MAX_Graph.txt");
+            PrintStream out = new PrintStream("test2.txt");
             out.println(f.search());
-            out = new PrintStream("MGM_Stabilities.txt");
+            out.flush();
+            out.close();
+            out = new PrintStream("test2_Stabilities.txt");
             for (int j = 0; j < d.getNumColumns(); j++) {
                 out.print(d.getVariable(j).getName());
                 if (j < d.getNumColumns() - 1)
@@ -120,6 +125,7 @@ public class lung_analysis {
                 else
                     out.println();
             }
+
             for (int k = 0; k < d.getNumColumns(); k++) {
                 out.print(d.getVariable(k).getName() + "\t");
                 for (int j = 0; j < d.getNumColumns(); j++) {
@@ -132,7 +138,7 @@ public class lung_analysis {
             }
             out.flush();
             out.close();
-            out = new PrintStream("MAX_Stabilities.txt");
+            out = new PrintStream("testmax2_Stabilities.txt");
             for (int j = 0; j < d.getNumColumns(); j++) {
                 out.print(d.getVariable(j).getName());
                 if (j < d.getNumColumns() - 1)
@@ -153,7 +159,7 @@ public class lung_analysis {
             out.flush();
             out.close();
 
-            for (int i = 0; i < N; i++) {
+            /*for (int i = 0; i < N; i++) {
 
                 DataSet train = subsamples[i];
                 double[] lam = {s.lastLambda[0], s.lastLambda[1], s.lastLambda[2]};
@@ -174,7 +180,7 @@ public class lung_analysis {
                 p.flush();
                 p.close();
 
-            }
+            }*/
     }
 
 }

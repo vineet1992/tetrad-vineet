@@ -24,6 +24,7 @@ public class runSteps {
         String stabilityFile = "";
         String graphFile = "";
         String causalFile = "";
+        String outputFile = "";
         int ns = 20;
         double g = 0.05;
         int numLambdas = 40;
@@ -32,6 +33,8 @@ public class runSteps {
         boolean LOO = true;
         int maxCategoriesForDiscrete = 4;
         ArrayList<String> varsToRemove = new ArrayList<String>();
+        boolean verbose = false;
+        boolean printCausal = false;
         while (index < args.length) {
             if (args[index].equals("-d"))
             {
@@ -101,6 +104,17 @@ public class runSteps {
             else if(args[index].equals("-causal"))
             {
                 causalFile = args[index+1];
+                printCausal = true;
+                index+=2;
+            }
+            else if (args[index].equals("-v"))
+            {
+                verbose = true;
+                index++;
+            }
+            else if(args[index].equals("-o"))
+            {
+                outputFile = args[index+1];
                 index+=2;
             }
         }
@@ -120,11 +134,19 @@ public class runSteps {
         {
             d.removeColumn(d.getVariable(s));
         }
-        System.out.println(d);
+        //System.out.println(d);
         STEPS s = new STEPS(d,lambda,g,d.getNumRows(),LOO);
         s.setComputeStabs(true);
+        if(verbose)
+            s.setVerbose();
         Graph g2 = s.runStepsPar();
         double [][] stab = s.stabilities;
+
+        PrintStream lamStream = new PrintStream(directory + "/" + outputFile);
+        lamStream.print(s.lastLambda[0] + "\t" + s.lastLambda[1] + "\t" + s.lastLambda[2]);
+        lamStream.flush();
+        lamStream.close();
+
         PrintStream out = new PrintStream(directory + "/" + graphFile);
         out.println(g2);
         out.flush();
@@ -132,10 +154,14 @@ public class runSteps {
         IndependenceTest ii = new IndTestMultinomialAJ(d,0.1);
         FciMaxP p = new FciMaxP(ii);
         p.setInitialGraph(g2);
-        out = new PrintStream(causalFile);
-        out.println(p.search());
-        out.flush();
-        out.close();
+        if(printCausal)
+        {
+            out = new PrintStream(directory + "/" + causalFile);
+            out.println(p.search());
+            out.flush();
+            out.close();
+        }
+
         out = new PrintStream(directory + "/" + stabilityFile);
         printStability(out,d,stab);
     }

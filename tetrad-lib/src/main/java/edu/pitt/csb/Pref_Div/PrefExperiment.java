@@ -1,8 +1,5 @@
 package edu.pitt.csb.Pref_Div;
-import edu.cmu.tetrad.data.ContinuousVariable;
-import edu.cmu.tetrad.data.DataSet;
-import edu.cmu.tetrad.data.DataUtils;
-import edu.cmu.tetrad.data.DiscreteVariable;
+import edu.cmu.tetrad.data.*;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.Node;
 import edu.cmu.tetrad.regression.LogisticRegression;
@@ -42,7 +39,6 @@ public class PrefExperiment
 	static int numSelected = 75; //How many true parents of the target are there?
 	static boolean targetContinuous = true; //Is the target variable continuous?
 	static boolean partialCorr = false; //Should we use partial correlation instead of pearson correlation (doesn't really work right now)
-	static boolean pdStability = false; //Should we run Pref-Div within the subsamples to get stability?
 	static boolean noPrior = true; //Should we use prior information at all or just stability?
 
 	static double rLow = 0.3; //Low value for the radius
@@ -71,7 +67,7 @@ public class PrefExperiment
 
 	static String runName = "Pref_Div";
 
-	static int maxCat = 3; //Maximum number of categories for a discrete variable
+	static int maxCat = 5; //Maximum number of categories for a discrete variable
 
 	static int pathwayLimit = 10; //How many genes must be present to include a pathway/gene list?
 	public static void main(String [] args) throws Exception
@@ -244,11 +240,7 @@ public class PrefExperiment
 					}
 					index+=2;
 				}
-				else if(args[index].equals("-pdStability"))
-				{
-					pdStability = true;
-					index++;
-				}
+
 				else if(args[index].equals("-pathwayFile"))
 				{
 					pathwayFile = args[index+1];
@@ -329,7 +321,7 @@ public class PrefExperiment
 
 		DataSet data = null;
 		try {
-			data = MixedUtils.loadDataSet2(dataFile,maxCat);
+			data = MixedUtils.loadDataSet2(dataFile,DelimiterType.TAB);
 		}
 		catch(Exception e)
 		{
@@ -432,7 +424,6 @@ public class PrefExperiment
 				int max = targetVar.getCategories().size()-1;
 				data = MixedUtils.loadDataSet2(dataFile,max);
 			}
-
 		}
 
 

@@ -51,6 +51,7 @@ public class Bootstrap {
     private boolean cpss; //Should we use Complimentary pairs to create datasets?
     private boolean subsample; //Should we use subsampling to create datasets?
     private int b = 0; //Subsample size
+    private boolean fullGraph;
 
     public Bootstrap (DataSet data, double bound, int B)
     {
@@ -79,7 +80,7 @@ public class Bootstrap {
     }
 
     public String getTabularOutput() {return tabularOutput;}
-
+    public void setFullGraph(){fullGraph=true;}
 
     public void setCPSS() {
         cpss = true;
@@ -174,7 +175,7 @@ public class Bootstrap {
             @Override
             protected void compute(){
                 if (to - from <= chunk) {
-                    for (int s = from; s < to; s++) {
+                    A:for (int s = from; s < to; s++) {
                         DataSet data1 = subset(subs[s]);
                         System.out.println("Running sample " + s);
                         DataGraphSearch gs = Algorithm.algToSearchWrapper(a,params);
@@ -184,7 +185,7 @@ public class Bootstrap {
                             addToGraphs(gt);
                         }catch(Exception e)
                         {
-                            continue;
+                            continue A;
                         }
                     }
 
@@ -221,7 +222,7 @@ public class Bootstrap {
                 {
                     String node2 = data.getVariable(k).getName();
                     Edge currEdge = curr.getEdge(curr.getNode(node1),curr.getNode(node2));
-                    theta[edgeToInt(currEdge)][j][k]++;
+                    theta[edgeToInt(currEdge,node1,node2)][j][k]++;
                     //TODO Debug this
                 }
             }
@@ -239,7 +240,17 @@ public class Bootstrap {
             double sum = StatUtils.sum(totalEdges);
             this.bound = CPSS.computeTao(p/sum,this.bound);
         }
-        Graph output = createGraph(theta,data);
+
+
+        //Run this algorithm on the full graph and subset edges based on bootstrap probabilities
+        Graph output;
+        if(fullGraph)
+        {
+            DataGraphSearch gs = Algorithm.algToSearchWrapper(a,params);
+            output = gs.search(data);
+        }
+        else
+            output = createGraph(theta,data);
         tabularOutput = createStringOutput(output,theta,data);
         return output;
     }
@@ -250,13 +261,28 @@ public class Bootstrap {
         {
             int x = data.getColumn(data.getVariable(e.getNode1().getName()));
             int y = data.getColumn(data.getVariable(e.getNode2().getName()));
-            out+=e.getNode1().getName()+"\t" + edgeString(e) + "\t" + e.getNode2().getName()+"\t";
+            String name1 = e.getNode1().getName();
+            String name2= e.getNode2().getName();
+
+            int ind1 = x;
+            int ind2 = y;
+            if(x > y)
+            {
+                name1 = e.getNode2().getName();
+                name2 = e.getNode1().getName();
+
+                int temp = ind2;
+                ind2 = ind1;
+                ind1 = temp;
+            }
+            out+= name1 +"\t" + edgeString(e) + "\t" + name2 +"\t";
+
             for(int i = 0; i < theta.length;i++)
             {
                 if(i==theta.length-1)
-                    out+=theta[i][x][y] +"\n";
+                    out+=theta[i][ind1][ind2] +"\n";
                 else
-                    out+=theta[i][x][y] + "\t";
+                    out+=theta[i][ind1][ind2] + "\t";
             }
         }
         return out;
@@ -488,15 +514,29 @@ public class Bootstrap {
         return finalResult;
     }
 
-    private int edgeToInt(Edge e)
+    private int edgeToInt(Edge e, String name1, String name2)
     {
+
         if(e==null)
             return 7;//No edge
+
+        boolean flip = false;
+
+        if(e.getNode1().getName().equals(name2))
+        {
+            if(!e.getNode2().getName().equals(name1))
+            {
+                System.err.println("Inconsistent names in edgeToInt...");
+                System.exit(-1);
+            }
+            flip = true;
+        }
+
         if(e.getEndpoint1()==Endpoint.ARROW)
         {
             if(e.getEndpoint2()==Endpoint.TAIL)
             {
-                return 2;// <--
+                return 2;// <-- this will never happen
             }
             else if(e.getEndpoint2()==Endpoint.ARROW)
             {
@@ -504,13 +544,17 @@ public class Bootstrap {
             }
             else
             {
-                return 5; //<-o
+                return 5; //<-o this will never happen
             }
         }
         else if(e.getEndpoint1()==Endpoint.TAIL)
         {
-            if(e.getEndpoint2()==Endpoint.ARROW)
-                return 1;//-->
+            if(e.getEndpoint2()==Endpoint.ARROW) {
+                if(flip)
+                    return 2;
+                else
+                    return 1;//-->
+            }
             else if(e.getEndpoint2()==Endpoint.TAIL)
                 return 0; //---
         }
@@ -518,8 +562,12 @@ public class Bootstrap {
         {
             if(e.getEndpoint2()==Endpoint.CIRCLE)
                 return 6; //o-o
-            else if(e.getEndpoint2()==Endpoint.ARROW)
-                return 4;//o->
+            else if(e.getEndpoint2()==Endpoint.ARROW) {
+                if(flip)
+                    return 5;
+                else
+                    return 4;//o->
+            }
         }
         return -1;
     }

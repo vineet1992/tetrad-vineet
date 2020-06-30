@@ -29,22 +29,22 @@ public class allPDTests {
 
 
     static int numRuns = 15;
-    static int numGenes = 500;
+    static int numGenes = 3000;
 
     static boolean boot = false; //Should we use bootstrap samples for PiPrefDiv
     static boolean loocv = false; //Should we use leave-one-out CV for PiPrefDiv
     static boolean useCausalGraph = false; //Are we selecting genes to then use a causal graph to find connections or direct selection?
     static int numSamples = 20; //Number of bootstrap/sub-sampled samples to use
-    static int numParams = 30;//Number of parameters to sweep over
+    static int numParams = 20;//Number of parameters to sweep over
     static boolean noiseRandom = true;//Is the reliability range of reliable and unreliable priors set randomly?
     static int numFolds = 5; //Number of Folds for CV to pick alpha
 
 
     static int numPriors = 5; //Number of prior knowledge sources
     static int numReliable = 5; //Number of reliable sources
-    static int numComponents = 50; //How many components do we have for cluster simulation?
-    static int minTargetParents = 25; //How many true parents of the target are there?
-    static boolean amountRandom = true; //Should the priors have a random amount of prior knowledge?
+    static int numComponents = 300; //How many components do we have for cluster simulation?
+    static int minTargetParents = 75; //How many true parents of the target are there?
+    static boolean amountRandom = false; //Should the priors have a random amount of prior knowledge?
     static boolean targetContinuous = true; //Is the target variable continuous?
     static boolean evenDistribution = true; //Is the distribution of nodes in each cluster even?
     static int numCategories = 4; //number of categories for discrete variables
@@ -70,7 +70,7 @@ public class allPDTests {
     public static void main(String [] args) {
 
 
-        double [] ap = new double[]{0.5};
+        double [] ap = new double[]{0.25,0.5,0.75};
         //double [] ap = new double[]{1.0,0.5};
         int [] nr = new int[]{1,3,5};
         //int [] nr = new int[]{5};
@@ -96,10 +96,11 @@ public class allPDTests {
                 numReliable = nr[jj];
                 for (int kk = 0; kk < ss.length; kk++) {
                     sampleSize = ss[kk];
-
+                    if(amountPrior==0.25 && numReliable==1)
+                        continue;
                     ArrayList<Integer> experiment = new ArrayList<Integer>();
-                    experiment.add(0);
-                    //experiment.add(1);
+                    //experiment.add(0);
+                    experiment.add(1);
                     //experiment.add(2);
                     //experiment.add(3);
                     //experiment.add(4);
@@ -481,7 +482,7 @@ public class allPDTests {
 
 
                                     double[] results;
-                                    double[]npParam;
+                                    double[] npParam;
                                     //for every radii and threshold combination, give the three accuracies
 
                                     if (!parallel) {
@@ -493,8 +494,8 @@ public class allPDTests {
                                     }
 
                                     out.get(curr).println(j + "\t" + p.getLastRadius()[0] + "\t" + p.getLastRadius()[1] + "\t" + noPrior.getLastRadius()[0] + "\t" +
-                                            results[0] + "\t" + results[1] + "\t" + npParam[0] + "\t"  + friendlyClust + "\t" +  npFriendly  + "\t" +
-                                            results[2] + "\t" + npParam[1]);
+                                            results[0] + "\t" + results[1] + "\t" + npParam[0] + "\t" + results[3] + "\t" + results[4] + "\t" + npParam[2] + "\t" + friendlyClust + "\t" +  npFriendly  + "\t" +
+                                            results[2] + "\t" + results[5] + "\t" + npParam[1] + "\t" + npParam[3]);
 
 
                                     //Roll through all tested radii,threshold combos and RunPrefDiv directly to get accuracies
@@ -850,7 +851,7 @@ public class allPDTests {
 
             private synchronized void addAccuracy(PrefDivComparator comp, int i,int j)
             {
-                result[i][j] = comp.getClusterAccuracy(numComponents);
+                result[i][j] = comp.getFriendlyCluster(numComponents);
 
             }
 
@@ -894,7 +895,9 @@ public class allPDTests {
         StabilityAction sa = new StabilityAction(chunk,0, radii.length * radiiNP.length);
         pool.invoke(sa);
 
-        double [] res = new double[3];
+        double [] res = new double[6];
+        res[5] = 1;
+
         for(int i = 0; i < result.length;i++)
         {
             for(int j = 0; j < result[i].length;j++)
@@ -904,6 +907,12 @@ public class allPDTests {
                     res[2] = result[i][j];
                     res[0] = radiiNP[i];
                     res[1] = radii[j];
+                }
+                if(result[i][j] < res[5])
+                {
+                    res[5] = result[i][j];
+                    res[3] = radiiNP[i];
+                    res[4] = radii[j];
                 }
             }
         }
@@ -942,7 +951,8 @@ public class allPDTests {
 
             private synchronized void addAccuracy(PrefDivComparator pc, int i, String type)
             {
-                result[i][2] = pc.getClusterAccuracy(numComponents);
+
+                result[i][2] = pc.getFriendlyCluster(numComponents);
 
 
                 result[i][0] = pc.getFeatAccuracy(type);
@@ -1005,15 +1015,22 @@ public class allPDTests {
     {
         double bestAcc = -1;
         double bestRadii = -1;
-        for(int i = 0; i < radii.length;i++)
-        {
-            if(result[i][2] > bestAcc) {
+        double worstAcc = 1;
+        double worstRadii = 1;
+        for(int i = 0; i < radii.length;i++) {
+            if (result[i][2] > bestAcc) {
                 bestAcc = result[i][2];
                 bestRadii = radii[i];
             }
 
+            if (result[i][2] < worstAcc)
+            {
+                worstAcc = result[i][2];
+                        worstRadii = radii[i];
+            }
+
         }
-        return new double[] {bestRadii,bestAcc};
+        return new double[] {bestRadii,bestAcc,worstRadii,worstAcc};
     }
 
     /***

@@ -452,6 +452,7 @@ public class Functions
             protected void compute(){
                 if (to - from <= chunk) {
                     for (int s = from; s < to; s++) {
+                        IndTestMultinomialAJ ind = new IndTestMultinomialAJ(d,0.05,true);
                         //RadiiWP is the columns, RadiiNP is the rows
                         double[] one = datArray[mapping.get(s)];
 
@@ -463,7 +464,6 @@ public class Functions
                             if(categories.get(s)!=null || categories.get(i)!=null)
                             {
                                 //corrs[index] = (float)mixedMI(two,one,categories.get(s));
-                                IndTestMultinomialAJ ind = new IndTestMultinomialAJ(d,0.05,true);
                                 ind.isIndependent(d.getVariable(mapping.get(i)),d.getVariable(mapping.get(s)));
                                 corrs[index] = (float)(1-ind.getPValue());
                             }
@@ -475,6 +475,7 @@ public class Functions
 
                             index++;
                         }
+
                     }
 
                     return;

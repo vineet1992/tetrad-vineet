@@ -76,6 +76,7 @@ public class runAlgorithms {
     private static boolean runCPSS = false; //Should we run CPSS?
     private static double cpssBound = 0.05; //Error rate threshold for CPSS
     private static boolean runBootstrap = false; //Should we run bootstrapping?
+    private static boolean bootFullGraph = false; //When we run bootstrapping, should the outputted graph be the one run on the full data? Or just the most frequent edges from the bootstrapping?
     private static double bootBound = 50; //Number of times an orientation must appear to be added to the output
     private static int numBoots = 100; //Number of bootstrapped samples to run
     private static boolean outputStabs = false; //Should we output edge stabilities (StARS/StEPS)?
@@ -139,7 +140,21 @@ public class runAlgorithms {
                 else if(args[count].equals("-bootstrap"))
                 {
                     runBootstrap = true;
-                    count++;
+                    if(count+1 < args.length && !args[count+1].startsWith("-"))
+                    {
+                        if(args[count+1].equals("full"))
+                        {
+                            bootFullGraph = true;
+                        }
+                        else
+                        {
+                            System.err.println("Did you mean to include \"full\" after bootstrap? Or did you mean to include another argument after -bootstrap?");
+                            System.exit(-1);
+                        }
+                        count+=2;
+                    }
+                    else
+                        count++;
                 }
                 else if(args[count].equals("-numBoots"))
                 {
@@ -195,7 +210,6 @@ public class runAlgorithms {
                 else if(args[count].equals("-steps")) //Should steps be run?
                 {
                     runSteps = true;
-                    runMGM = true;
                     if(args.length==count+1 || args[count+1].startsWith("-")) {
                         count++;
                     }
@@ -321,7 +335,7 @@ public class runAlgorithms {
                 System.exit(-1);
             }
             //Load specified dataset from the file
-            d = MixedUtils.loadDataSet2(dataFile,maxNumDiscrete);
+            d = MixedUtils.loadDataSet2(dataFile,DelimiterType.TAB);
             System.out.println("Loaded dataset: " + d + "\n Dataset is mixed? " + d.isMixed());
 
 
@@ -405,7 +419,7 @@ public class runAlgorithms {
                 out.println(lbm[0] + "\t" + lbm[1] + "\t" + lbm[2]);
                 out.flush();
                 out.close();
-                System.out.println("Done");
+                System.out.println("Done, Lambdas selected are: [" + lambda[0] + "," + lambda[1] + "," + lambda[2] + "]");
             }
 
             Graph g = null;
@@ -420,6 +434,7 @@ public class runAlgorithms {
                 }
                 if(runCPSS) //MGM with CPSS
                 {
+                    System.out.println("Running Complimentary Pairs Stability Selection with MGM");
                     Bootstrap bs = new Bootstrap(d,cpssBound,50);
                     bs.setCPSS();
                     g = bs.runBootstrap(convert("MGM"),lambda);
@@ -428,7 +443,10 @@ public class runAlgorithms {
                 }
                 else if(runBootstrap) //MGM with Bootstrapping
                 {
+                    System.out.println("Running MGM with bootstrapping");
                     Bootstrap bs = new Bootstrap(d,bootBound,numBoots);
+                    if(bootFullGraph)
+                        bs.setFullGraph();
                     g = bs.runBootstrap(convert("MGM"),lambda);
                     if(outputOrients)
                         outputBootOrients(bs.getTabularOutput());
@@ -614,8 +632,11 @@ public class runAlgorithms {
                     }
                     else if(alg.equals("MGM-FCI-MAX"))
                     {
+                        System.out.println("Bootstrapping MGM-FCI-MAX procedure with parameters: Lambda=" + Arrays.toString(lambda) + ", Alpha=" + alpha);
                         double [] param = new double[]{lambda[0],lambda[1],lambda[2],alpha};
                         bs.runBootstrap(convert(alg),param);
+                        if(bootFullGraph)
+                            bs.setFullGraph();
                         outputBootOrients(bs.getTabularOutput());
                     }
                     else {
@@ -624,6 +645,7 @@ public class runAlgorithms {
                             param = penalty;
                         else
                             param = alpha;
+                        System.out.println("Bootstrapping " + alg + " with parameter: " + param);
                         bs.runBootstrap(convert(alg),new double[]{param});
                         outputBootOrients(bs.getTabularOutput());
                     }
@@ -635,11 +657,13 @@ public class runAlgorithms {
                 Bootstrap bs = new Bootstrap(d, cpssBound, 50);
                 bs.setCPSS();
                 if(!alg.equals("FGES") && !alg.equals("None")) {
+                    System.out.println("Running CPSS " + alg + " with parameter: " + alpha);
 
                     finalOutput = bs.runBootstrap(convert(alg), new double[]{alpha});
                 }
                 else if(!alg.equals("None")) //Use penalty instead of alpha for FGES
                 {
+                    System.out.println("Running CPSS " + alg + " with parameter: " + penalty);
                     finalOutput = bs.runBootstrap(convert(alg), new double[]{penalty});
                 }
                 if(outputOrients)
@@ -650,17 +674,24 @@ public class runAlgorithms {
             else if(runBootstrap)
             {
                 Bootstrap bs = new Bootstrap(d,bootBound,numBoots);
+                if(bootFullGraph)
+                    bs.setFullGraph();
                 if(alg.equals("MGM-FCI-MAX"))
                 {
+                    System.out.println("Bootstrapping MGM-FCI-MAX procedure with parameters: Lambda=" + Arrays.toString(lambda) + ", Alpha=" + alpha);
                     double [] param = new double[]{lambda[0],lambda[1],lambda[2],alpha};
+
                     finalOutput = bs.runBootstrap(convert(alg),param);
                 }
                 else if(!alg.equals("FGES") && !alg.equals("None")) {
+                    System.out.println("Bootstrapping " + alg + " with parameter: " + alpha);
 
                     finalOutput = bs.runBootstrap(convert(alg),new double[]{alpha});
                 }
                 else if(!alg.equals("None"))
                 {
+                    System.out.println("Bootstrapping " + alg + " with parameter: " + penalty);
+
                     finalOutput = bs.runBootstrap(convert(alg),new double[]{penalty});
                 }
                 if(outputOrients)

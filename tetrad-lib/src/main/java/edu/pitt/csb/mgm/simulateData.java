@@ -9,11 +9,13 @@ import edu.cmu.tetrad.data.CovarianceMatrix;
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.data.DataUtils;
 import edu.cmu.tetrad.data.ICovarianceMatrix;
+import edu.cmu.tetrad.graph.EdgeListGraphSingleConnections;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.GraphUtils;
 import edu.cmu.tetrad.graph.Node;
 import edu.cmu.tetrad.util.Parameters;
 import edu.cmu.tetrad.util.TetradMatrix;
+import edu.pitt.csb.Priors.runPriors;
 import org.apache.commons.math3.distribution.NormalDistribution;
 
 import java.io.File;
@@ -35,9 +37,9 @@ public class simulateData {
         int maxCategories = 5; //Maximum number of categories for the discrete variables
         double percentDiscrete = 50; //Percent of variables that are discrete
         String directory = "."; //Directory to write files to
-        double edgeCoefLow = 0.05; //Low range of edge coefficient, by default the values of these coefficients will be uniformly distributed from [edgeCoefLow to edgeCoefHigh]
-        double edgeCoefHigh = 3; //High range of edge coefficients
-        double varLow = 0.5;//Low range of variance, by default the variance will be uniformly distributed from [varLow to varHigh]
+        double edgeCoefLow = 0.1; //Low range of edge coefficient, by default the values of these coefficients will be uniformly distributed from [edgeCoefLow to edgeCoefHigh]
+        double edgeCoefHigh = 2; //High range of edge coefficients
+        double varLow = 1;//Low range of variance, by default the variance will be uniformly distributed from [varLow to varHigh]
         double varHigh = 3; //High range of variance
         int numLatents = 0; //Number of latent variables in the graph
         int maxInDegree = 10; //Maximum number of parents for any child
@@ -194,18 +196,36 @@ public class simulateData {
                 p.set("connected",connected);
                 p.set("meanDegree",meanDegree);
                 p.set("devDegree",devDegree);
-                p.set("numRuns",numRuns);
+                p.set("numRuns",1);
                 p.set("scaleFreeAlpha",alpha);
                 p.set("scaleFreeBeta",beta);
                 p.set("scaleFreeDeltaIn",deltaIn);
                 p.set("scaleFreeDeltaOut",deltaOut);
+                NormalDistribution ed = new NormalDistribution(mean,sd);
 
 
-                c.createData(p);
+
+
                 for(int i = 0; i < numRuns;i++) {
-                    PrintStream out = new PrintStream(directory + "/Graphs/Graph_" + i + ".txt");
-                    Graph curr = c.getTrueGraph(i);
-                    DataSet data = (DataSet)c.getDataModel(i);
+                    Graph curr;
+                    DataSet data;
+                    PrintStream out;
+                    B:while(true) {
+                        try {
+                            System.out.println("Simulating Dataset #" + (i + 1));
+                            p.set("numEdges", ed.sample());
+                            out = new PrintStream(directory + "/Graphs/Graph_" + i + ".txt");
+                            c.createData(p);
+                            curr = c.getTrueGraph(0);
+                            data = (DataSet) c.getDataModel(0);
+                            if(runPriors.checkForVariance2(data)!=-1)
+                                continue B;
+                            break B;
+                        }catch (Exception e)
+                        {
+
+                        }
+                    }
 
 
                  out.println(curr);

@@ -233,6 +233,7 @@ public class PiPrefDiv4 implements ComparablePD {
                 else
                     num[i] += countPLessThan(corrs, init[i])/(double)subsamples.length;
             }
+            System.out.println("Completing subsample: " + x);
         }
         TetradMatrix t = new TetradMatrix(init.length,2);
         for(int i = 0; i < t.rows();i++) {

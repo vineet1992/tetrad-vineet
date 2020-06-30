@@ -952,6 +952,7 @@ System.out.println("Lambdas: " + Arrays.toString(lambda));
         // System.out.println("P:" + p);
         //   System.out.println("Q:" + q);
         //  System.out.println("b:" + b);
+        long time = System.nanoTime();
         A:while(true) //go until we break by having instability better than threshold
         {
 
@@ -959,7 +960,7 @@ System.out.println("Lambdas: " + Arrays.toString(lambda));
 
             if(verbose)
             {
-                System.out.println("Running Lambda value: " + lambda[currIndex]);
+                System.out.println(currIndex*100/(double)lambda.length);
             }
                 DoubleMatrix2D adjMat;
                 if(subs!=null)
@@ -1062,6 +1063,8 @@ System.out.println("Lambdas: " + Arrays.toString(lambda));
                 break A;
             currIndex++;
         }
+        time = System.nanoTime()-time;
+        double timePerIter = time / ((double)currIndex*N);
         if(CC==-1)
             CC = CCMaxI;
         if(CD==-1)
@@ -1069,6 +1072,11 @@ System.out.println("Lambdas: " + Arrays.toString(lambda));
         if(DD==-1)
             DD = DDMaxI;
 
+
+        if(verbose)
+        {
+            System.out.println(100-(timePerIter*100)/(time+timePerIter));
+        }
         double [] lambda = {CC,CD,DD};
         System.out.println("Lambdas: " + Arrays.toString(lambda));
         if(oneLamb==-1)
